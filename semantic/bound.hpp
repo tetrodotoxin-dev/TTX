@@ -3,7 +3,7 @@
 
 #pragma once
 
-namespace Ttx::Concept {
+namespace Ttx::Semantic {
 
 // A bound view borrows an implementation and its operation table. The table
 // belongs to the provider, so its thunks can reach an owned member or read a
@@ -24,4 +24,4 @@ class Bound {
   const Operations& operations;
 };
 
-}  // namespace Ttx::Concept
+}  // namespace Ttx::Semantic

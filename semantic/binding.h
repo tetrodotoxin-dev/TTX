@@ -1,8 +1,8 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#ifndef TTX_CONCEPT_BINDING_H
-#define TTX_CONCEPT_BINDING_H
+#ifndef TTX_SEMANTIC_BINDING_H
+#define TTX_SEMANTIC_BINDING_H
 
 #include "perimortem/core/perimortem.h"
 

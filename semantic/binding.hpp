@@ -5,9 +5,9 @@
 
 #include "perimortem/core/perimortem.hpp"
 
-#include "ttx/concept/binding.h"
+#include "ttx/semantic/binding.h"
 
-namespace Ttx::Concept {
+namespace Ttx::Semantic {
 
 // The dispatch boundary receives a runtime contract identity, so its return
 // type cannot name the selected operation table at compile time. Binding
@@ -20,6 +20,16 @@ namespace Ttx::Concept {
 // partially populated Binding.
 class Binding {
  public:
+  enum class Status : U8 {
+    Satisfied = TTX_BINDING_SATISFIED,
+    Unsupported = TTX_BINDING_UNSUPPORTED,
+    Pending = TTX_BINDING_PENDING,
+    Rejected = TTX_BINDING_REJECTED,
+  };
+
+  // The C status must represent success alongside refusal. A C++ Result
+  // already carries a successful Binding, so its error alternative contains
+  // only the outcomes that prevented that binding from being established.
   enum class Failure : U8 {
     Unsupported = TTX_BINDING_UNSUPPORTED,
     Pending = TTX_BINDING_PENDING,
@@ -54,4 +64,4 @@ class Binding {
   ttx_binding value;
 };
 
-}  // namespace Ttx::Concept
+}  // namespace Ttx::Semantic
