@@ -4,12 +4,9 @@
 #ifndef VALIDATION_DATA_PROVIDER_H
 #define VALIDATION_DATA_PROVIDER_H
 
-#include "ttx/semantic/transport/block.h"
-#include "ttx/semantic/transport/direct.h"
-#include "ttx/semantic/transport/fragment.h"
-#include "ttx/semantic/negotiation/query.h"
-#include "ttx/semantic/transport/shared.h"
 #include "ttx/semantic/flows/swizzle.h"
+#include "ttx/semantic/negotiation/query.h"
+#include "ttx/semantic/transport/flow.h"
 
 // Fixture flags describe explicit implementations, not inherited abilities.
 #define PROVIDES_DIRECT 1
@@ -32,6 +29,8 @@ typedef struct provider_state {
   U32 values[4];
   void* observer;
   void (*released)(void*);
+  const ttx_representation* destination_representation;
+  Count destination_capacity;
 } provider_state;
 
 typedef struct provider_values {
@@ -58,7 +57,8 @@ typedef struct provider_api {
   const ttx_swizzle_selection* (*selection)(void);
   ttx_semantic_query (*primitives)(void);
   const ttx_representation* (*primitive_schema)(void);
-  ttx_data_status (*select)(const provider_operations*, const ttx_flow*, ttx_storage);
+  ttx_data_status (
+      *select)(const provider_operations*, const ttx_flow*, ttx_storage);
 } provider_api;
 
 #endif

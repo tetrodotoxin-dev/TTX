@@ -5,6 +5,8 @@
 
 #include <stddef.h>
 
+#include "perimortem/core/static/vector.hpp"
+
 #include "ttx/data/form/schema.hpp"
 
 namespace Ttx::Data::Form {
@@ -79,8 +81,12 @@ class Native<Type*> {
       // preserves that extra indirection instead of collapsing two pointers
       // into the same target selector.
       static constexpr Schema::Position field(Native<Type>::reference, 0);
-      static constexpr Schema schema =
-          Schema::composite({&field, 1}, sizeof(Type), alignof(Type));
+      static constexpr Schema schema = Schema::composite(
+          {
+            &field,
+            1,
+          },
+          sizeof(Type), alignof(Type));
       return &schema;
     } else {
       return &Native<Type>::schema;
@@ -126,13 +132,19 @@ class Native<Result (*)(Arguments...)> {
       "Windows callable results must use plain C carriers, not C++ facades");
 #endif
 
-  static constexpr Schema::Argument arguments[] = {
-    Native<Arguments>::reference..., Schema::Argument()};
+  static constexpr Perimortem::Core::Static::
+      Vector<Schema::Argument, sizeof...(Arguments) + 1>
+          arguments = {
+            {
+              Native<Arguments>::reference...,
+              Schema::Argument(),
+            },
+  };
 
  public:
   static constexpr Schema schema = Schema::callable(
       Schema::Convention::Native,
-      {arguments, sizeof...(Arguments)},
+      arguments.get_view().slice(0, sizeof...(Arguments)),
       Native<Result>::reference);
   static constexpr Schema::Reference reference = schema;
 };
@@ -155,21 +167,28 @@ class Native<Result (*)(Arguments..., ...)> {
       "Windows callable results must use plain C carriers, not C++ facades");
 #endif
 
-  static constexpr Schema::Argument arguments[] = {
-    Native<Arguments>::reference..., Schema::Argument()};
+  static constexpr Perimortem::Core::Static::
+      Vector<Schema::Argument, sizeof...(Arguments) + 1>
+          arguments = {
+            {
+              Native<Arguments>::reference...,
+              Schema::Argument(),
+            },
+  };
 
  public:
   static constexpr Schema schema = Schema::callable(
       Schema::Convention::NativeVariadic,
-      {arguments, sizeof...(Arguments)},
+      arguments.get_view().slice(0, sizeof...(Arguments)),
       Native<Result>::reference);
   static constexpr Schema::Reference reference = schema;
 };
 
 }  // namespace Ttx::Data::Form
 
-// These declarations use real C fields, so renaming a field or changing its
-// function signature also changes its description at the same compile boundary.
+// These declarations use the actual C fields, so renaming, moving or changing a
+// field a function signature also changes its description at the same compile
+// boundary.
 #define TTX_DATA_MEMBER(type, member)                             \
   Ttx::Data::Form::Schema::Position(                              \
       Ttx::Data::Form::Native<decltype(type::member)>::reference, \
@@ -183,12 +202,17 @@ class Native<Result (*)(Arguments..., ...)> {
             __is_trivially_constructible(type, const type&) &&              \
             __is_trivially_destructible(type),                              \
         "Native API records require a trivial C-compatible call boundary"); \
-    static constexpr Schema::Position fields[] = {__VA_ARGS__};             \
+    static constexpr auto fields = [](auto... entries) {                    \
+      return Perimortem::Core::Static::Vector<                              \
+          Schema::Position, sizeof...(entries)>{                            \
+        {                                                                   \
+          entries...,                                                       \
+        },                                                                  \
+      };                                                                    \
+    }(__VA_ARGS__);                                                         \
                                                                             \
    public:                                                                  \
-    static constexpr Schema schema = Schema::composite(                     \
-        {fields, sizeof(fields) / sizeof(fields[0])},                       \
-        sizeof(type),                                                       \
-        alignof(type));                                                     \
+    static constexpr Schema schema =                                        \
+        Schema::composite(fields.get_view(), sizeof(type), alignof(type));  \
     static constexpr Schema::Reference reference = schema;                  \
   }

@@ -15,8 +15,9 @@
 // The root can be an interior object or a policy view whose receiver differs
 // from the allocation owner. Release therefore takes a separate owner pointer.
 // Success transfers this release obligation. Every borrowed root or descendant
-// must finish before release, and the supplying Module must remain alive through
-// that release. An emitted factory can retain the Module after acquisition ends.
+// must finish before release, and the supplying Module must remain alive
+// through that release. An emitted factory can retain the Module after
+// acquisition ends.
 typedef struct ttx_module_acquisition {
   ttx_abstract root;
   const void* owner;
@@ -31,8 +32,8 @@ typedef struct ttx_module_acquisition {
 // the subject to negotiate further interfaces.
 // Only this Concept acquisition protocol promises an Abstract. Independent
 // Semantic endpoints can continue to supply Query without a Concept surface.
-typedef ttx_data_status (*ttx_module_entry)(
-    ttx_semantic_query host, ttx_module_acquisition* output);
+typedef ttx_data_status (
+    *ttx_module_entry)(ttx_semantic_query host, ttx_module_acquisition* output);
 
 // A Module owns an acquisition implementation. Native implementations retain
 // their executable library, while embedded implementations may retain managed

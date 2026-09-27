@@ -18,7 +18,9 @@ static _Alignas(8) U8 representation_storage[32768];
 static Count representation_usage;
 
 typedef ttx_data_status (*provider_compile)(
-    ttx_schema_reference, Count, ttx_representation_allocator,
+    ttx_schema_reference,
+    Count,
+    ttx_representation_allocator,
     const ttx_representation**);
 static provider_compile compile_representation;
 
@@ -33,10 +35,19 @@ static void* representation_allocate(void* owner, Count size, Count alignment) {
   return representation_storage + start;
 }
 
-static const ttx_representation* prepare_representation(const ttx_schema* source) {
+static const ttx_representation* prepare_representation(
+    const ttx_schema* source) {
   const ttx_representation* result;
-  const ttx_representation_allocator output = {NULL, representation_allocate};
-  if (compile_representation((ttx_schema_reference){source, 0}, sizeof(void*), output, &result) != TTX_DATA_SUCCESS) {
+  const ttx_representation_allocator output = {
+    NULL,
+    representation_allocate,
+  };
+  if (compile_representation(
+          (ttx_schema_reference){
+            source,
+            0,
+          },
+          sizeof(void*), output, &result) != TTX_DATA_SUCCESS) {
     abort();
   }
 

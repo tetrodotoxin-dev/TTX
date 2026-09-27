@@ -16,7 +16,10 @@ ttx_data_status observe_representation(
     const Count* coordinates,
     Count count,
     visitation_probe* probe) {
-  const ttx_representation_visitor visitor = {probe, observe};
+  const ttx_representation_visitor visitor = {
+    probe,
+    observe,
+  };
   if (coordinates) {
     return ttx_representation_visit_selected(
         representation, coordinates, count, visitor);

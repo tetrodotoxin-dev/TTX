@@ -8,7 +8,9 @@
 
 #ifdef __cplusplus
 #include "perimortem/memory/allocator/arena.hpp"
+
 #include "perimortem/utility/result.hpp"
+
 #include "ttx/data/status.hpp"
 #endif
 
@@ -32,9 +34,12 @@ typedef struct ttx_representation_position {
   using ByteOrder = ttx_schema::ByteOrder;
 
   constexpr ttx_representation_position(
-      Count offset = 0, Value type = Value::U8,
-      ByteOrder byte_order = ByteOrder::Little, U32 extent = 0)
-      : offset(offset), type(static_cast<U8>(type)),
+      Count offset = 0,
+      Value type = Value::U8,
+      ByteOrder byte_order = ByteOrder::Little,
+      U32 extent = 0)
+      : offset(offset),
+        type(static_cast<U8>(type)),
         byte_order(static_cast<U8>(byte_order)),
         extent(extent ? extent : U32(ttx_schema::get_width(type))) {}
 
@@ -43,8 +48,10 @@ typedef struct ttx_representation_position {
     return static_cast<ByteOrder>(byte_order);
   }
   constexpr auto get_extent() const -> Count;
-  constexpr auto compatible(const ttx_representation_position& other) const -> Bool {
-    return type == other.type && byte_order == other.byte_order && extent == other.extent;
+  constexpr auto compatible(const ttx_representation_position& other) const
+      -> Bool {
+    return type == other.type && byte_order == other.byte_order &&
+           extent == other.extent;
   }
 #endif
 } ttx_representation_position;
@@ -58,7 +65,8 @@ typedef struct ttx_representation_member {
 #ifdef __cplusplus
   constexpr ttx_representation_member() : representation(nullptr), offset(0) {}
   constexpr ttx_representation_member(
-      const ttx_representation& representation, Count offset)
+      const ttx_representation& representation,
+      Count offset)
       : representation(&representation), offset(offset) {}
 #endif
 } ttx_representation_member;
@@ -99,7 +107,9 @@ typedef struct ttx_representation {
     return (data[0] & 15) ? 8 : 4;
   }
   // Admission already established a complete root after any pointer prefix.
-  constexpr auto get_depth() const -> U8 { return get_blocks().get_data()[0] & 15; }
+  constexpr auto get_depth() const -> U8 {
+    return get_blocks().get_data()[0] & 15;
+  }
   constexpr auto get_extent() const -> Count;
   constexpr auto get_alignment() const -> Count;
   constexpr auto get_abi() const -> const ttx_representation& { return *this; }
@@ -112,9 +122,11 @@ typedef struct ttx_representation {
       Result<const ttx_representation&, Ttx::Data::Status>;
 
   static auto compose(
-      Perimortem::Core::View::Vector<Member> members, Count extent,
-      Count alignment, Perimortem::Memory::Allocator::Arena& arena)
-      -> Perimortem::Utility::Result<const ttx_representation&, Ttx::Data::Status>;
+      Perimortem::Core::View::Vector<Member> members,
+      Count extent,
+      Count alignment,
+      Perimortem::Memory::Allocator::Arena& arena) -> Perimortem::Utility::
+      Result<const ttx_representation&, Ttx::Data::Status>;
 
   // A byte coordinate selects the first primitive whose start is at or after
   // it. Padding is skipped, and a coordinate inside a primitive advances to
@@ -161,13 +173,19 @@ PERIMORTEM_C ttx_data_status ttx_representation_compile(
     ttx_representation_allocator allocator,
     const ttx_representation** result);
 PERIMORTEM_C ttx_data_status ttx_representation_compose(
-    const ttx_representation_member* members, Count count, Count extent,
-    Count alignment, ttx_representation_allocator allocator,
+    const ttx_representation_member* members,
+    Count count,
+    Count extent,
+    Count alignment,
+    ttx_representation_allocator allocator,
     const ttx_representation** result);
 PERIMORTEM_C U8 ttx_representation_compatible(
-    const ttx_representation* source, const ttx_representation* destination);
+    const ttx_representation* source,
+    const ttx_representation* destination);
 PERIMORTEM_C ttx_data_status ttx_representation_next(
-    const ttx_representation* source, Count offset, ttx_representation_position* result);
+    const ttx_representation* source,
+    Count offset,
+    ttx_representation_position* result);
 
 // C operations need the same streaming walk as native consumers. The callback
 // receives each primitive's physical coordinate and type while the walker
@@ -180,12 +198,15 @@ typedef struct ttx_representation_visitor {
 } ttx_representation_visitor;
 
 PERIMORTEM_C ttx_data_status ttx_representation_visit(
-    const ttx_representation* source, ttx_representation_visitor visitor);
+    const ttx_representation* source,
+    ttx_representation_visitor visitor);
 
 // The coordinates are a borrowed, strictly increasing selection of primitive
 // starts. Unselected repetitions consume no callbacks or expanded inventory.
 PERIMORTEM_C ttx_data_status ttx_representation_visit_selected(
-    const ttx_representation* source, const Count* coordinates, Count count,
+    const ttx_representation* source,
+    const Count* coordinates,
+    Count count,
     ttx_representation_visitor visitor);
 
 #endif

@@ -7,6 +7,8 @@
 
 #include "perimortem/memory/dynamic/map.hpp"
 
+#include "ttx/data/protocol/block/provider.hpp"
+#include "ttx/data/protocol/fragment/provider.hpp"
 #include "ttx/semantic/flows/fragment.hpp"
 
 using namespace Perimortem::Core;
@@ -15,7 +17,6 @@ using namespace Perimortem::Memory;
 using namespace Ttx::Semantic::Flows;
 using namespace Ttx::Data;
 using namespace Ttx::Data::Form;
-using Ttx::Data::Protocol::Block;
 
 auto Swizzle::Mapping::create(ttx_swizzle_selection selection)
     -> Perimortem::Utility::Result<Mapping, Status> {
@@ -147,7 +148,7 @@ static auto memory(
 }
 
 static auto fragments(
-    Ttx::Data::Protocol::Fragment::Access source,
+    Ttx::Data::Protocol::Fragment::Provider source,
     ttx_swizzle_mapping mapping,
     Storage target) -> Status {
   for (Count i = 0; i < mapping.count; ++i) {
@@ -181,8 +182,8 @@ static auto swizzle(
   };
   return flow.visit(
       copy, copy,
-      [](Block::View, Block::Access) { return Status::Unsupported; },
-      [&](Ttx::Data::Protocol::Fragment::Access source) {
+      [](Ttx::Data::Protocol::Block::Provider) { return Status::Unsupported; },
+      [&](Ttx::Data::Protocol::Fragment::Provider source) {
         return fragments(source, mapping, target);
       });
 }

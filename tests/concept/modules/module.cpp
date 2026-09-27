@@ -3,10 +3,9 @@
 
 #include "ttx/concept/modules/module.hpp"
 
-#include "toolchain/validation/unit_test.hpp"
-
 #include "perimortem/core/null_terminated.hpp"
 
+#include "toolchain/validation/unit_test.hpp"
 #include "ttx/concept/answers/constant.hpp"
 #include "ttx/concept/answers/none.hpp"
 
@@ -14,7 +13,9 @@ using namespace Perimortem;
 using Ttx::Concept::Modules::Module;
 using namespace Ttx::Semantic::Negotiation;
 
-static Toolchain::Validation::Harness Modules = {.name = "TTX::Concept::Module"};
+static Toolchain::Validation::Harness Modules = {
+  .name = "TTX::Concept::Module",
+};
 
 // The encountered policy rejects a question which its resolved referent could
 // answer. Acquisition must expose that policy directly instead of choosing a
@@ -66,16 +67,19 @@ struct Provider {
 
         ++provider.opened;
         *output = {
-          Ttx::Concept::Abstract::provide(provider.root).get_abi(), &provider,
+          Ttx::Concept::Abstract::provide(provider.root).get_abi(),
+          &provider,
           [](const void* owner) {
             ++const_cast<Provider*>(static_cast<const Provider*>(owner))
                   ->closed;
-          }};
+          },
+        };
         if (provider.malformed) {
           output->root.operations = nullptr;
         }
         return TTX_DATA_SUCCESS;
-      }};
+      },
+    };
   }
 };
 
@@ -84,14 +88,15 @@ VALIDATION_TEST(Modules, direct_policy) {
   {
     Module module(provider.get_module());
     U8 service = 0;
-    const Ttx::Semantic::Negotiation::Query host(
-        {&service,
-         [](const void*, perimortem_uuid, ttx_storage) -> ttx_binding_status {
-           return TTX_BINDING_UNSUPPORTED;
-         },
-         [](const void*, perimortem_uuid) -> ttx_binding_status {
-           return TTX_BINDING_UNSUPPORTED;
-         }});
+    const Ttx::Semantic::Negotiation::Query host({
+      &service,
+      [](const void*, perimortem_uuid, ttx_storage) -> ttx_binding_status {
+        return TTX_BINDING_UNSUPPORTED;
+      },
+      [](const void*, perimortem_uuid) -> ttx_binding_status {
+        return TTX_BINDING_UNSUPPORTED;
+      },
+    });
     module.open(host).visit(
         [&](Module::Acquisition& acquired) {
           EXPECT(provider.host == &service);

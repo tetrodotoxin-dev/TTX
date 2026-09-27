@@ -1,9 +1,11 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "tests/semantic/fixtures.hpp"
-
 #include <stddef.h>
+
+#include "perimortem/core/static/vector.hpp"
+
+#include "tests/semantic/fixtures.hpp"
 
 using namespace Validation::FlowTests;
 
@@ -18,7 +20,9 @@ VALIDATION_TEST(TtxFlow, heterogeneous_outputs) {
   ASSERT(module.is_set());
 
   {
-    Module::Heterogeneous state = {.seed = 7};
+    Module::Heterogeneous state = {
+      .seed = 7,
+    };
     struct Record {
       U16 tag;
       R64 energy;
@@ -33,20 +37,56 @@ VALIDATION_TEST(TtxFlow, heterogeneous_outputs) {
 
     const auto tag = Schema::primitive(Schema::Value::U16);
     const auto energy = Schema::primitive(Schema::Value::R64);
-    const Schema::Position fields[] = {
-      {tag, offsetof(Record, tag)},
-      {energy, offsetof(Record, energy)},
-      {integer, offsetof(Record, frame)}};
-    const auto input =
-        prepare(Schema::composite({fields, 3}, sizeof(Record), alignof(Record)));
+    const Static::Vector<Schema::Position, 3> fields = {
+      {
+        Schema::Position{
+          tag,
+          offsetof(Record, tag),
+        },
+        {
+          energy,
+          offsetof(Record, energy),
+        },
+        {
+          integer,
+          offsetof(Record, frame),
+        },
+      },
+    };
+    const auto input = prepare(
+        Schema::composite(
+            {
+              fields.get_data(),
+              3,
+            },
+            sizeof(Record), alignof(Record)));
 
-    const Schema::Position reordered[] = {
-      {integer, offsetof(Reordered, frame)},
-      {tag, offsetof(Reordered, tag)},
-      {energy, offsetof(Reordered, energy)}};
+    const Static::Vector<Schema::Position, 3> reordered = {
+      {
+        Schema::Position{
+          integer,
+          offsetof(Reordered, frame),
+        },
+        {
+          tag,
+          offsetof(Reordered, tag),
+        },
+        {
+          energy,
+          offsetof(Reordered, energy),
+        },
+      },
+    };
     const auto target = prepare(
-        Schema::composite({reordered, 3}, sizeof(Reordered), alignof(Reordered)));
-    Validation::FlowTests::Reader reader{input};
+        Schema::composite(
+            {
+              reordered.get_data(),
+              3,
+            },
+            sizeof(Reordered), alignof(Reordered)));
+    Validation::FlowTests::Reader reader{
+      input,
+    };
 
     Flow flow;
     ASSERT(
@@ -95,7 +135,9 @@ VALIDATION_TEST(TtxFlow, copy_padding_values) {
   Preparation prepare;
   Module module("libheterogeneous_provider.so", "heterogeneous_provider_open");
   ASSERT(module.is_set());
-  Module::Heterogeneous state = {.seed = 7};
+  Module::Heterogeneous state = {
+    .seed = 7,
+  };
   struct Record {
     U16 tag;
     R64 energy;
@@ -108,18 +150,29 @@ VALIDATION_TEST(TtxFlow, copy_padding_values) {
 
   const auto tag = Schema::primitive(Schema::Value::U16);
   const auto energy = Schema::primitive(Schema::Value::R64);
-  const Schema::Position fields[] = {
-    {tag, offsetof(Record, tag)},
-    {energy, offsetof(Record, energy)},
-    {integer, offsetof(Record, frame)},
+  const Static::Vector<Schema::Position, 3> fields = {
+    {
+      Schema::Position{
+        tag,
+        offsetof(Record, tag),
+      },
+      {
+        energy,
+        offsetof(Record, energy),
+      },
+      {
+        integer,
+        offsetof(Record, frame),
+      },
+    },
   };
   const auto& representation = prepare(
       Schema::composite(
-          View::Vector<Schema::Position>(fields, 3), sizeof(Record),
+          View::Vector<Schema::Position>(fields.get_data(), 3), sizeof(Record),
           alignof(Record)));
   Flow flow;
   ASSERT(
-      flow.connect(Flow::reader(representation), module.writer(state)) ==
+      flow.connect(Flow::consumer(representation), module.writer(state)) ==
       Flow::Status::Success);
   ASSERT(Copy::flow(flow, storage(representation, output)) == Status::Success);
   EXPECT_EQ(output.tag, U16(8));
@@ -128,7 +181,7 @@ VALIDATION_TEST(TtxFlow, copy_padding_values) {
 
   for (Count i = 0; i < sizeof(output); ++i) {
     Bool field = False;
-    for (const auto& position : fields) {
+    for (const auto& position : fields.get_view()) {
       field |= i >= position.offset &&
                i < position.offset + position.get_reference().get_extent();
     }

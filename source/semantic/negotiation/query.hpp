@@ -60,38 +60,54 @@ class Query {
 
   template <typename Contract>
   auto bind() const -> Perimortem::Utility::Result<Contract, Binding::Failure> {
-    const auto& form = Binding::representation<Contract>();
-    if constexpr (__is_same(typename Contract::Api, void)) {
+    return bind<Contract>(Contract::contract_id);
+  }
+
+  // A Data API describes the requested callable record independently of the
+  // semantic promise identified by its UUID. Keeping both inputs explicit
+  // lets that API perform admission without inheriting a semantic facade.
+  template <typename Interface>
+  auto bind(Perimortem::System::Uuid contract) const
+      -> Perimortem::Utility::Result<Interface, Binding::Failure> {
+    const auto& form = Binding::representation<Interface>();
+    if constexpr (__is_same(typename Interface::Api, void)) {
       const auto status = bind(
-          Contract::contract_id,
-          Data::Form::Storage(ttx_storage{&form, nullptr, 0}));
+          contract, Data::Form::Storage(
+                        ttx_storage{
+                          &form,
+                          nullptr,
+                          0,
+                        }));
       if (status != Binding::Status::Satisfied) {
         return static_cast<Binding::Failure>(status);
       }
 
-      return Contract();
+      return Interface();
     } else {
       // The actual API type supplies storage, including its alignment. A failed
       // exchange never publishes this local value as a callable interface.
-      typename Contract::Api api = {};
-      const ttx_storage target{&form, reinterpret_cast<U8*>(&api), sizeof(api)};
+      typename Interface::Api api = {};
+      const ttx_storage target{
+        &form,
+        reinterpret_cast<U8*>(&api),
+        sizeof(api),
+      };
       if (ttx_storage_check(target) != TTX_DATA_SUCCESS) {
         return Binding::Failure::Rejected;
       }
 
-      const auto status =
-          bind(Contract::contract_id, Data::Form::Storage(target));
+      const auto status = bind(contract, Data::Form::Storage(target));
       if (status != Binding::Status::Satisfied) {
         return static_cast<Binding::Failure>(status);
       }
 
-      if constexpr (requires { Contract::accept(api); }) {
-        if (!Contract::accept(api)) {
+      if constexpr (requires { Interface::accept(api); }) {
+        if (!Interface::accept(api)) {
           return Binding::Failure::Rejected;
         }
       }
 
-      return Contract(api);
+      return Interface(api);
     }
   }
 

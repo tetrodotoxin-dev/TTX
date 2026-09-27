@@ -29,20 +29,20 @@ static auto publish(System::Library&& library, void* symbol)
   auto storage = Core::Object<>::create(descriptor).get_payload();
   auto* module = new (storage, Core::Placement::Construct) NativeModule(
       Core::Data::take(library), reinterpret_cast<ttx_module_entry>(symbol));
-  return Concept::Modules::Module(
-      {module,
-       [](const void* source) {
-         Core::Object<>(reinterpret_cast<U8*>(const_cast<void*>(source)))
-             .retain();
-       },
-       [](const void* source) {
-         Core::Object<>(reinterpret_cast<U8*>(const_cast<void*>(source)))
-             .release();
-       },
-       [](const void* source, ttx_semantic_query host,
-          ttx_module_acquisition* output) {
-         return static_cast<const NativeModule*>(source)->entry(host, output);
-       }});
+  return Concept::Modules::Module({
+    module,
+    [](const void* source) {
+      Core::Object<>(reinterpret_cast<U8*>(const_cast<void*>(source))).retain();
+    },
+    [](const void* source) {
+      Core::Object<>(reinterpret_cast<U8*>(const_cast<void*>(source)))
+          .release();
+    },
+    [](const void* source, ttx_semantic_query host,
+       ttx_module_acquisition* output) {
+      return static_cast<const NativeModule*>(source)->entry(host, output);
+    },
+  });
 }
 
 auto Concept::Modules::Module::load(

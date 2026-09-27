@@ -4,6 +4,7 @@
 #pragma once
 
 #include "perimortem/core/view/bytes.hpp"
+#include "perimortem/core/static/vector.hpp"
 #include "perimortem/core/option.hpp"
 
 #include "perimortem/system/uuid.hpp"
@@ -43,13 +44,19 @@ class Abstract {
   static auto accept(Api api) -> Bool { return api.source && api.operations; }
 
   constexpr Abstract(const void* source, const Operations& operations)
-      : value{source, &operations} {}
+      : value{
+          source,
+          &operations,
+        } {}
   explicit constexpr Abstract(Api value) : value(value) {}
 
   constexpr auto get_abi() const -> Api { return value; }
   constexpr auto get_query() const -> Semantic::Negotiation::Query {
-    return Semantic::Negotiation::Query(
-        {value.source, value.operations->bind, value.operations->supports});
+    return Semantic::Negotiation::Query({
+      value.source,
+      value.operations->bind,
+      value.operations->supports,
+    });
   }
 
   auto supports(Perimortem::System::Uuid contract) const
@@ -120,7 +127,10 @@ class Abstract {
   // bytes can also encode instructions for negotiation between domains.
   auto resolve_concept(Perimortem::Core::View::Bytes route) const -> Abstract {
     return Abstract(value.operations->resolve_concept(
-        value.source, {route.get_data(), route.get_size()}));
+        value.source, {
+                        route.get_data(),
+                        route.get_size(),
+                      }));
   }
 
   // The owner advertises the routes visible at this boundary. It can walk its
@@ -137,11 +147,13 @@ class Abstract {
   // and should mostly be avoided. Abstracts keep their normal graph lifetime.
   auto visit_concepts(Visitor visitor) const -> void {
     const ttx_concept_visitor receiver = {
-      &visitor, [](void* source, perimortem_view_bytes route, Api subject) {
+      &visitor,
+      [](void* source, perimortem_view_bytes route, Api subject) {
         (*static_cast<Visitor*>(source))(
             Perimortem::Core::View::Bytes(route.data, route.size),
             Abstract(subject));
-      }};
+      },
+    };
     value.operations->visit_concepts(value.source, receiver);
   }
 
@@ -240,14 +252,20 @@ class Abstract {
       },
       [](const void* source) -> perimortem_view_bytes {
         const auto data = static_cast<const Owner*>(source)->get_data();
-        return {data.get_data(), data.get_size()};
+        return {
+          data.get_data(),
+          data.get_size(),
+        };
       },
       [](const void* source) -> Api {
         if constexpr (requires { &Owner::resolve; }) {
           return static_cast<const Owner*>(source)->resolve().get_abi();
         }
 
-        return {source, &operations};
+        return {
+          source,
+          &operations,
+        };
       },
       [](const void* source, perimortem_view_bytes route) -> Api {
         if constexpr (requires { &Owner::resolve_concept; }) {
@@ -264,7 +282,11 @@ class Abstract {
           auto receive = [&](Perimortem::Core::View::Bytes route,
                              Abstract subject) {
             visitor.receive(
-                visitor.source, {route.get_data(), route.get_size()},
+                visitor.source,
+                {
+                  route.get_data(),
+                  route.get_size(),
+                },
                 subject.get_abi());
           };
           static_cast<const Owner*>(source)->visit_concepts(Visitor(receive));
@@ -299,68 +321,102 @@ class Ttx::Data::Form::Native<ttx_abstract> {
     Schema resolve;
     Schema lookup;
     Schema visit;
-    Schema::Argument receive_arguments[3];
-    Schema::Argument resolve_arguments[1];
-    Schema::Argument lookup_arguments[2];
-    Schema::Argument visit_arguments[2];
-    Schema::Position root_fields[2];
-    Schema::Position operation_fields[6];
-    Schema::Position visitor_fields[2];
+    Perimortem::Core::Static::Vector<Schema::Argument, 3> receive_arguments;
+    Perimortem::Core::Static::Vector<Schema::Argument, 1> resolve_arguments;
+    Perimortem::Core::Static::Vector<Schema::Argument, 2> lookup_arguments;
+    Perimortem::Core::Static::Vector<Schema::Argument, 2> visit_arguments;
+    Perimortem::Core::Static::Vector<Schema::Position, 2> root_fields;
+    Perimortem::Core::Static::Vector<Schema::Position, 6> operation_fields;
+    Perimortem::Core::Static::Vector<Schema::Position, 2> visitor_fields;
 
+    // The lists retain schema addresses while construction is in progress.
+    // Populate each shape after the vectors exist so every view borrows live
+    // storage, including the edges that point back to the root.
     constexpr Definition()
-        : root(
-              Schema::composite(
-                  {root_fields, 2},
-                  sizeof(ttx_abstract),
-                  alignof(ttx_abstract))),
-          operations(
-              Schema::composite(
-                  {operation_fields, 6},
-                  sizeof(ttx_abstract_ops),
-                  alignof(ttx_abstract_ops))),
-          visitor(
-              Schema::composite(
-                  {visitor_fields, 2},
-                  sizeof(ttx_concept_visitor),
-                  alignof(ttx_concept_visitor))),
-          receive(
-              Schema::callable(
-                  Schema::Convention::Native,
-                  {receive_arguments, 3})),
-          resolve(
-              Schema::callable(
-                  Schema::Convention::Native,
-                  {resolve_arguments, 1},
-                  root)),
-          lookup(
-              Schema::callable(
-                  Schema::Convention::Native,
-                  {lookup_arguments, 2},
-                  root)),
-          visit(
-              Schema::callable(
-                  Schema::Convention::Native,
-                  {visit_arguments, 2})),
-          receive_arguments{
-            Schema::pointer(), Native<perimortem_view_bytes>::reference,
-            Schema::Argument(root)},
-          resolve_arguments{Schema::pointer()},
+        : receive_arguments{
+            {
+              Schema::pointer(),
+              Native<perimortem_view_bytes>::reference,
+              Schema::Argument(root),
+            },
+          },
+          resolve_arguments{
+            {
+              Schema::pointer(),
+            },
+          },
           lookup_arguments{
-            Schema::pointer(), Native<perimortem_view_bytes>::reference},
-          visit_arguments{Schema::pointer(), Schema::Argument(visitor)},
+            {
+              Schema::pointer(),
+              Native<perimortem_view_bytes>::reference,
+            },
+          },
+          visit_arguments{
+            {
+              Schema::pointer(),
+              Schema::Argument(visitor),
+            },
+          },
           root_fields{
-            {Schema::pointer(), offsetof(ttx_abstract, source)},
-            {Schema::pointer(&operations), offsetof(ttx_abstract, operations)}},
+            {
+              Schema::Position{
+                Schema::pointer(),
+                offsetof(ttx_abstract, source),
+              },
+              {
+                Schema::pointer(&operations),
+                offsetof(ttx_abstract, operations),
+              },
+            },
+          },
           operation_fields{
-            TTX_DATA_MEMBER(ttx_abstract_ops, supports),
-            TTX_DATA_MEMBER(ttx_abstract_ops, bind),
-            TTX_DATA_MEMBER(ttx_abstract_ops, get_data),
-            {resolve, offsetof(ttx_abstract_ops, resolve)},
-            {lookup, offsetof(ttx_abstract_ops, resolve_concept)},
-            {visit, offsetof(ttx_abstract_ops, visit_concepts)}},
+            {
+              TTX_DATA_MEMBER(ttx_abstract_ops, supports),
+              TTX_DATA_MEMBER(ttx_abstract_ops, bind),
+              TTX_DATA_MEMBER(ttx_abstract_ops, get_data),
+              {
+                resolve,
+                offsetof(ttx_abstract_ops, resolve),
+              },
+              {
+                lookup,
+                offsetof(ttx_abstract_ops, resolve_concept),
+              },
+              {
+                visit,
+                offsetof(ttx_abstract_ops, visit_concepts),
+              },
+            },
+          },
           visitor_fields{
-            {Schema::pointer(), offsetof(ttx_concept_visitor, source)},
-            {receive, offsetof(ttx_concept_visitor, receive)}} {}
+            {
+              Schema::Position{
+                Schema::pointer(),
+                offsetof(ttx_concept_visitor, source),
+              },
+              {
+                receive,
+                offsetof(ttx_concept_visitor, receive),
+              },
+            },
+          } {
+      root = Schema::composite(
+          root_fields.get_view(), sizeof(ttx_abstract), alignof(ttx_abstract));
+      operations = Schema::composite(
+          operation_fields.get_view(), sizeof(ttx_abstract_ops),
+          alignof(ttx_abstract_ops));
+      visitor = Schema::composite(
+          visitor_fields.get_view(), sizeof(ttx_concept_visitor),
+          alignof(ttx_concept_visitor));
+      receive = Schema::callable(
+          Schema::Convention::Native, receive_arguments.get_view());
+      resolve = Schema::callable(
+          Schema::Convention::Native, resolve_arguments.get_view(), root);
+      lookup = Schema::callable(
+          Schema::Convention::Native, lookup_arguments.get_view(), root);
+      visit = Schema::callable(
+          Schema::Convention::Native, visit_arguments.get_view());
+    }
   };
 
   static const Definition definition;

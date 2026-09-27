@@ -1,17 +1,17 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "perimortem/core/null_terminated.hpp"
-
 #include "ttx/semantic/realization/simulacra.hpp"
-
-#include "tests/library.hpp"
-#include "toolchain/validation/unit_test.hpp"
-#include "tests/semantic/measurement.hpp"
 
 #include <string.h>
 
+#include "perimortem/core/static/vector.hpp"
+#include "perimortem/core/null_terminated.hpp"
+
+#include "tests/library.hpp"
 #include "tests/semantic/fixtures/interface_provider.h"
+#include "tests/semantic/measurement.hpp"
+#include "toolchain/validation/unit_test.hpp"
 
 using namespace Perimortem;
 using namespace Ttx::Semantic::Negotiation;
@@ -26,13 +26,18 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(counter_api, add),
     TTX_DATA_MEMBER(counter_api, read));
 
-static Toolchain::Validation::Harness TtxSimulacra = {.name = "TTX::Simulacra"};
+static Toolchain::Validation::Harness TtxSimulacra = {
+  .name = "TTX::Simulacra",
+};
 
 // This API is three words, with the functions themselves in the transferred
 // record. Its facade owns those words while borrowing the foreign receiver.
 class Counter {
  public:
-  static constexpr System::Uuid contract_id{COUNTER_ID_HIGH, COUNTER_ID_LOW};
+  static constexpr System::Uuid contract_id{
+    COUNTER_ID_HIGH,
+    COUNTER_ID_LOW,
+  };
   using Api = counter_api;
   static auto accept(Api api) -> Bool { return api.add && api.read; }
 
@@ -78,7 +83,11 @@ VALIDATION_TEST(TtxSimulacra, support_without_abi) {
   U64 output = 0x1234;
   const auto& form = Compiled<Native<U64>::reference>::get_representation();
   const Storage target(
-      ttx_storage{&form, reinterpret_cast<U8*>(&output), sizeof(output)});
+      ttx_storage{
+        &form,
+        reinterpret_cast<U8*>(&output),
+        sizeof(output),
+      });
   EXPECT(query.bind(Counter::contract_id, target) == Binding::Status::Rejected);
   EXPECT_EQ(output, U64(0x1234));
   EXPECT(query.supports<Counter>() == Binding::Status::Satisfied);
@@ -99,10 +108,14 @@ VALIDATION_TEST(TtxSimulacra, support_outcomes) {
   const Query query(foreign.api.query);
   ASSERT(query.is_set());
 
-  const Binding::Status statuses[] = {
-    Binding::Status::Unsupported, Binding::Status::Pending,
-    Binding::Status::Rejected};
-  for (const auto status : statuses) {
+  const Perimortem::Core::Static::Vector<Binding::Status, 3> statuses = {
+    {
+      Binding::Status::Unsupported,
+      Binding::Status::Pending,
+      Binding::Status::Rejected,
+    },
+  };
+  for (const auto status : statuses.get_view()) {
     foreign.api.reset(static_cast<ttx_binding_status>(status), 0, 0);
     EXPECT(query.supports<Counter>() == status);
     EXPECT_EQ(foreign.api.statistics().queries, U64(0));
@@ -114,8 +127,8 @@ VALIDATION_TEST(TtxSimulacra, support_outcomes) {
 }
 
 // The provider compiles its own C Schema at module opening. C++ derives this
-// side's description from counter_api. One checked bind copies the entire API;
-// all later calls use the acquired functions without metadata or allocation.
+// side's description from counter_api. One checked bind copies the entire API.
+// All later calls use the acquired functions without metadata or allocation.
 VALIDATION_TEST(TtxSimulacra, retained_c_calls) {
   Foreign foreign;
   ASSERT(foreign.api.query.bind);
@@ -143,9 +156,15 @@ VALIDATION_TEST(TtxSimulacra, retained_c_calls) {
 VALIDATION_TEST(TtxSimulacra, refusal_boundaries) {
   Foreign foreign;
   ASSERT(foreign.api.query.bind);
-  const ttx_binding_status statuses[] = {
-    TTX_BINDING_UNSUPPORTED, TTX_BINDING_PENDING, TTX_BINDING_REJECTED, 99};
-  for (const auto status : statuses) {
+  const Perimortem::Core::Static::Vector<ttx_binding_status, 4> statuses = {
+    {
+      TTX_BINDING_UNSUPPORTED,
+      TTX_BINDING_PENDING,
+      TTX_BINDING_REJECTED,
+      99,
+    },
+  };
+  for (const auto status : statuses.get_view()) {
     foreign.api.reset(status, 0, 0);
     Query(foreign.api.query)
         .bind<Counter>()
@@ -226,23 +245,31 @@ TTX_DATA_RECORD(
 VALIDATION_TEST(TtxSimulacra, mismatched_callables) {
   Foreign foreign;
   ASSERT(foreign.api.query.bind);
-  const Ttx::Data::Form::Representation* forms[] = {
-    &Compiled<Native<WrongResult>::reference>::get_representation(),
-    &Compiled<Native<WrongArguments>::reference>::get_representation(),
-    &Compiled<Native<WrongAbi>::reference>::get_representation(),
-    &Compiled<Native<WrongOrder>::reference>::get_representation()};
-  alignas(counter_api) U8 output[sizeof(counter_api)];
-  U8 expected[sizeof(output)];
-  memset(expected, 0xa5, sizeof(expected));
-  for (const auto* form : forms) {
-    memcpy(output, expected, sizeof(output));
-    const auto status =
-        Query(foreign.api.query)
-            .bind(
-                Counter::contract_id,
-                Storage(ttx_storage{form, output, sizeof(output)}));
+  Perimortem::Core::Static::Vector<const Ttx::Data::Form::Representation*, 4>
+      forms = {
+        {
+          &Compiled<Native<WrongResult>::reference>::get_representation(),
+          &Compiled<Native<WrongArguments>::reference>::get_representation(),
+          &Compiled<Native<WrongAbi>::reference>::get_representation(),
+          &Compiled<Native<WrongOrder>::reference>::get_representation(),
+        },
+      };
+  alignas(counter_api) Perimortem::Core::Static::Vector<U8, sizeof(counter_api)>
+      output;
+  Perimortem::Core::Static::Vector<U8, sizeof(output)> expected;
+  memset(expected.get_data(), 0xa5, sizeof(expected));
+  for (const auto* form : forms.get_view()) {
+    memcpy(output.get_data(), expected.get_data(), sizeof(output));
+    const auto status = Query(foreign.api.query)
+                            .bind(
+                                Counter::contract_id, Storage(
+                                                          ttx_storage{
+                                                            form,
+                                                            output.get_data(),
+                                                            sizeof(output),
+                                                          }));
     EXPECT(status == Binding::Status::Rejected);
-    EXPECT(memcmp(output, expected, sizeof(output)) == 0);
+    EXPECT(memcmp(output.get_data(), expected.get_data(), sizeof(output)) == 0);
   }
 
   EXPECT_EQ(foreign.api.statistics().calls, U64(0));
@@ -259,8 +286,10 @@ class Local {
     }
     if constexpr (__is_same(Contract, Counter)) {
       const counter_api api{
-        nullptr, [](const void*, U64 amount) -> U64 { return amount; },
-        [](const void*) -> U64 { return 0; }};
+        nullptr,
+        [](const void*, U64 amount) -> U64 { return amount; },
+        [](const void*) -> U64 { return 0; },
+      };
       return Counter(api);
     }
     return Binding::Failure::Unsupported;
@@ -275,10 +304,15 @@ class Local {
 VALIDATION_TEST(TtxSimulacra, native_policy) {
   Foreign foreign;
   ASSERT(foreign.api.query.bind);
-  const Binding::Status statuses[] = {
-    Binding::Status::Satisfied, Binding::Status::Unsupported,
-    Binding::Status::Rejected, Binding::Status::Pending};
-  for (auto status : statuses) {
+  const Perimortem::Core::Static::Vector<Binding::Status, 4> statuses = {
+    {
+      Binding::Status::Satisfied,
+      Binding::Status::Unsupported,
+      Binding::Status::Rejected,
+      Binding::Status::Pending,
+    },
+  };
+  for (auto status : statuses.get_view()) {
     foreign.api.reset(TTX_BINDING_SATISFIED, 0, 0);
     const Local native(Query(foreign.api.query), status);
     Simulacra::fulfill<Counter>(native).visit(

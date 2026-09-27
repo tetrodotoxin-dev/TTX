@@ -1,6 +1,8 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "perimortem/core/static/vector.hpp"
+
 #include "tests/semantic/fixtures.hpp"
 
 using namespace Validation::FlowTests;
@@ -20,15 +22,31 @@ VALIDATION_TEST(TtxFlow, fragment_failure) {
     .provides = PROVIDES_FRAGMENT,
     .failure = 1,
     .fail_at = 3,
-    .values = {10, 20, 30, 40}};
-  Validation::FlowTests::Reader reader{four};
+    .values =
+        {
+          10,
+          20,
+          30,
+          40,
+        },
+  };
+  Validation::FlowTests::Reader reader{
+    four,
+  };
 
   Flow flow;
   ASSERT(
       flow.connect(reader.query(), module.writer(writer)) ==
       Flow::Status::Success);
 
-  U32 output[4] = {99, 99, 99, 99};
+  Static::Vector<U32, 4> output = {
+    {
+      99,
+      99,
+      99,
+      99,
+    },
+  };
   EXPECT(Copy::flow(flow, storage(four, output)) == Status::IoError);
   EXPECT_EQ(output[0], U32(10));
   EXPECT_EQ(output[1], U32(20));
@@ -50,15 +68,24 @@ VALIDATION_TEST(TtxFlow, fragment_retry) {
     .provides = PROVIDES_FRAGMENT,
     .failure = 1,
     .fail_at = 1,
-    .values = {10, 20, 30, 40}};
-  Validation::FlowTests::Reader reader{four};
+    .values =
+        {
+          10,
+          20,
+          30,
+          40,
+        },
+  };
+  Validation::FlowTests::Reader reader{
+    four,
+  };
 
   Flow flow;
   ASSERT(
       flow.connect(reader.query(), module.writer(writer)) ==
       Flow::Status::Success);
 
-  U32 output[4] = {};
+  Static::Vector<U32, 4> output = {};
   EXPECT(Copy::flow(flow, storage(four, output)) == Status::IoError);
 
   writer.failure = 0;

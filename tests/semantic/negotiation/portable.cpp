@@ -1,10 +1,9 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "toolchain/validation/unit_test.hpp"
-
-#include "ttx/semantic/negotiation/query.hpp"
 #include "tests/semantic/fixtures/portable_provider.h"
+#include "toolchain/validation/unit_test.hpp"
+#include "ttx/semantic/negotiation/query.hpp"
 
 TTX_DATA_RECORD(
     portable_counter,
@@ -37,7 +36,8 @@ struct Wrong {
 };
 
 static Toolchain::Validation::Harness PortableBinding = {
-  .name = "TTX::PortableBinding"};
+  .name = "TTX::PortableBinding",
+};
 
 // One UUID can describe the intended operation even when its C declaration
 // drifted. Refuse the U64 declaration before calling anything, then negotiate

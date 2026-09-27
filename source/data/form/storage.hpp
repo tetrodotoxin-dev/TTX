@@ -23,7 +23,10 @@ class Storage {
       Perimortem::Core::Access::Bytes bytes)
       -> Perimortem::Utility::Result<Storage, Status> {
     const ttx_storage value{
-      &representation, bytes.get_data(), bytes.get_size()};
+      &representation,
+      bytes.get_data(),
+      bytes.get_size(),
+    };
 
     const auto status = ttx_storage_check(value);
     if (status) {
@@ -42,7 +45,10 @@ class Storage {
   }
 
   constexpr auto get_bytes() const -> Perimortem::Core::Access::Bytes {
-    return {value.data, value.size};
+    return {
+      value.data,
+      value.size,
+    };
   }
 
   constexpr auto get_abi() const -> ttx_storage { return value; }

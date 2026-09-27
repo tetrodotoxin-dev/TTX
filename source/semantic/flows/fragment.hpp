@@ -7,7 +7,7 @@
 #include "perimortem/core/data.hpp"
 
 #include "ttx/data/form/storage.hpp"
-#include "ttx/data/protocol/fragment.hpp"
+#include "ttx/data/protocol/fragment/provider.hpp"
 
 namespace Ttx::Semantic::Flows {
 
@@ -24,7 +24,7 @@ class Fragment {
   // and its state remains on the caller's side of the C boundary.
   template <typename Consumer>
   static auto read(
-      Data::Protocol::Fragment::Access access,
+      Ttx::Data::Protocol::Fragment::Provider access,
       const Data::Form::Representation::Position& type,
       Count position,
       Consumer consume) -> Data::Status {

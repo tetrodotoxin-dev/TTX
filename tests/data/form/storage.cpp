@@ -1,16 +1,18 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "toolchain/validation/unit_test.hpp"
-#include "tests/data/form/preparation.hpp"
-
 #include "ttx/data/form/storage.hpp"
+
+#include "tests/data/form/preparation.hpp"
+#include "toolchain/validation/unit_test.hpp"
 
 using namespace Perimortem::Core;
 using namespace Ttx::Data;
 using namespace Ttx::Data::Form;
 
-static Toolchain::Validation::Harness TtxStorage = {.name = "TTX::Data::Form::Storage"};
+static Toolchain::Validation::Harness TtxStorage = {
+  .name = "TTX::Data::Form::Storage",
+};
 static constexpr auto u32 = Schema::primitive(Schema::Value::U32);
 
 VALIDATION_TEST(TtxStorage, storage_check) {
@@ -26,7 +28,12 @@ VALIDATION_TEST(TtxStorage, storage_check) {
               },
               [](Status) { return false; }));
 
-  Storage::create(representation, {reinterpret_cast<U8*>(&value), 2})
+  Storage::create(
+      representation,
+      {
+        reinterpret_cast<U8*>(&value),
+        2,
+      })
       .visit(
           [&](Storage) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Bounds); });

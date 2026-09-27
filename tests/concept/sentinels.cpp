@@ -4,7 +4,6 @@
 #include "perimortem/core/null_terminated.hpp"
 
 #include "toolchain/validation/unit_test.hpp"
-
 #include "ttx/concept/answers/constant.hpp"
 #include "ttx/concept/answers/none.hpp"
 #include "ttx/concept/answers/unknown.hpp"
@@ -13,7 +12,9 @@ using namespace Perimortem;
 using namespace Ttx;
 using namespace Toolchain::Validation;
 
-static Harness Sentinels = {.name = "TTX::Sentinels"};
+static Harness Sentinels = {
+  .name = "TTX::Sentinels",
+};
 
 static_assert(__is_empty(Concept::Answers::None));
 static_assert(__is_empty(Concept::Answers::Unknown));
@@ -99,7 +100,11 @@ VALIDATION_TEST(Sentinels, nested_table_abi) {
       Data::Form::Native<WrongAbstract>::reference>::get_representation();
   WrongAbstract output = {};
   const Data::Form::Storage target(
-      ttx_storage{&form, reinterpret_cast<U8*>(&output), sizeof(output)});
+      ttx_storage{
+        &form,
+        reinterpret_cast<U8*>(&output),
+        sizeof(output),
+      });
   const auto query = Concept::Answers::None::get_none().get_query();
   EXPECT(
       query.bind(Concept::Abstract::contract_id, target) ==
@@ -113,7 +118,11 @@ VALIDATION_TEST(Sentinels, marker_carrier) {
   const auto none = ttx_none();
   const auto& empty =
       Semantic::Negotiation::Binding::representation<Concept::Answers::None>();
-  const ttx_storage output{&empty, nullptr, 0};
+  const ttx_storage output{
+    &empty,
+    nullptr,
+    0,
+  };
   EXPECT_EQ(
       none.operations->bind(
           none.source, Concept::Answers::None::contract_id, output),
@@ -123,7 +132,10 @@ VALIDATION_TEST(Sentinels, marker_carrier) {
   const auto& operational = Data::Form::Compiled<
       Data::Form::Native<U32>::reference>::get_representation();
   const ttx_storage wrong{
-    &operational, reinterpret_cast<U8*>(&untouched), sizeof(untouched)};
+    &operational,
+    reinterpret_cast<U8*>(&untouched),
+    sizeof(untouched),
+  };
   EXPECT_EQ(
       none.operations->bind(
           none.source, Concept::Answers::None::contract_id, wrong),
@@ -170,16 +182,16 @@ VALIDATION_TEST(Sentinels, navigation_and_pending) {
 // operational contract. Keeping admission typed prevents the marker exception
 // from weakening the table requirement used by all ordinary interfaces.
 VALIDATION_TEST(Sentinels, empty_table_admission) {
-  Semantic::Negotiation::Query query(
-      {nullptr,
-       [](const void*, perimortem_uuid,
-          ttx_storage output) -> ttx_binding_status {
-         (void)output;
-         return TTX_BINDING_SATISFIED;
-       },
-       [](const void*, perimortem_uuid) -> ttx_binding_status {
-         return TTX_BINDING_SATISFIED;
-       }});
+  Semantic::Negotiation::Query query({
+    nullptr,
+    [](const void*, perimortem_uuid, ttx_storage output) -> ttx_binding_status {
+      (void)output;
+      return TTX_BINDING_SATISFIED;
+    },
+    [](const void*, perimortem_uuid) -> ttx_binding_status {
+      return TTX_BINDING_SATISFIED;
+    },
+  });
   query.bind<Concept::Answers::Constant>().visit(
       [&](Concept::Answers::Constant) {},
       [&](Semantic::Negotiation::Binding::Failure) { EXPECT(False); });

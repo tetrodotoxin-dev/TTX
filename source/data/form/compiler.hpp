@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "perimortem/core/static/vector.hpp"
 #include "perimortem/core/hash.hpp"
 
 #include "perimortem/memory/const/vector.hpp"
@@ -439,7 +440,7 @@ class Compiler {
         : first(first), size(size), hash(hash) {}
   };
   struct Octets {
-    U8 bytes[sizeof(Element)];
+    Perimortem::Core::Static::Vector<U8, sizeof(Element)> bytes;
   };
 
   // Numbering already visits every emitted field. Accumulate their occupied

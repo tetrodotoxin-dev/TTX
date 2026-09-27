@@ -46,8 +46,8 @@ typedef struct ttx_callable_description {
 } ttx_callable_description;
 
 typedef struct ttx_callable_operations {
-  ttx_binding_status (*describe)(const void* source,
-                                 ttx_callable_description* output);
+  ttx_binding_status (
+      *describe)(const void* source, ttx_callable_description* output);
 } ttx_callable_operations;
 
 typedef struct ttx_callable {

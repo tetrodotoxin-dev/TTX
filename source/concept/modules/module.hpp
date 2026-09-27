@@ -37,7 +37,11 @@ class Module {
     ~Acquisition() { close(); }
 
     auto take() -> ttx_module_acquisition {
-      const ttx_module_acquisition result{get_abi(), owner, release};
+      const ttx_module_acquisition result{
+        get_abi(),
+        owner,
+        release,
+      };
       owner = nullptr;
       release = nullptr;
       return result;

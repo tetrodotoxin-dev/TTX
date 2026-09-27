@@ -1,6 +1,8 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "perimortem/core/static/vector.hpp"
+
 #include "tests/semantic/fixtures.hpp"
 
 using namespace Validation::FlowTests;
@@ -14,15 +16,26 @@ VALIDATION_TEST(TtxFlow, shared_lifetime) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {.provides = PROVIDES_SHARED, .values = {1, 2, 3, 4}};
-  Validation::FlowTests::Reader reader{four};
+  Module::State writer = {
+    .provides = PROVIDES_SHARED,
+    .values =
+        {
+          1,
+          2,
+          3,
+          4,
+        },
+  };
+  Validation::FlowTests::Reader reader{
+    four,
+  };
 
   Flow flow;
   ASSERT(
       flow.connect(reader.query(), module.writer(writer)) ==
       Flow::Status::Success);
 
-  U32 a[4] = {}, b[4] = {};
+  Static::Vector<U32, 4> a = {}, b = {};
   EXPECT(Copy::flow(flow, storage(four, a)) == Status::Success);
   EXPECT(Copy::flow(flow, storage(four, b)) == Status::Success);
 
@@ -45,8 +58,12 @@ VALIDATION_TEST(TtxFlow, shared_failure) {
   ASSERT(module.is_set());
 
   Module::State writer = {
-    .provides = PROVIDES_SHARED | PROVIDES_BLOCK, .failure = 1};
-  Validation::FlowTests::Reader reader{four};
+    .provides = PROVIDES_SHARED | PROVIDES_BLOCK,
+    .failure = 1,
+  };
+  Validation::FlowTests::Reader reader{
+    four,
+  };
 
   Flow flow;
   EXPECT(
@@ -78,12 +95,29 @@ VALIDATION_TEST(TtxFlow, release_reentrancy) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State first = {.provides = PROVIDES_SHARED};
-  Module::State second = {.provides = PROVIDES_DIRECT, .values = {1, 2, 3, 4}};
-  Validation::FlowTests::Reader reader{four};
+  Module::State first = {
+    .provides = PROVIDES_SHARED,
+  };
+  Module::State second = {
+    .provides = PROVIDES_DIRECT,
+    .values =
+        {
+          1,
+          2,
+          3,
+          4,
+        },
+  };
+  Validation::FlowTests::Reader reader{
+    four,
+  };
   Flow flow;
 
-  OnRelease observer{flow, reader, module.writer(second)};
+  OnRelease observer{
+    flow,
+    reader,
+    module.writer(second),
+  };
   first.observer = &observer;
   first.released = [](void* object) { static_cast<OnRelease*>(object)->run(); };
 
@@ -95,7 +129,7 @@ VALIDATION_TEST(TtxFlow, release_reentrancy) {
   EXPECT(observer.was_closed);
   EXPECT(observer.result == Flow::Status::Success);
 
-  U32 output[4] = {};
+  Static::Vector<U32, 4> output = {};
   EXPECT(Copy::flow(flow, storage(four, output)) == Status::Success);
   EXPECT_EQ(output[3], U32(4));
 }

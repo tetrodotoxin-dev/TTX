@@ -5,8 +5,8 @@
 
 #include "perimortem/memory/dynamic/vector.hpp"
 
-#include "ttx/semantic/transport/flow.hpp"
 #include "ttx/semantic/flows/swizzle.h"
+#include "ttx/semantic/transport/flow.hpp"
 
 namespace Ttx::Semantic::Flows {
 
@@ -36,11 +36,14 @@ class Swizzle {
         const Data::Form::Representation& output,
         Resolver& resolver)
         -> Perimortem::Utility::Result<Mapping, Data::Status> {
-      return create(
-          {&input, &output, &resolver,
-           [](const void* source, Count position) -> Count {
-             return (*static_cast<const Resolver*>(source))(position);
-           }});
+      return create({
+        &input,
+        &output,
+        &resolver,
+        [](const void* source, Count position) -> Count {
+          return (*static_cast<const Resolver*>(source))(position);
+        },
+      });
     }
 
     auto get_input() const -> const Data::Form::Representation& {
@@ -51,7 +54,12 @@ class Swizzle {
     }
 
     auto get_abi() const -> ttx_swizzle_mapping {
-      return {&input, &output, groups.get_data(), groups.get_size()};
+      return {
+        &input,
+        &output,
+        groups.get_data(),
+        groups.get_size(),
+      };
     }
 
    private:

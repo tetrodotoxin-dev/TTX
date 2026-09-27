@@ -1,17 +1,17 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/data/protocol/fragment.hpp"
-
-#include "toolchain/validation/unit_test.hpp"
 #include "tests/data/form/preparation.hpp"
+#include "toolchain/validation/unit_test.hpp"
+#include "ttx/data/protocol/fragment/provider.hpp"
 
 using namespace Perimortem::Core;
 using namespace Ttx::Data;
 using namespace Ttx::Data::Form;
 
 static Toolchain::Validation::Harness TtxFragment = {
-  .name = "TTX::Data::Protocol::Fragment"};
+  .name = "TTX::Data::Protocol::Fragment",
+};
 static constexpr auto u32 = Schema::primitive(Schema::Value::U32);
 
 // The C getter fills its output during the call. Native users receive a typed
@@ -19,7 +19,7 @@ static constexpr auto u32 = Schema::primitive(Schema::Value::U32);
 VALIDATION_TEST(TtxFragment, typed_fragment_read) {
   Validation::DataTests::Preparation prepare;
   const auto& representation = prepare(u32);
-  const Protocol::Fragment::Access::Operations operations = {
+  const Ttx::Data::Protocol::Fragment::Provider::Operations operations = {
     .representation = [](const void* state) -> const Representation* {
       return static_cast<const Representation*>(state);
     },
@@ -34,7 +34,7 @@ VALIDATION_TEST(TtxFragment, typed_fragment_read) {
     },
   };
 
-  Protocol::Fragment::Access access(&representation, operations);
+  Ttx::Data::Protocol::Fragment::Provider access(&representation, operations);
   access.get_u32(0).visit(
       [&](U32 value) { EXPECT_EQ(value, U32(42)); },
       [&](Status) { EXPECT(false); });
@@ -53,7 +53,7 @@ VALIDATION_TEST(TtxFragment, vector_observation) {
   EXPECT_EQ(representation.get_extent(), Count(64));
   EXPECT_EQ(representation.get_alignment(), Count(64));
   EXPECT_EQ(representation.get_depth(), U8(2));
-  const Protocol::Fragment::Access::Operations operations = {
+  const Ttx::Data::Protocol::Fragment::Provider::Operations operations = {
     .representation = [](const void* state) -> const Representation* {
       return static_cast<const Representation*>(state);
     },
@@ -70,7 +70,7 @@ VALIDATION_TEST(TtxFragment, vector_observation) {
       return TTX_DATA_SUCCESS;
     },
   };
-  Protocol::Fragment::Access access(&representation, operations);
+  Ttx::Data::Protocol::Fragment::Provider access(&representation, operations);
   access.get_v512(0).visit(
       [&](Schema::V512 value) {
         for (Count i = 0; i < 64; ++i) {
@@ -94,7 +94,7 @@ VALIDATION_TEST(TtxFragment, vector_widths) {
     }
     return TTX_DATA_SUCCESS;
   };
-  const Protocol::Fragment::Access::Operations operations = {
+  const Ttx::Data::Protocol::Fragment::Provider::Operations operations = {
     .representation = [](const void* state) -> const Representation* {
       return static_cast<const Representation*>(state);
     },
@@ -105,7 +105,7 @@ VALIDATION_TEST(TtxFragment, vector_widths) {
   };
   const auto check = [&](Schema::Value type, auto observe) {
     const auto& representation = prepare(Schema::primitive(type));
-    Protocol::Fragment::Access access(&representation, operations);
+    Ttx::Data::Protocol::Fragment::Provider access(&representation, operations);
     observe(access).visit(
         [&](auto value) {
           EXPECT_EQ(sizeof(value), representation.get_extent());

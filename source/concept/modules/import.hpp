@@ -26,7 +26,12 @@ class Import {
       -> Perimortem::Utility::Result<Module, Data::Status> {
     ttx_module output = {};
     const auto status = api.operations->open(
-        api.source, {name.get_data(), name.get_size()}, &output);
+        api.source,
+        {
+          name.get_data(),
+          name.get_size(),
+        },
+        &output);
     if (status != TTX_DATA_SUCCESS) {
       return static_cast<Data::Status>(status);
     }

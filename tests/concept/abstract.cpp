@@ -3,20 +3,21 @@
 
 #include "perimortem/core/null_terminated.hpp"
 
+#include "tests/concept/fixtures/observation.h"
+#include "tests/concept/fixtures/subject.hpp"
 #include "tests/library.hpp"
 #include "toolchain/validation/unit_test.hpp"
-#include "tests/concept/fixtures/subject.hpp"
-
 #include "ttx/concept/answers/constant.hpp"
 #include "ttx/concept/answers/none.hpp"
-#include "tests/concept/fixtures/observation.h"
 
 using namespace Perimortem;
 using namespace Ttx::Concept;
 using namespace Ttx::Semantic::Negotiation;
 using namespace Validation::ConceptTests;
 
-static Toolchain::Validation::Harness Abstracts = {.name = "TTX::Abstract"};
+static Toolchain::Validation::Harness Abstracts = {
+  .name = "TTX::Abstract",
+};
 
 struct Requirement {
   U8 family;
@@ -28,7 +29,9 @@ struct Requirement {
 VALIDATION_TEST(Abstracts, c_observations) {
   observation_subject owner{
     &Binding::representation<Abstract>(),
-    &Binding::representation<Answers::Constant>(), 0};
+    &Binding::representation<Answers::Constant>(),
+    0,
+  };
   const Abstract subject(observation_abstract(&owner));
   subject.get_query().bind<Abstract>().visit(
       [&](Abstract acquired) { EXPECT(acquired == subject); },

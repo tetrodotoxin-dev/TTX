@@ -1,12 +1,11 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
-#include "perimortem/core/diagnostics/log.hpp"
+#include <string.h>
 
+#include "perimortem/core/diagnostics/log.hpp"
 #include "perimortem/core/null_terminated.hpp"
 
 #include "tests/semantic/fixtures.hpp"
-
-#include <string.h>
 using namespace Validation::FlowTests;
 
 Module::Module(const char* library, const char* entry_name)
@@ -41,7 +40,7 @@ auto Module::import_query(const Flow& flow) const -> Query {
   };
   return flow.visit(
       cast, cast,
-      [](auto, auto) -> Query {
+      [](auto) -> Query {
         Diagnostics::Log::fatal("Bootstrap requires a castable protocol."_view);
       },
       [](auto) -> Query {
@@ -57,7 +56,9 @@ auto Module::selection() const -> Swizzle::Mapping {
           });
 }
 auto Module::select(const Flow& flow, Storage target) const -> Status {
-  const provider_operations operations = {ttx_swizzle};
+  const provider_operations operations = {
+    ttx_swizzle,
+  };
   const auto result =
       api->select(&operations, flow.get_abi(), target.get_abi());
   return static_cast<Status>(result);

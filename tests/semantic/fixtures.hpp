@@ -2,37 +2,34 @@
 // Copyright (c) 2023-present Matt Kaes and contributors
 #pragma once
 
-#include <stdlib.h>
 #include <stdio.h>
-#include "perimortem/core/null_terminated.hpp"
-
-#include "toolchain/validation/unit_test.hpp"
-#include "tests/semantic/module.hpp"
-#include "tests/data/form/preparation.hpp"
+#include <stdlib.h>
 
 #include "perimortem/core/access/vector.hpp"
+#include "perimortem/core/static/vector.hpp"
+#include "perimortem/core/null_terminated.hpp"
 
-#include "ttx/data/form/schema.hpp"
-#include "ttx/semantic/transport/block.hpp"
-#include "ttx/semantic/transport/direct.hpp"
-#include "ttx/semantic/flows/copy.hpp"
-#include "ttx/semantic/flows/swizzle.hpp"
-#include "ttx/semantic/transport/fragment.hpp"
-#include "ttx/semantic/transport/shared.hpp"
+#include "tests/data/form/preparation.hpp"
 #include "tests/semantic/fixtures/heterogeneous_provider.h"
 #include "tests/semantic/fixtures/provider.h"
+#include "tests/semantic/module.hpp"
+#include "toolchain/validation/unit_test.hpp"
+#include "ttx/data/form/schema.hpp"
+#include "ttx/semantic/flows/copy.hpp"
+#include "ttx/semantic/flows/swizzle.hpp"
+#include "ttx/semantic/transport/flow.hpp"
 
 namespace Validation::FlowTests {
 using namespace Perimortem::Core;
+using Ttx::Data::Status;
 using Ttx::Data::Form::Representation;
 using Ttx::Data::Form::Schema;
-using Ttx::Data::Status;
 using Ttx::Data::Form::Storage;
 using namespace Ttx::Semantic::Negotiation;
-using Ttx::Semantic::Transport::Flow;
-using Ttx::Semantic::Negotiation::Query;
 using Ttx::Semantic::Flows::Copy;
 using Ttx::Semantic::Flows::Swizzle;
+using Ttx::Semantic::Negotiation::Query;
+using Ttx::Semantic::Transport::Flow;
 using Protocol = Flow::Protocol;
 extern Toolchain::Validation::Harness TtxFlow;
 inline constexpr auto integer = Schema::primitive(Schema::Value::U32);
@@ -46,7 +43,7 @@ struct Reader {
   const Representation& schema;
   U8 provides =
       PROVIDES_DIRECT | PROVIDES_SHARED | PROVIDES_BLOCK | PROVIDES_FRAGMENT;
-  Count binds[4] = {};
+  Perimortem::Core::Static::Vector<Count, 4> binds = {};
   Count descriptions = 0;
   Binding::Status decline = Binding::Status::Unsupported;
   const Representation* direct_schema = nullptr;
@@ -55,12 +52,17 @@ struct Reader {
 
 template <typename T>
 auto storage(const Representation& schema, T& data) -> Storage {
-  return Storage::create(schema, {reinterpret_cast<U8*>(&data), sizeof(data)})
+  return Storage::create(
+             schema,
+             {
+               reinterpret_cast<U8*>(&data),
+               sizeof(data),
+             })
       .visit(
           [](Storage value) { return value; },
           [](Status) -> Storage {
             fputs("Invalid fixture Storage.", stderr);
-              abort();
+            abort();
           });
 }
 

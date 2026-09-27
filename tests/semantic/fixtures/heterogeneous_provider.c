@@ -1,11 +1,12 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
+#include "tests/semantic/fixtures/heterogeneous_provider.h"
+
 #include <stddef.h>
 
 #include "tests/semantic/fixtures/provider_representation.h"
-
-#include "ttx/semantic/transport/fragment.h"
-#include "tests/semantic/fixtures/heterogeneous_provider.h"
+#include "ttx/data/protocol/fragment/provider.h"
+#include "ttx/semantic/transport/flow.h"
 
 typedef struct record {
   U16 tag;
@@ -16,28 +17,74 @@ static const ttx_schema tag = {
   2,
   2,
   TTX_SCHEMA_VALUE,
-  {.value = {TTX_SCHEMA_U16, TTX_SCHEMA_LITTLE_ENDIAN}}};
+  {
+    .value =
+        {
+          TTX_SCHEMA_U16,
+          TTX_SCHEMA_LITTLE_ENDIAN,
+        },
+  },
+};
 static const ttx_schema energy = {
   8,
   8,
   TTX_SCHEMA_VALUE,
-  {.value = {TTX_SCHEMA_R64, TTX_SCHEMA_LITTLE_ENDIAN}}};
+  {
+    .value =
+        {
+          TTX_SCHEMA_R64,
+          TTX_SCHEMA_LITTLE_ENDIAN,
+        },
+  },
+};
 static const ttx_schema frame = {
   4,
   4,
   TTX_SCHEMA_VALUE,
-  {.value = {TTX_SCHEMA_U32, TTX_SCHEMA_LITTLE_ENDIAN}}};
+  {
+    .value =
+        {
+          TTX_SCHEMA_U32,
+          TTX_SCHEMA_LITTLE_ENDIAN,
+        },
+  },
+};
 static const ttx_schema_position fields[] = {
-  {{&tag, 0}, offsetof(record, tag)},
-  {{&energy, 0}, offsetof(record, energy)},
-  {{&frame, 0}, offsetof(record, frame)},
+  {
+    {
+      &tag,
+      0,
+    },
+    offsetof(record, tag),
+  },
+  {
+    {
+      &energy,
+      0,
+    },
+    offsetof(record, energy),
+  },
+  {
+    {
+      &frame,
+      0,
+    },
+    offsetof(record, frame),
+  },
 };
 
 static const ttx_schema schema = {
   sizeof(record),
   _Alignof(record),
   TTX_SCHEMA_COMPOSITE,
-  {.composite = {fields, 3}}};
+  {
+    .composite =
+        {
+          fields,
+          3,
+        },
+  },
+};
 static const ttx_representation* prepared;
 
 static const ttx_representation* describe(const void* source) {
@@ -45,7 +92,8 @@ static const ttx_representation* describe(const void* source) {
   return prepared;
 }
 
-static ttx_data_status get_tag(const void* source, Count position, U16* result) {
+static ttx_data_status
+    get_tag(const void* source, Count position, U16* result) {
   heterogeneous_state* state = (heterogeneous_state*)source;
   ++state->reads;
   if (position != offsetof(record, tag)) {
@@ -56,7 +104,8 @@ static ttx_data_status get_tag(const void* source, Count position, U16* result) 
   return TTX_DATA_SUCCESS;
 }
 
-static ttx_data_status get_energy(const void* source, Count position, R64* result) {
+static ttx_data_status
+    get_energy(const void* source, Count position, R64* result) {
   heterogeneous_state* state = (heterogeneous_state*)source;
   ++state->reads;
   if (position != offsetof(record, energy)) {
@@ -67,7 +116,8 @@ static ttx_data_status get_energy(const void* source, Count position, R64* resul
   return TTX_DATA_SUCCESS;
 }
 
-static ttx_data_status get_frame(const void* source, Count position, U32* result) {
+static ttx_data_status
+    get_frame(const void* source, Count position, U32* result) {
   heterogeneous_state* state = (heterogeneous_state*)source;
   ++state->reads;
   if (position != offsetof(record, frame)) {
@@ -78,39 +128,54 @@ static ttx_data_status get_frame(const void* source, Count position, U32* result
   return TTX_DATA_SUCCESS;
 }
 
-static const ttx_fragment_access_operations access = {
+static const ttx_fragment_provider_operations access = {
   .representation = describe,
   .get_u16 = get_tag,
   .get_u32 = get_frame,
-  .get_r64 = get_energy};
+  .get_r64 = get_energy,
+};
 static ttx_binding_status
     writer_bind(const void* source, perimortem_uuid id, ttx_storage requested) {
-  if (id.high != TTX_FRAGMENT_ACCESS_ID_HIGH ||
-      id.low != TTX_FRAGMENT_ACCESS_ID_LOW) {
+  if (id.high != TTX_FRAGMENT_PROVIDER_ID_HIGH ||
+      id.low != TTX_FRAGMENT_PROVIDER_ID_LOW) {
     return TTX_BINDING_UNSUPPORTED;
   }
 
-  const ttx_fragment_access api = {source, &access};
+  const ttx_fragment_provider api = {
+    source,
+    &access,
+  };
   return ttx_binding_provide(
-      ttx_fragment_access_representation(), &api, requested);
+      ttx_fragment_provider_representation(), &api, requested);
 }
 
-static ttx_binding_status writer_supports(const void* source, perimortem_uuid id) {
+static ttx_binding_status writer_supports(
+    const void* source,
+    perimortem_uuid id) {
   (void)source;
-  return id.high == TTX_FRAGMENT_ACCESS_ID_HIGH && id.low == TTX_FRAGMENT_ACCESS_ID_LOW
-             ? TTX_BINDING_SATISFIED : TTX_BINDING_UNSUPPORTED;
+  return id.high == TTX_FRAGMENT_PROVIDER_ID_HIGH &&
+                 id.low == TTX_FRAGMENT_PROVIDER_ID_LOW
+             ? TTX_BINDING_SATISFIED
+             : TTX_BINDING_UNSUPPORTED;
 }
 
 static ttx_semantic_query source(heterogeneous_state* state) {
-  return (ttx_semantic_query){state, writer_bind, writer_supports};
+  return (ttx_semantic_query){
+    state,
+    writer_bind,
+    writer_supports,
+  };
 }
 
-const heterogeneous_provider* heterogeneous_provider_open(provider_compile compiler) {
+const heterogeneous_provider* heterogeneous_provider_open(
+    provider_compile compiler) {
   compile_representation = compiler;
   if (!prepared) {
     prepared = prepare_representation(&schema);
   }
 
-  static const heterogeneous_provider provider = {source};
+  static const heterogeneous_provider provider = {
+    source,
+  };
   return &provider;
 }

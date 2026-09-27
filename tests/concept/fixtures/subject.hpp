@@ -16,7 +16,6 @@ struct Subject {
   auto get_data() const -> Perimortem::Core::View::Bytes {
     return "subject"_view;
   }
-
 };
 
 }  // namespace Validation::ConceptTests

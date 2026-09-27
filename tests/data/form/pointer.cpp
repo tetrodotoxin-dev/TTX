@@ -1,9 +1,10 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "toolchain/validation/unit_test.hpp"
-#include "tests/data/form/preparation.hpp"
+#include "perimortem/core/static/vector.hpp"
 
+#include "tests/data/form/preparation.hpp"
+#include "toolchain/validation/unit_test.hpp"
 #include "ttx/data/form/compiled.hpp"
 #include "ttx/data/form/compiler.hpp"
 
@@ -11,7 +12,9 @@ using namespace Perimortem;
 using namespace Ttx::Data;
 using namespace Ttx::Data::Form;
 
-static Toolchain::Validation::Harness Pointers = {.name = "TTX::Data::Form::Pointer"};
+static Toolchain::Validation::Harness Pointers = {
+  .name = "TTX::Data::Form::Pointer",
+};
 
 // Constant evaluation may build a temporary reference to itself. Only the
 // finished bytes escape preparation, so no constexpr allocation or source
@@ -20,7 +23,12 @@ static consteval auto recursive_bytes() -> Core::Static::Bytes<8> {
   auto node = Schema::composite({}, 8, 8);
   const auto pointer = Schema::pointer(&node);
   const Schema::Position field(pointer, 0);
-  node = Schema::composite({&field, 1}, 8, 8);
+  node = Schema::composite(
+      {
+        &field,
+        1,
+      },
+      8, 8);
   Compiler compiler;
   if (compiler.compile(node) != Status::Success || compiler.get_size() != 8) {
     return Core::Static::Bytes<8>();
@@ -40,14 +48,36 @@ VALIDATION_TEST(Pointers, reference_modifier) {
   Validation::DataTests::Preparation prepare;
   const auto integer = Schema::primitive(Schema::Value::U32);
   const Schema::Position member(integer, 0);
-  const auto target = Schema::composite({&member, 1}, 4, 4);
+  const auto target = Schema::composite(
+      {
+        &member,
+        1,
+      },
+      4, 4);
   const Schema::Reference direct(target);
   const auto indirect = Schema::pointer(&target);
   EXPECT(direct.schema == indirect.schema);
   EXPECT_NOT(direct.is_pointer());
   EXPECT(indirect.is_pointer());
-  const Schema::Position fields[] = {{direct, 0}, {indirect, 8}};
-  const auto& form = prepare(Schema::composite({fields, 2}, 16, 8));
+  const Perimortem::Core::Static::Vector<Schema::Position, 2> fields = {
+    {
+      Schema::Position{
+        direct,
+        0,
+      },
+      {
+        indirect,
+        8,
+      },
+    },
+  };
+  const auto& form = prepare(
+      Schema::composite(
+          {
+            fields.get_data(),
+            2,
+          },
+          16, 8));
   const auto a =
       Encoding::Element::decode(form.get_bytes(), 1, form.get_depth());
   const auto b =
@@ -62,9 +92,21 @@ VALIDATION_TEST(Pointers, reference_modifier) {
 
 VALIDATION_TEST(Pointers, opaque_spelling) {
   Validation::DataTests::Preparation prepare;
-  const U8 expected[] = {0x11, 0x80, 0x80, 0, 0x80, 0x20, 0, 1};
+  const Perimortem::Core::Static::Vector<U8, 8> expected = {
+    {
+      0x11,
+      0x80,
+      0x80,
+      0,
+      0x80,
+      0x20,
+      0,
+      1,
+    },
+  };
   const auto& pointer = prepare(Schema::pointer());
-  EXPECT(pointer.compatible(Representation(expected, sizeof(expected))));
+  EXPECT(pointer.compatible(
+      Representation(expected.get_data(), sizeof(expected))));
   // The native observation name does not introduce a second wire code.
   EXPECT(
       pointer.compatible(prepare(Schema::primitive(Schema::Value::Pointer))));
@@ -88,8 +130,18 @@ VALIDATION_TEST(Pointers, recursive_sharing) {
   auto b = Schema::composite({}, 8, 8);
   const auto pa = Schema::pointer(&a), pb = Schema::pointer(&b);
   const Schema::Position ab(pb, 0), ba(pa, 0);
-  a = Schema::composite({&ab, 1}, 8, 8);
-  b = Schema::composite({&ba, 1}, 8, 8);
+  a = Schema::composite(
+      {
+        &ab,
+        1,
+      },
+      8, 8);
+  b = Schema::composite(
+      {
+        &ba,
+        1,
+      },
+      8, 8);
   const auto& ready = prepare(a);
   EXPECT(ready.compatible(Representation(recursive.get_data(), 8)));
 
@@ -104,15 +156,36 @@ VALIDATION_TEST(Pointers, recursive_sharing) {
   // A difference beyond a recursive edge still rejects agreement. Structural
   // sharing must preserve the other fields even when a target repeats.
   const auto integer = Schema::primitive(Schema::Value::U64);
-  const Schema::Position different[] = {{pa, 0}, {integer, 8}};
-  b = Schema::composite({different, 2}, 16, 8);
+  const Perimortem::Core::Static::Vector<Schema::Position, 2> different = {
+    {
+      Schema::Position{
+        pa,
+        0,
+      },
+      {
+        integer,
+        8,
+      },
+    },
+  };
+  b = Schema::composite(
+      {
+        different.get_data(),
+        2,
+      },
+      16, 8);
   EXPECT_NOT(ready.compatible(prepare(a)));
 }
 
 VALIDATION_TEST(Pointers, inline_cycle_rejected) {
   auto node = Schema::composite({}, 8, 8);
   const Schema::Position self(node, 0);
-  node = Schema::composite({&self, 1}, 8, 8);
+  node = Schema::composite(
+      {
+        &self,
+        1,
+      },
+      8, 8);
   Compiler compiler;
   EXPECT(compiler.compile(node) == Status::Invalid);
 }
@@ -124,10 +197,18 @@ VALIDATION_TEST(Pointers, recursive_callable) {
   Validation::DataTests::Preparation prepare;
   auto node = Schema::composite({}, 8, 8);
   const Schema::Argument self(node);
-  const auto callback =
-      Schema::callable(Schema::Convention::SystemVAMD64, {&self, 1});
+  const auto callback = Schema::callable(
+      Schema::Convention::SystemVAMD64, {
+                                          &self,
+                                          1,
+                                        });
   const Schema::Position field(callback, 0);
-  node = Schema::composite({&field, 1}, 8, 8);
+  node = Schema::composite(
+      {
+        &field,
+        1,
+      },
+      8, 8);
   const auto& ready = prepare(node);
   EXPECT_EQ(ready.get_bytes().get_size(), Count(16));
   EXPECT(ready.visit([](Representation::Position position) {
@@ -142,11 +223,38 @@ VALIDATION_TEST(Pointers, pointer_run) {
   Validation::DataTests::Preparation prepare;
   const auto integer = Schema::primitive(Schema::Value::U32);
   const Schema::Position value(integer, 0);
-  const auto a = Schema::composite({&value, 1}, 4, 4);
-  const auto b = Schema::composite({&value, 1}, 4, 4);
+  const auto a = Schema::composite(
+      {
+        &value,
+        1,
+      },
+      4, 4);
+  const auto b = Schema::composite(
+      {
+        &value,
+        1,
+      },
+      4, 4);
   const auto pa = Schema::pointer(&a), pb = Schema::pointer(&b);
-  const Schema::Position fields[] = {{pa, 0}, {pb, 16}};
-  const auto& explicit_fields = prepare(Schema::composite({fields, 2}, 24, 8));
+  const Perimortem::Core::Static::Vector<Schema::Position, 2> fields = {
+    {
+      Schema::Position{
+        pa,
+        0,
+      },
+      {
+        pb,
+        16,
+      },
+    },
+  };
+  const auto& explicit_fields = prepare(
+      Schema::composite(
+          {
+            fields.get_data(),
+            2,
+          },
+          24, 8));
   const auto& ranged = prepare(Schema::range(pa, 2, 16, 24, 8));
   EXPECT(explicit_fields.compatible(ranged));
   EXPECT_EQ(ranged.get_bytes().get_size(), Count(16));
@@ -166,9 +274,17 @@ VALIDATION_TEST(Pointers, pointer_run) {
 VALIDATION_TEST(Pointers, distinct_ring) {
   Validation::DataTests::Preparation prepare;
   constexpr Count size = 32;
-  Schema nodes[2][size];
-  Schema::Reference pointers[2][size];
-  Schema::Position fields[2][size][2];
+  Perimortem::Core::Static::Vector<
+      Perimortem::Core::Static::Vector<Schema, size>, 2>
+      nodes;
+  Perimortem::Core::Static::Vector<
+      Perimortem::Core::Static::Vector<Schema::Reference, size>, 2>
+      pointers;
+  Perimortem::Core::Static::Vector<
+      Perimortem::Core::Static::Vector<
+          Perimortem::Core::Static::Vector<Schema::Position, 2>, size>,
+      2>
+      fields;
   const auto integer = Schema::primitive(Schema::Value::U32);
   const auto real = Schema::primitive(Schema::Value::R32);
   for (Count copy = 0; copy < 2; ++copy) {
@@ -177,7 +293,12 @@ VALIDATION_TEST(Pointers, distinct_ring) {
       fields[copy][i][copy] = Schema::Position(pointers[copy][i], 0);
       fields[copy][i][1 - copy] =
           Schema::Position(i + 1 == size ? real : integer, 8);
-      nodes[copy][i] = Schema::composite({fields[copy][i], 2}, 16, 8);
+      nodes[copy][i] = Schema::composite(
+          {
+            fields[copy][i].get_data(),
+            2,
+          },
+          16, 8);
     }
   }
 
@@ -199,10 +320,29 @@ static_assert(Compiled<scalar, 8>::get_representation().compatible(
     Compiled<scalar, 4>::get_representation()));
 
 VALIDATION_TEST(Pointers, pointer_width) {
-  const U8 expected[] = {
-    0x10, 0, 0, 0, 1, 0, 0, 0, 0x11, 0x40, 0x40, 0, 0x80, 0x10, 0, 1,
+  const Perimortem::Core::Static::Vector<U8, 16> expected = {
+    {
+      0x10,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0x11,
+      0x40,
+      0x40,
+      0,
+      0x80,
+      0x10,
+      0,
+      1,
+    },
   };
-  EXPECT(narrow_pointer.get_bytes() == Core::View::Bytes(expected));
+  EXPECT(
+      narrow_pointer.get_bytes() ==
+      Core::View::Bytes(expected.get_data(), expected.get_size()));
   EXPECT(narrow_pointer.get_pointer_size() == 4);
   EXPECT_EQ(narrow_pointer.get_extent(), Count(4));
   EXPECT_EQ(narrow_pointer.get_alignment(), Count(4));
@@ -223,7 +363,11 @@ VALIDATION_TEST(Pointers, pointer_width) {
       },
       [&](Status) { EXPECT(false); });
 
-  const Count coordinates[] = {0};
+  const Perimortem::Core::Static::Vector<Count, 1> coordinates = {
+    {
+      Count(0),
+    },
+  };
   Count visits = 0;
   EXPECT(
       narrow_pointer.visit(coordinates, [&](Representation::Position position) {
@@ -270,9 +414,17 @@ VALIDATION_TEST(Pointers, convention_agreement) {
 
 VALIDATION_TEST(Pointers, composed_pointers) {
   Memory::Allocator::Arena arena;
-  const Representation::Member members[] = {
-    {narrow_pointer, 0},
-    {narrow_pointer, 4},
+  const Perimortem::Core::Static::Vector<Representation::Member, 2> members = {
+    {
+      Representation::Member{
+        narrow_pointer,
+        0,
+      },
+      {
+        narrow_pointer,
+        4,
+      },
+    },
   };
   Representation::compose(members, 8, 4, arena)
       .visit(
@@ -288,9 +440,17 @@ VALIDATION_TEST(Pointers, composed_pointers) {
           },
           [&](Status) { EXPECT(false); });
 
-  const Representation::Member mixed[] = {
-    {narrow_pointer, 0},
-    {wide_pointer, 8},
+  const Perimortem::Core::Static::Vector<Representation::Member, 2> mixed = {
+    {
+      Representation::Member{
+        narrow_pointer,
+        0,
+      },
+      {
+        wide_pointer,
+        8,
+      },
+    },
   };
   Representation::compose(mixed, 16, 8, arena)
       .visit(

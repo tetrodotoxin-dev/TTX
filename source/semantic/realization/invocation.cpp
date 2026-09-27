@@ -12,11 +12,17 @@ PERIMORTEM_C const ttx_representation* ttx_invocation_representation() {
 }
 
 auto Invocation::connect(
-    Query instance, Perimortem::System::Uuid contract,
-    const Representation& inputs, const Representation& outputs) -> Binding::Status {
+    Query instance,
+    Perimortem::System::Uuid contract,
+    const Representation& inputs,
+    const Representation& outputs) -> Binding::Status {
   ttx_invocation next = {};
-  const Storage target(ttx_storage{
-      ttx_invocation_representation(), reinterpret_cast<U8*>(&next), sizeof(next)});
+  const Storage target(
+      ttx_storage{
+        ttx_invocation_representation(),
+        reinterpret_cast<U8*>(&next),
+        sizeof(next),
+      });
   const auto status = instance.bind(contract, target);
   if (status != Binding::Status::Satisfied) {
     return status;

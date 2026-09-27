@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "ttx/semantic/ownership/publication.h"
 #include "ttx/semantic/negotiation/query.hpp"
+#include "ttx/semantic/ownership/publication.h"
 
 namespace Ttx::Semantic::Ownership {
 
@@ -19,7 +19,9 @@ class Publication {
   Publication(Publication&& other) : value(other.take()) {}
   ~Publication() { close(); }
 
-  auto get_query() const -> Negotiation::Query { return Negotiation::Query(value.query); }
+  auto get_query() const -> Negotiation::Query {
+    return Negotiation::Query(value.query);
+  }
   auto take() -> ttx_publication {
     auto result = value;
     value = {};

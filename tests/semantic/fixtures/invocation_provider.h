@@ -32,7 +32,8 @@ typedef struct invocation_fixture {
 } invocation_fixture;
 
 PERIMORTEM_C invocation_fixture invocation_provider_open(
-    const ttx_representation* record, const ttx_representation* inputs,
+    const ttx_representation* record,
+    const ttx_representation* inputs,
     const ttx_representation* outputs);
 
 #endif

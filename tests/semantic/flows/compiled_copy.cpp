@@ -1,9 +1,10 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "perimortem/core/static/vector.hpp"
+
 #include "tests/semantic/fixtures.hpp"
 #include "tests/semantic/measurement.hpp"
-
 #include "ttx/data/form/compiled.hpp"
 
 using namespace Validation::FlowTests;
@@ -19,14 +20,22 @@ VALIDATION_TEST(TtxFlow, static_form_flow) {
   ASSERT(module.is_set());
 
   Module::State writer = {
-    .provides = PROVIDES_DIRECT, .values = {10, 20, 30, 40}};
-  U32 output[4] = {};
+    .provides = PROVIDES_DIRECT,
+    .values =
+        {
+          10,
+          20,
+          30,
+          40,
+        },
+  };
+  Static::Vector<U32, 4> output = {};
   const auto target = storage(representation, output);
   Flow flow;
 
   Measurement measurement;
   const auto agreement =
-      flow.connect(Flow::reader(representation), module.writer(writer));
+      flow.connect(Flow::consumer(representation), module.writer(writer));
   ASSERT(agreement == Flow::Status::Success);
   const auto status = Copy::flow(flow, target);
   measurement.stop();

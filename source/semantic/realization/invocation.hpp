@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "ttx/semantic/realization/invocation.h"
 #include "ttx/semantic/negotiation/query.hpp"
+#include "ttx/semantic/realization/invocation.h"
 
 namespace Ttx::Semantic::Realization {
 
@@ -14,12 +14,15 @@ namespace Ttx::Semantic::Realization {
 class Invocation {
  public:
   auto connect(
-      Negotiation::Query instance, Perimortem::System::Uuid contract,
+      Negotiation::Query instance,
+      Perimortem::System::Uuid contract,
       const Data::Form::Representation& inputs,
-      const Data::Form::Representation& outputs) -> Negotiation::Binding::Status;
+      const Data::Form::Representation& outputs)
+      -> Negotiation::Binding::Status;
 
   auto invoke(const void* inputs, void* outputs) const -> Data::Status {
-    return static_cast<Data::Status>(call.invoke(call.receiver, inputs, outputs));
+    return static_cast<Data::Status>(
+        call.invoke(call.receiver, inputs, outputs));
   }
 
   auto close() -> void { call = {}; }

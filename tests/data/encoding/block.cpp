@@ -3,15 +3,18 @@
 
 #include "ttx/data/encoding/block.hpp"
 
-#include "toolchain/validation/unit_test.hpp"
+#include "perimortem/core/static/vector.hpp"
 
 #include "perimortem/memory/const/vector.hpp"
+
+#include "toolchain/validation/unit_test.hpp"
 
 using namespace Perimortem::Core;
 using namespace Ttx::Data::Encoding;
 
 static Toolchain::Validation::Harness EncodingBlock = {
-  .name = "TTX::Data::Encoding::Block"};
+  .name = "TTX::Data::Encoding::Block",
+};
 
 // This oracle reads individual bits rather than using the chunk algorithm.
 // Arbitrary bytes exercise both zero and nonzero high fields without relying
@@ -28,23 +31,59 @@ static constexpr auto bits(View::Bytes bytes, Count first, Count width)
   return result;
 }
 
-static constexpr U8 constant[] = {0x81, 0x42, 0x24, 0x18, 0xf0, 0x0f,
-                                  0xaa, 0x55, 0x96, 0x69, 0x87, 0x78,
-                                  0,    0,    0,    0};
+static constexpr Static::Vector<U8, 16> constant = {
+  {
+    0x81,
+    0x42,
+    0x24,
+    0x18,
+    0xf0,
+    0x0f,
+    0xaa,
+    0x55,
+    0x96,
+    0x69,
+    0x87,
+    0x78,
+    0,
+    0,
+    0,
+    0,
+  },
+};
 static_assert(
-    Block::extract(View::Bytes(constant), 61, 35) ==
-    bits(View::Bytes(constant), 61, 35));
+    Block::extract(
+        View::Bytes(constant.get_data(), constant.get_size()),
+        61,
+        35) ==
+    bits(View::Bytes(constant.get_data(), constant.get_size()), 61, 35));
 
 VALIDATION_TEST(EncodingBlock, field_boundaries) {
-  const Count widths[] = {1, 6, 7, 8, 12, 16, 31, 32, 33, 63, 64, 72, 120};
+  const Static::Vector<Count, 13> widths = {
+    {
+      1,
+      6,
+      7,
+      8,
+      12,
+      16,
+      31,
+      32,
+      33,
+      63,
+      64,
+      72,
+      120,
+    },
+  };
   for (U8 depth = 1; depth <= 15; ++depth) {
     const Count block_size = Count(depth) << 2;
     for (Count count = 2; count <= 3; ++count) {
       const Count raw_size = count * block_size;
       const Count size = Data::align<8>(raw_size);
 
-      // Two blocks cover an already complete buffer; three require padding
-      // at odd depths. The one-byte prefix misaligns native memory, while each
+      // Two blocks cover an already complete buffer. Three require padding
+      // at odd depths. The one byte prefix misaligns native memory, while each
       // U64 read must still use coordinates from the beginning of the buffer.
       // The exact allocation lets ASan catch a read past its padded end.
       Perimortem::Memory::Const::Vector<U8> storage;
@@ -55,7 +94,7 @@ VALIDATION_TEST(EncodingBlock, field_boundaries) {
 
       const View::Bytes bytes(storage.get_data() + 1, size);
       for (Count first = 0; first < raw_size * 8; ++first) {
-        for (const Count width : widths) {
+        for (const Count width : widths.get_view()) {
           if (width <= raw_size * 8 - first) {
             ASSERT_EQ(
                 Block::extract(bytes, first, width), bits(bytes, first, width));

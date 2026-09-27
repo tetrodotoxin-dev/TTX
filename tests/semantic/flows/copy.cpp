@@ -1,14 +1,15 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "tests/semantic/fixtures.hpp"
-#include "tests/semantic/measurement.hpp"
-
 #include <new>
 #include <stdlib.h>
 
+#include "perimortem/core/static/vector.hpp"
+
 #include "perimortem/memory/dynamic/vector.hpp"
 
+#include "tests/semantic/fixtures.hpp"
+#include "tests/semantic/measurement.hpp"
 #include "ttx/semantic/transport/flow.hpp"
 
 using namespace Validation::FlowTests;
@@ -24,15 +25,25 @@ VALIDATION_TEST(TtxFlow, copy_multiple_targets) {
   ASSERT(module.is_set());
 
   Module::State writer = {
-    .provides = PROVIDES_DIRECT, .values = {10, 20, 30, 40}};
-  Validation::FlowTests::Reader reader{four};
+    .provides = PROVIDES_DIRECT,
+    .values =
+        {
+          10,
+          20,
+          30,
+          40,
+        },
+  };
+  Validation::FlowTests::Reader reader{
+    four,
+  };
 
   Flow flow;
   ASSERT(
       flow.connect(reader.query(), module.writer(writer)) ==
       Flow::Status::Success);
 
-  U32 a[4] = {}, b[4] = {};
+  Static::Vector<U32, 4> a = {}, b = {};
   Measurement measurement;
   const auto first = Copy::flow(flow, storage(four, a));
   const auto second = Copy::flow(flow, storage(four, b));
@@ -61,8 +72,12 @@ VALIDATION_TEST(TtxFlow, copy_target_mismatch) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {.provides = PROVIDES_BLOCK};
-  Validation::FlowTests::Reader reader{four};
+  Module::State writer = {
+    .provides = PROVIDES_BLOCK,
+  };
+  Validation::FlowTests::Reader reader{
+    four,
+  };
 
   Flow flow;
   ASSERT(
@@ -70,7 +85,12 @@ VALIDATION_TEST(TtxFlow, copy_target_mismatch) {
       Flow::Status::Success);
 
   U32 small = 99;
-  Storage::create(four, {reinterpret_cast<U8*>(&small), sizeof(small)})
+  Storage::create(
+      four,
+      {
+        reinterpret_cast<U8*>(&small),
+        sizeof(small),
+      })
       .visit(
           [&](Storage) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Bounds); });
@@ -92,13 +112,31 @@ VALIDATION_TEST(TtxFlow, reusable_reader) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {.provides = PROVIDES_DIRECT, .values = {1, 2, 3, 4}};
-  U32 original[4] = {99, 99, 99, 99}, output[4] = {};
+  Module::State writer = {
+    .provides = PROVIDES_DIRECT,
+    .values =
+        {
+          1,
+          2,
+          3,
+          4,
+        },
+  };
+  Static::Vector<U32, 4> original =
+                             {
+                               {
+                                 99,
+                                 99,
+                                 99,
+                                 99,
+                               },
+                             },
+                         output = {};
 
   Flow flow;
   ASSERT(
       flow.connect(
-          Flow::reader(storage(four, original)), module.writer(writer)) ==
+          Flow::consumer(storage(four, original)), module.writer(writer)) ==
       Flow::Status::Success);
 
   EXPECT(Copy::flow(flow, storage(four, output)) == Status::Success);
@@ -117,15 +155,25 @@ VALIDATION_TEST(TtxFlow, c_copy_result) {
   ASSERT(module.is_set());
 
   Module::State writer = {
-    .provides = PROVIDES_FRAGMENT, .values = {1, 2, 3, 4}};
-  Validation::FlowTests::Reader reader{four};
+    .provides = PROVIDES_FRAGMENT,
+    .values =
+        {
+          1,
+          2,
+          3,
+          4,
+        },
+  };
+  Validation::FlowTests::Reader reader{
+    four,
+  };
 
   Flow flow;
   ASSERT(
       flow.connect(reader.query(), module.writer(writer)) ==
       Flow::Status::Success);
 
-  U32 output[4] = {};
+  Static::Vector<U32, 4> output = {};
   const auto outcome =
       ttx_copy(flow.get_abi(), storage(four, output).get_abi());
   EXPECT_EQ(outcome, TTX_DATA_SUCCESS);

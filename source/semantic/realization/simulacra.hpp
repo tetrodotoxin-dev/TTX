@@ -14,8 +14,8 @@ namespace Ttx::Semantic::Realization {
 class Simulacra {
  public:
   template <typename Contract>
-  static auto fulfill(Negotiation::Query query) -> Perimortem::Utility::
-      Result<Contract, Negotiation::Binding::Failure> {
+  static auto fulfill(Negotiation::Query query)
+      -> Perimortem::Utility::Result<Contract, Negotiation::Binding::Failure> {
     return query.template bind<Contract>();
   }
 
@@ -31,14 +31,12 @@ class Simulacra {
       owner.template fulfill_native<Contract>();
       owner.get_query();
     }
-  static auto fulfill(const Owner& owner) -> Perimortem::Utility::
-      Result<Contract, Negotiation::Binding::Failure> {
-    using Result = Perimortem::Utility::Result<
-        Contract, Negotiation::Binding::Failure>;
+  static auto fulfill(const Owner& owner)
+      -> Perimortem::Utility::Result<Contract, Negotiation::Binding::Failure> {
+    using Result =
+        Perimortem::Utility::Result<Contract, Negotiation::Binding::Failure>;
     return owner.template fulfill_native<Contract>().visit(
-        [](const Contract& contract) -> Result {
-          return contract;
-        },
+        [](const Contract& contract) -> Result { return contract; },
         [&](Negotiation::Binding::Failure failure) -> Result {
           if (failure == Negotiation::Binding::Failure::Unsupported) {
             return fulfill<Contract>(owner.get_query());

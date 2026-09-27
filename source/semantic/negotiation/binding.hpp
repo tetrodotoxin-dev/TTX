@@ -33,14 +33,15 @@ auto representation() -> const Data::Form::Representation& {
         Perimortem::Core::View::Vector<Data::Form::Schema::Position>(), 0);
     return Data::Form::Compiled<empty>::get_representation();
   } else {
-    return Data::Form::Compiled<
-        Data::Form::Native<typename Contract::Api>::reference>::get_representation();
+    return Data::Form::Compiled<Data::Form::Native<
+        typename Contract::Api>::reference>::get_representation();
   }
 }
 
 template <typename Api>
 auto provide(
-    const Api& api, const Data::Form::Representation& actual,
+    const Api& api,
+    const Data::Form::Representation& actual,
     Data::Form::Storage requested) -> Status {
   return static_cast<Status>(
       ttx_binding_provide(&actual, &api, requested.get_abi()));

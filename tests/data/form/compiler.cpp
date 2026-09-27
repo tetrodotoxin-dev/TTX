@@ -1,11 +1,12 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "toolchain/validation/unit_test.hpp"
-#include "tests/data/form/preparation.hpp"
-
 #include <stddef.h>
 
+#include "perimortem/core/static/vector.hpp"
+
+#include "tests/data/form/preparation.hpp"
+#include "toolchain/validation/unit_test.hpp"
 #include "ttx/data/form/schema.hpp"
 
 using namespace Perimortem::Core;
@@ -15,7 +16,8 @@ using Ttx::Data::Form::Schema;
 using Validation::DataTests::Preparation;
 
 static Toolchain::Validation::Harness TtxCompiler = {
-  .name = "TTX::Data::Form::Compiler"};
+  .name = "TTX::Data::Form::Compiler",
+};
 static constexpr auto integer = Schema::primitive(Schema::Value::U32);
 
 // Both encodings describe four adjacent U32s. One stores four entries and the
@@ -24,13 +26,32 @@ static constexpr auto integer = Schema::primitive(Schema::Value::U32);
 VALIDATION_TEST(TtxCompiler, composite_and_range) {
   Preparation prepare;
   auto foreign_integer = integer;
-  const Schema::Position entries[] = {
-    {integer, 0},
-    {integer, 4},
-    {integer, 8},
-    {integer, 12},
+  const Static::Vector<Schema::Position, 4> entries = {
+    {
+      Schema::Position{
+        integer,
+        0,
+      },
+      {
+        integer,
+        4,
+      },
+      {
+        integer,
+        8,
+      },
+      {
+        integer,
+        12,
+      },
+    },
   };
-  const auto flat = Schema::composite({entries, 4}, 16, 4);
+  const auto flat = Schema::composite(
+      {
+        entries.get_data(),
+        4,
+      },
+      16, 4);
   const auto range = Schema::range(foreign_integer, 4, 4, 16, 4);
 
   EXPECT(prepare(flat).compatible(prepare(range)));
@@ -46,8 +67,24 @@ VALIDATION_TEST(TtxCompiler, composite_and_range) {
 // admitted immutable descriptor so they never repeat this walk for each GEP.
 VALIDATION_TEST(TtxCompiler, schema_validation) {
   Preparation prepare;
-  Schema::Position entries[] = {{integer, 0}, {integer, 2}};
-  auto shape = Schema::composite({entries, 2}, 8, 4);
+  Static::Vector<Schema::Position, 2> entries = {
+    {
+      Schema::Position{
+        integer,
+        0,
+      },
+      {
+        integer,
+        2,
+      },
+    },
+  };
+  auto shape = Schema::composite(
+      {
+        entries.get_data(),
+        2,
+      },
+      8, 4);
   EXPECT(prepare.validate(shape) == Status::Invalid);
 
   entries[1].offset = 4;
@@ -80,14 +117,30 @@ VALIDATION_TEST(TtxCompiler, wide_composite) {
   Preparation prepare;
   const auto other = Schema::primitive(Schema::Value::U32);
   const auto real = Schema::primitive(Schema::Value::R32);
-  Schema::Position a[512], b[512];
+  Static::Vector<Schema::Position, 512> a, b;
   for (Count i = 0; i < 512; ++i) {
-    a[i] = {i % 2 ? integer : real, i * 4};
-    b[i] = {i % 2 ? other : real, i * 4};
+    a[i] = {
+      i % 2 ? integer : real,
+      i * 4,
+    };
+    b[i] = {
+      i % 2 ? other : real,
+      i * 4,
+    };
   }
 
-  const auto left = Schema::composite({a, 512}, 2048, 4);
-  const auto right = Schema::composite({b, 512}, 2048, 4);
+  const auto left = Schema::composite(
+      {
+        a.get_data(),
+        512,
+      },
+      2048, 4);
+  const auto right = Schema::composite(
+      {
+        b.get_data(),
+        512,
+      },
+      2048, 4);
 
   const auto& prepared_left = prepare(left);
   const auto& prepared_right = prepare(right);
@@ -106,15 +159,22 @@ VALIDATION_TEST(TtxCompiler, wide_composite) {
 VALIDATION_TEST(TtxCompiler, empty_equivalence) {
   Preparation prepare;
   const auto real = Schema::primitive(Schema::Value::R32);
-  const Schema forms[] = {
-    Schema::range(integer, 0, 4, 0, 4),
-    Schema::composite({}, 0, 4),
-    Schema::range(real, 0, 4, 0, 4),
+  const Static::Vector<Schema, 3> forms = {
+    {
+      Schema::range(integer, 0, 4, 0, 4),
+      Schema::composite({}, 0, 4),
+      Schema::range(real, 0, 4, 0, 4),
+    },
   };
-  const Representation* prepared[] = {
-    &prepare(forms[0]), &prepare(forms[1]), &prepare(forms[2])};
-  for (const auto* source : prepared) {
-    for (const auto* destination : prepared) {
+  Static::Vector<const Representation*, 3> prepared = {
+    {
+      &prepare(forms[0]),
+      &prepare(forms[1]),
+      &prepare(forms[2]),
+    },
+  };
+  for (const auto* source : prepared.get_view()) {
+    for (const auto* destination : prepared.get_view()) {
       EXPECT(source->compatible(*destination));
     }
   }
@@ -125,21 +185,88 @@ VALIDATION_TEST(TtxCompiler, empty_equivalence) {
 // Explicitly placed compact children still agree with their repeated form.
 VALIDATION_TEST(TtxCompiler, padding_equivalence) {
   Preparation prepare;
-  const Schema::Position child[] = {{integer, 0}};
-  const auto padded = Schema::composite({child, 1}, 8, 4);
-  const auto compact = Schema::composite({child, 1}, 4, 4);
-  const Schema::Position nested[] = {{padded, 0}, {compact, 8}};
-  const Schema::Position flat[] = {{compact, 0}, {compact, 8}};
-  const Schema forms[] = {
-    Schema::composite({nested, 2}, 12, 4),
-    Schema::composite({flat, 2}, 12, 4),
-    Schema::range(compact, 2, 8, 12, 4),
+  const Static::Vector<Schema::Position, 1> child = {
+    {
+      Schema::Position{
+        integer,
+        0,
+      },
+    },
+  };
+  const auto padded = Schema::composite(
+      {
+        child.get_data(),
+        1,
+      },
+      8, 4);
+  const auto compact = Schema::composite(
+      {
+        child.get_data(),
+        1,
+      },
+      4, 4);
+  const Static::Vector<Schema::Position, 2> nested = {
+    {
+      Schema::Position{
+        padded,
+        0,
+      },
+      {
+        compact,
+        8,
+      },
+    },
+  };
+  const Static::Vector<Schema::Position, 2> flat = {
+    {
+      Schema::Position{
+        compact,
+        0,
+      },
+      {
+        compact,
+        8,
+      },
+    },
+  };
+  const Static::Vector<Schema, 3> forms = {
+    {
+      Schema::composite(
+          {
+            nested.get_data(),
+            2,
+          },
+          12, 4),
+      Schema::composite(
+          {
+            flat.get_data(),
+            2,
+          },
+          12, 4),
+      Schema::range(compact, 2, 8, 12, 4),
+    },
   };
   EXPECT_NOT(prepare(forms[0]).compatible(prepare(forms[1])));
   EXPECT(prepare(forms[1]).compatible(prepare(forms[2])));
 
-  const Schema::Position shifted[] = {{compact, 4}, {compact, 8}};
-  const auto different = Schema::composite({shifted, 2}, 12, 4);
+  const Static::Vector<Schema::Position, 2> shifted = {
+    {
+      Schema::Position{
+        compact,
+        4,
+      },
+      {
+        compact,
+        8,
+      },
+    },
+  };
+  const auto different = Schema::composite(
+      {
+        shifted.get_data(),
+        2,
+      },
+      12, 4);
   EXPECT_NOT(prepare(forms[0]).compatible(prepare(different)));
 }
 
@@ -148,9 +275,26 @@ VALIDATION_TEST(TtxCompiler, padding_equivalence) {
 // their repeated descriptor and child body to the comparison.
 VALIDATION_TEST(TtxCompiler, repeated_padding) {
   Preparation prepare;
-  const Schema::Position child[] = {{integer, 0}};
-  const auto padded = Schema::composite({child, 1}, 8, 4);
-  const auto compact = Schema::composite({child, 1}, 4, 4);
+  const Static::Vector<Schema::Position, 1> child = {
+    {
+      Schema::Position{
+        integer,
+        0,
+      },
+    },
+  };
+  const auto padded = Schema::composite(
+      {
+        child.get_data(),
+        1,
+      },
+      8, 4);
+  const auto compact = Schema::composite(
+      {
+        child.get_data(),
+        1,
+      },
+      4, 4);
   const auto a = Schema::range(padded, 1000000000, 8, 8000000000, 4);
   const auto b = Schema::range(compact, 1000000000, 8, 8000000000, 4);
   EXPECT_NOT(prepare(a).compatible(prepare(b)));
@@ -160,12 +304,56 @@ VALIDATION_TEST(TtxCompiler, repeated_padding) {
 // nor a matching extent allows comparison to discard that boundary.
 VALIDATION_TEST(TtxCompiler, nested_group_match) {
   Preparation prepare;
-  const Schema::Position pair[] = {{integer, 0}, {integer, 4}};
-  const auto group = Schema::composite({pair, 2}, 8, 4);
-  const Schema::Position fields[] = {{group, 0}, {integer, 8}};
-  const auto flat = Schema::composite({fields, 2}, 12, 4);
-  const Schema::Position wrapper[] = {{flat, 0}};
-  const auto nested = Schema::composite({wrapper, 1}, 12, 4);
+  const Static::Vector<Schema::Position, 2> pair = {
+    {
+      Schema::Position{
+        integer,
+        0,
+      },
+      {
+        integer,
+        4,
+      },
+    },
+  };
+  const auto group = Schema::composite(
+      {
+        pair.get_data(),
+        2,
+      },
+      8, 4);
+  const Static::Vector<Schema::Position, 2> fields = {
+    {
+      Schema::Position{
+        group,
+        0,
+      },
+      {
+        integer,
+        8,
+      },
+    },
+  };
+  const auto flat = Schema::composite(
+      {
+        fields.get_data(),
+        2,
+      },
+      12, 4);
+  const Static::Vector<Schema::Position, 1> wrapper = {
+    {
+      Schema::Position{
+        flat,
+        0,
+      },
+    },
+  };
+  const auto nested = Schema::composite(
+      {
+        wrapper.get_data(),
+        1,
+      },
+      12, 4);
   EXPECT_NOT(prepare(nested).compatible(prepare(flat)));
 
   const auto ungrouped = Schema::range(integer, 3, 4, 12, 4);

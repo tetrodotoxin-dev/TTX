@@ -30,7 +30,11 @@ typedef struct counter_fixture {
 } counter_fixture;
 
 typedef ttx_data_status (*interface_compile)(
-    ttx_schema_reference, Count, ttx_representation_allocator, const ttx_representation**);
-PERIMORTEM_C counter_fixture interface_provider_open(interface_compile compiler);
+    ttx_schema_reference,
+    Count,
+    ttx_representation_allocator,
+    const ttx_representation**);
+PERIMORTEM_C counter_fixture
+    interface_provider_open(interface_compile compiler);
 
 #endif

@@ -13,7 +13,10 @@ VALIDATION_TEST(TtxFlow, primitive_abi) {
   Module module;
   ASSERT(module.is_set());
 
-  Validation::FlowTests::Reader reader{module.primitive_schema(), PROVIDES_FRAGMENT};
+  Validation::FlowTests::Reader reader{
+    module.primitive_schema(),
+    PROVIDES_FRAGMENT,
+  };
   Flow flow;
   ASSERT(
       flow.connect(reader.query(), module.primitives()) ==
@@ -37,5 +40,4 @@ VALIDATION_TEST(TtxFlow, primitive_abi) {
 
   ASSERT(output.pointer);
   EXPECT_EQ(*static_cast<const U32*>(output.pointer), U32(42));
-
 }

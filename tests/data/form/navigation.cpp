@@ -1,11 +1,12 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "toolchain/validation/unit_test.hpp"
-#include "tests/data/form/preparation.hpp"
+#include "perimortem/core/static/vector.hpp"
 
-#include "ttx/data/form/representation.hpp"
+#include "tests/data/form/preparation.hpp"
 #include "tests/data/form/visitation.h"
+#include "toolchain/validation/unit_test.hpp"
+#include "ttx/data/form/representation.hpp"
 
 using namespace Perimortem::Core;
 using namespace Ttx::Data;
@@ -14,7 +15,8 @@ using Ttx::Data::Form::Schema;
 using Validation::DataTests::Preparation;
 
 static Toolchain::Validation::Harness TtxNavigation = {
-  .name = "TTX::Data::Form::Navigation"};
+  .name = "TTX::Data::Form::Navigation",
+};
 static constexpr auto integer = Schema::primitive(Schema::Value::U32);
 static constexpr auto small = Schema::primitive(Schema::Value::U16);
 
@@ -44,10 +46,38 @@ VALIDATION_TEST(TtxNavigation, range_coordinate) {
 // the child placement to its own member offset, preserving leading padding.
 VALIDATION_TEST(TtxNavigation, composite_coordinate) {
   Preparation prepare;
-  const Schema::Position members[] = {{small, 0}, {integer, 8}};
-  const auto record = Schema::composite({members, 2}, 16, 4);
-  const Schema::Position entries[] = {{record, 16}};
-  const auto root = Schema::composite({entries, 1}, 32, 4);
+  const Static::Vector<Schema::Position, 2> members = {
+    {
+      Schema::Position{
+        small,
+        0,
+      },
+      {
+        integer,
+        8,
+      },
+    },
+  };
+  const auto record = Schema::composite(
+      {
+        members.get_data(),
+        2,
+      },
+      16, 4);
+  const Static::Vector<Schema::Position, 1> entries = {
+    {
+      Schema::Position{
+        record,
+        16,
+      },
+    },
+  };
+  const auto root = Schema::composite(
+      {
+        entries.get_data(),
+        1,
+      },
+      32, 4);
   const auto& prepared = prepare(root);
 
   prepared.next(24).visit(
@@ -63,8 +93,24 @@ VALIDATION_TEST(TtxNavigation, composite_coordinate) {
 // active composite path and performs no repeated lookup of earlier fields.
 VALIDATION_TEST(TtxNavigation, padded_range_walk) {
   Preparation prepare;
-  const Schema::Position fields[] = {{small, 0}, {integer, 8}};
-  const auto record = Schema::composite({fields, 2}, 16, 4);
+  const Static::Vector<Schema::Position, 2> fields = {
+    {
+      Schema::Position{
+        small,
+        0,
+      },
+      {
+        integer,
+        8,
+      },
+    },
+  };
+  const auto record = Schema::composite(
+      {
+        fields.get_data(),
+        2,
+      },
+      16, 4);
   const auto records = Schema::range(record, 16, 16, 256, 4);
   const auto& prepared = prepare(records);
   Count seen = 0;
@@ -87,8 +133,24 @@ VALIDATION_TEST(TtxNavigation, padded_range_walk) {
 // coordinate with their request, as Swizzle admission does.
 VALIDATION_TEST(TtxNavigation, physical_coordinates) {
   Preparation prepare;
-  const Schema::Position fields[] = {{small, 0}, {integer, 8}};
-  const auto record = Schema::composite({fields, 2}, 16, 4);
+  const Static::Vector<Schema::Position, 2> fields = {
+    {
+      Schema::Position{
+        small,
+        0,
+      },
+      {
+        integer,
+        8,
+      },
+    },
+  };
+  const auto record = Schema::composite(
+      {
+        fields.get_data(),
+        2,
+      },
+      16, 4);
   const auto records = Schema::range(record, 4, 16, 64, 4);
   const auto& prepared = prepare(records);
 
@@ -127,11 +189,19 @@ VALIDATION_TEST(TtxNavigation, empty_and_invalid) {
 // preceding subtree has to be counted to return an ABI byte coordinate.
 VALIDATION_TEST(TtxNavigation, deep_coordinate) {
   Preparation prepare;
-  Schema layers[256];
-  Schema::Position entries[256];
+  Static::Vector<Schema, 256> layers;
+  Static::Vector<Schema::Position, 256> entries;
   for (Count i = 0; i < 256; ++i) {
-    entries[i] = {i ? &layers[i - 1] : &integer, 4};
-    layers[i] = Schema::composite({&entries[i], 1}, (i + 2) * 4, 4);
+    entries[i] = {
+      i ? &layers[i - 1] : &integer,
+      4,
+    };
+    layers[i] = Schema::composite(
+        {
+          &entries[i],
+          1,
+        },
+        (i + 2) * 4, 4);
   }
 
   const auto& root = layers[255];
@@ -151,8 +221,8 @@ VALIDATION_TEST(TtxNavigation, deep_coordinate) {
 VALIDATION_TEST(TtxNavigation, shared_body_access) {
   Preparation prepare;
   const auto byte = Schema::primitive(Schema::Value::U8);
-  Schema bodies[24];
-  Schema::Position fields[24][3];
+  Static::Vector<Schema, 24> bodies;
+  Static::Vector<Static::Vector<Schema::Position, 3>, 24> fields;
   for (Count i = 0; i < 24; ++i) {
     const auto& child = i ? bodies[i - 1] : byte;
     const Count extent = child.get_extent();
@@ -160,7 +230,8 @@ VALIDATION_TEST(TtxNavigation, shared_body_access) {
     fields[i][1] = Schema::Position(byte, extent);
     fields[i][2] = Schema::Position(child, extent + 1);
     bodies[i] = Schema::composite(
-        View::Vector<Schema::Position>(fields[i], 3), extent * 2 + 1);
+        View::Vector<Schema::Position>(fields[i].get_data(), 3),
+        extent * 2 + 1);
   }
 
   const auto& representation = prepare(bodies[23]);
@@ -190,7 +261,9 @@ VALIDATION_TEST(TtxNavigation, shared_body_access) {
 VALIDATION_TEST(TtxNavigation, c_streaming_visit) {
   Preparation prepare;
   const auto& representation = prepare(Schema::range(integer, 4, 4, 16, 4));
-  visitation_probe probe = {.stop = 2};
+  visitation_probe probe = {
+    .stop = 2,
+  };
   EXPECT(
       observe_representation(&representation, nullptr, 0, &probe) ==
       TTX_DATA_DENIED);
@@ -213,24 +286,38 @@ VALIDATION_TEST(TtxNavigation, c_selected_visit) {
   Preparation prepare;
   const auto& representation =
       prepare(Schema::range(integer, 1000000000, 4, 4000000000, 4));
-  const Count last[] = {3999999996};
-  visitation_probe probe = {.stop = 8};
+  const Static::Vector<Count, 1> last = {
+    {
+      3999999996,
+    },
+  };
+  visitation_probe probe = {
+    .stop = 8,
+  };
   EXPECT(
-      observe_representation(&representation, last, 1, &probe) ==
+      observe_representation(&representation, last.get_data(), 1, &probe) ==
       TTX_DATA_SUCCESS);
   EXPECT_EQ(probe.count, Count(1));
   EXPECT_EQ(probe.offsets[0], last[0]);
 
-  const Count interior[] = {1};
+  const Static::Vector<Count, 1> interior = {
+    {
+      1,
+    },
+  };
   probe.count = 0;
   EXPECT(
-      observe_representation(&representation, interior, 1, &probe) ==
+      observe_representation(&representation, interior.get_data(), 1, &probe) ==
       TTX_DATA_BOUNDS);
   EXPECT_EQ(probe.count, Count(0));
 
-  const Count outside[] = {4000000000};
+  const Static::Vector<Count, 1> outside = {
+    {
+      4000000000,
+    },
+  };
   EXPECT(
-      observe_representation(&representation, outside, 1, &probe) ==
+      observe_representation(&representation, outside.get_data(), 1, &probe) ==
       TTX_DATA_BOUNDS);
   EXPECT_EQ(probe.count, Count(0));
 }
@@ -243,18 +330,29 @@ VALIDATION_TEST(TtxNavigation, selected_composites) {
   const auto record =
       Schema::composite(View::Vector<Schema::Position>(&member, 1), 12, 4);
   const auto& representation = prepare(Schema::range(record, 3, 16, 44, 4));
-  const Count selected[] = {4, 36};
-  visitation_probe probe = {.stop = 8};
+  const Static::Vector<Count, 2> selected = {
+    {
+      4,
+      36,
+    },
+  };
+  visitation_probe probe = {
+    .stop = 8,
+  };
   EXPECT(
-      observe_representation(&representation, selected, 2, &probe) ==
+      observe_representation(&representation, selected.get_data(), 2, &probe) ==
       TTX_DATA_SUCCESS);
   EXPECT_EQ(probe.offsets[0], Count(4));
   EXPECT_EQ(probe.offsets[1], Count(36));
 
-  const Count padding[] = {12};
+  const Static::Vector<Count, 1> padding = {
+    {
+      12,
+    },
+  };
   probe.count = 0;
   EXPECT(
-      observe_representation(&representation, padding, 1, &probe) ==
+      observe_representation(&representation, padding.get_data(), 1, &probe) ==
       TTX_DATA_BOUNDS);
   EXPECT_EQ(probe.count, Count(0));
 }

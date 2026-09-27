@@ -228,7 +228,10 @@ typedef struct ttx_schema {
   U8 kind;
   union {
 #ifdef __cplusplus
-    ttx_schema_primitive value = {0, 0};
+    ttx_schema_primitive value = {
+      0,
+      0,
+    };
 #else
     ttx_schema_primitive value;
 #endif
@@ -337,7 +340,10 @@ typedef struct ttx_schema {
 
   constexpr auto get_positions() const
       -> Perimortem::Core::View::Vector<Position> {
-    return {data.composite.positions, data.composite.count};
+    return {
+      data.composite.positions,
+      data.composite.count,
+    };
   }
 
   constexpr auto get_range() const -> const Range& { return data.range; }

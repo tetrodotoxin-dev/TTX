@@ -1,18 +1,18 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "perimortem/core/null_terminated.hpp"
-
 #include "ttx/semantic/realization/invocation.hpp"
 
-#include "tests/library.hpp"
-#include "toolchain/validation/unit_test.hpp"
-#include "tests/semantic/measurement.hpp"
+#include "perimortem/core/static/vector.hpp"
+#include "perimortem/core/null_terminated.hpp"
 
+#include "tests/library.hpp"
+#include "tests/semantic/fixtures/invocation_provider.h"
+#include "tests/semantic/measurement.hpp"
+#include "toolchain/validation/unit_test.hpp"
 #include "ttx/data/form/compiled.hpp"
 #include "ttx/semantic/flows/copy.hpp"
 #include "ttx/semantic/transport/flow.hpp"
-#include "tests/semantic/fixtures/invocation_provider.h"
 
 using namespace Perimortem;
 using namespace Ttx::Semantic::Negotiation;
@@ -20,21 +20,28 @@ using namespace Ttx::Semantic::Realization;
 using namespace Ttx::Semantic::Transport;
 using Ttx::Data::Form::Schema;
 
-static Toolchain::Validation::Harness InvocationTests = {.name = "TTX::Invocation"};
+static Toolchain::Validation::Harness InvocationTests = {
+  .name = "TTX::Invocation",
+};
 static constexpr auto integer = Schema::primitive(Schema::Value::S64);
 static constexpr auto real = Schema::primitive(Schema::Value::R64);
 static constexpr auto flag = Schema::primitive(Schema::Value::U8);
-static constexpr Schema::Position positions[] = {
-  Schema::Position(integer, __builtin_offsetof(invocation_input, value)),
-  Schema::Position(real, __builtin_offsetof(invocation_input, scale)),
-  Schema::Position(flag, __builtin_offsetof(invocation_input, negate)),
+static constexpr Perimortem::Core::Static::Vector<Schema::Position, 3>
+    positions = {
+      {
+        Schema::Position(integer, __builtin_offsetof(invocation_input, value)),
+        Schema::Position(real, __builtin_offsetof(invocation_input, scale)),
+        Schema::Position(flag, __builtin_offsetof(invocation_input, negate)),
+      },
 };
 static constexpr auto inputs = Schema::composite(
     positions,
     sizeof(invocation_input),
     alignof(invocation_input));
 static constexpr System::Uuid operation{
-  INVOCATION_METHOD_HIGH, INVOCATION_METHOD_LOW};
+  INVOCATION_METHOD_HIGH,
+  INVOCATION_METHOD_LOW,
+};
 
 class ForeignInvocation {
  public:
@@ -52,40 +59,41 @@ class ForeignInvocation {
     return Ttx::Data::Form::Compiled<real>::get_representation();
   }
   auto query() -> Query {
-    return Query(
-        {this,
-         [](const void* source, perimortem_uuid id,
-            ttx_storage requested) -> ttx_binding_status {
-           const auto& self = *static_cast<const ForeignInvocation*>(source);
-           if (System::Uuid(id) != operation) {
-             return TTX_BINDING_UNSUPPORTED;
-           }
+    return Query({
+      this,
+      [](const void* source, perimortem_uuid id,
+         ttx_storage requested) -> ttx_binding_status {
+        const auto& self = *static_cast<const ForeignInvocation*>(source);
+        if (System::Uuid(id) != operation) {
+          return TTX_BINDING_UNSUPPORTED;
+        }
 
-           // This provider policy composes ordinary Flow and Copy. The C module
-           // chooses its transport. Binding transfers an ordinary API record.
-           // The copied receiver belongs to the module, so releasing a Shared
-           // loan of the API record does not invalidate that receiver.
-           Flow flow;
-           const auto status = flow.connect(
-               Flow::reader(*requested.representation), Query(self.api.query));
-           if (status == Flow::Status::Unsupported) {
-             return TTX_BINDING_UNSUPPORTED;
-           }
-           if (status == Flow::Status::BindingPending) {
-             return TTX_BINDING_PENDING;
-           }
-           if (status != Flow::Status::Success) {
-             return TTX_BINDING_REJECTED;
-           }
-           const auto copied = Ttx::Semantic::Flows::Copy::flow(
-               flow, Ttx::Data::Form::Storage(requested));
-           return copied == Ttx::Data::Status::Success ? TTX_BINDING_SATISFIED
-                                                       : TTX_BINDING_REJECTED;
-         },
-         [](const void*, perimortem_uuid id) -> ttx_binding_status {
-           return System::Uuid(id) == operation ? TTX_BINDING_SATISFIED
-                                                : TTX_BINDING_UNSUPPORTED;
-         }});
+        // This provider policy composes ordinary Flow and Copy. The C module
+        // chooses its transport. Binding transfers an ordinary API record.
+        // The copied receiver belongs to the module, so releasing a Shared
+        // loan of the API record does not invalidate that receiver.
+        Flow flow;
+        const auto status = flow.connect(
+            Flow::consumer(*requested.representation), Query(self.api.query));
+        if (status == Flow::Status::Unsupported) {
+          return TTX_BINDING_UNSUPPORTED;
+        }
+        if (status == Flow::Status::BindingPending) {
+          return TTX_BINDING_PENDING;
+        }
+        if (status != Flow::Status::Success) {
+          return TTX_BINDING_REJECTED;
+        }
+        const auto copied = Ttx::Semantic::Flows::Copy::flow(
+            flow, Ttx::Data::Form::Storage(requested));
+        return copied == Ttx::Data::Status::Success ? TTX_BINDING_SATISFIED
+                                                    : TTX_BINDING_REJECTED;
+      },
+      [](const void*, perimortem_uuid id) -> ttx_binding_status {
+        return System::Uuid(id) == operation ? TTX_BINDING_SATISFIED
+                                             : TTX_BINDING_UNSUPPORTED;
+      },
+    });
   }
 
   auto connect(Invocation& call) -> Binding::Status {
@@ -110,7 +118,11 @@ VALIDATION_TEST(InvocationTests, foreign_transports) {
     // Preparation and Data transfer are deliberately outside measurement.
     // A private C receiver adds two before scaling. The independent arithmetic
     // answer catches lost fields, wrong offsets and incorrect receiver use.
-    const invocation_input arguments{5, 1.5, 1};
+    const invocation_input arguments{
+      5,
+      1.5,
+      1,
+    };
     R64 answer = 0;
     Validation::FlowTests::Measurement measurement;
     for (Count i = 0; i != 2; ++i) {
@@ -144,16 +156,25 @@ VALIDATION_TEST(InvocationTests, refusal_and_retry) {
           Ttx::Data::Form::Compiled<integer>::get_representation()) ==
       Binding::Status::Rejected);
   EXPECT_EQ(foreign.api.statistics().calls, U64(0));
-  const ttx_binding_status failures[] = {
-    TTX_BINDING_UNSUPPORTED, TTX_BINDING_PENDING, TTX_BINDING_REJECTED};
-  const Binding::Status expected[] = {
-    Binding::Status::Unsupported, Binding::Status::Pending,
-    Binding::Status::Rejected};
+  const Perimortem::Core::Static::Vector<ttx_binding_status, 3> failures = {
+    {
+      TTX_BINDING_UNSUPPORTED,
+      TTX_BINDING_PENDING,
+      TTX_BINDING_REJECTED,
+    },
+  };
+  const Perimortem::Core::Static::Vector<Binding::Status, 3> expected = {
+    {
+      Binding::Status::Unsupported,
+      Binding::Status::Pending,
+      Binding::Status::Rejected,
+    },
+  };
   for (U32 i = 0; i != 3; ++i) {
     foreign.api.configure(0, failures[i], 0);
     EXPECT(foreign.connect(call) == expected[i]);
-    // Unsupported allows the provider's ordinary Flow to try every protocol;
-    // a pending or rejected policy stops after the first request.
+    // Unsupported allows the provider's ordinary Flow to try every protocol.
+    // A pending or rejected policy stops after the first request.
     EXPECT_EQ(
         foreign.api.statistics().binds,
         U64(failures[i] == TTX_BINDING_UNSUPPORTED ? 4 : 1));

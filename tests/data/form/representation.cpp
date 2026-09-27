@@ -3,8 +3,9 @@
 
 #include "ttx/data/form/representation.hpp"
 
-#include "toolchain/validation/unit_test.hpp"
+#include "perimortem/core/static/vector.hpp"
 
+#include "toolchain/validation/unit_test.hpp"
 #include "ttx/data/form/schema.hpp"
 
 using namespace Perimortem::Core;
@@ -13,7 +14,8 @@ using namespace Ttx::Data::Form;
 using Perimortem::Memory::Allocator::Arena;
 
 static Toolchain::Validation::Harness TtxRepresentation = {
-  .name = "TTX::Data::Form::Representation"};
+  .name = "TTX::Data::Form::Representation",
+};
 static constexpr auto u32 = Schema::primitive(Schema::Value::U32);
 
 // Both the source tree and its placement array disappear before lookup. The
@@ -24,8 +26,24 @@ VALIDATION_TEST(TtxRepresentation, independent_lifetime) {
   const Representation* prepared = nullptr;
   {
     auto value = u32;
-    const Schema::Position entries[] = {{value, 0}, {value, 8}};
-    const auto schema = Schema::composite({entries, 2}, 12, 4);
+    const Static::Vector<Schema::Position, 2> entries = {
+      {
+        Schema::Position{
+          value,
+          0,
+        },
+        {
+          value,
+          8,
+        },
+      },
+    };
+    const auto schema = Schema::composite(
+        {
+          entries.get_data(),
+          2,
+        },
+        12, 4);
     Representation::compile(schema, arena)
         .visit(
             [&](const Representation& result) { prepared = &result; },
@@ -47,10 +65,38 @@ VALIDATION_TEST(TtxRepresentation, independent_lifetime) {
 VALIDATION_TEST(TtxRepresentation, heterogeneous_index) {
   Arena arena;
   const auto real = Schema::primitive(Schema::Value::R32);
-  const Schema::Position entries[] = {{u32, 0}, {real, 8}};
-  const auto inner = Schema::composite({entries, 2}, 12, 4);
-  const Schema::Position wrapper[] = {{inner, 0}};
-  const auto outer = Schema::composite({wrapper, 1}, 12, 4);
+  const Static::Vector<Schema::Position, 2> entries = {
+    {
+      Schema::Position{
+        u32,
+        0,
+      },
+      {
+        real,
+        8,
+      },
+    },
+  };
+  const auto inner = Schema::composite(
+      {
+        entries.get_data(),
+        2,
+      },
+      12, 4);
+  const Static::Vector<Schema::Position, 1> wrapper = {
+    {
+      Schema::Position{
+        inner,
+        0,
+      },
+    },
+  };
+  const auto outer = Schema::composite(
+      {
+        wrapper.get_data(),
+        1,
+      },
+      12, 4);
   Representation::compile(outer, arena)
       .visit(
           [&](const Representation& value) {
@@ -73,8 +119,14 @@ VALIDATION_TEST(TtxRepresentation, invalid_publication) {
   auto misaligned = u32;
   misaligned.alignment = 1;
   const auto padding = Schema::composite({}, 8, 8);
-  const Schema failures[] = {truncated, misaligned, padding};
-  for (const auto& source : failures) {
+  const Static::Vector<Schema, 3> failures = {
+    {
+      truncated,
+      misaligned,
+      padding,
+    },
+  };
+  for (const auto& source : failures.get_view()) {
     Representation::compile(source, arena)
         .visit(
             [&](const Representation&) { EXPECT(false); },
@@ -82,8 +134,20 @@ VALIDATION_TEST(TtxRepresentation, invalid_publication) {
   }
 
   Schema cyclic{};
-  const Schema::Position entry[] = {{cyclic, 0}};
-  cyclic = Schema::composite({entry, 1}, 4, 4);
+  const Static::Vector<Schema::Position, 1> entry = {
+    {
+      Schema::Position{
+        cyclic,
+        0,
+      },
+    },
+  };
+  cyclic = Schema::composite(
+      {
+        entry.get_data(),
+        1,
+      },
+      4, 4);
   Representation::compile(cyclic, arena)
       .visit(
           [&](const Representation&) { EXPECT(false); },
@@ -120,9 +184,11 @@ VALIDATION_TEST(TtxRepresentation, publication_on_error) {
   auto source = u32;
   source.extent = 1;
   const ttx_representation_allocator allocator = {
-    &arena, [](void* owner, Count size, Count) -> void* {
+    &arena,
+    [](void* owner, Count size, Count) -> void* {
       return static_cast<Arena*>(owner)->allocate(size).get_data();
-    }};
+    },
+  };
   EXPECT(
       ttx_representation_compile(&source, sizeof(void*), allocator, &output) ==
       TTX_DATA_INVALID);
@@ -135,8 +201,24 @@ VALIDATION_TEST(TtxRepresentation, nested_units) {
   Arena arena;
   const auto empty = Schema::composite({}, 0);
   const auto repeated = Schema::range(empty, 1000000000, 8, 0, 8);
-  const Schema::Position children[] = {{empty, 0}, {repeated, 0}};
-  const auto grouped = Schema::composite({children, 2}, 0, 8);
+  const Static::Vector<Schema::Position, 2> children = {
+    {
+      Schema::Position{
+        empty,
+        0,
+      },
+      {
+        repeated,
+        0,
+      },
+    },
+  };
+  const auto grouped = Schema::composite(
+      {
+        children.get_data(),
+        2,
+      },
+      0, 8);
   Representation::compile(grouped, arena)
       .visit(
           [&](const Representation& value) {
@@ -154,10 +236,14 @@ VALIDATION_TEST(TtxRepresentation, adjacent_ranges) {
   Arena arena;
   const auto first = Schema::range(u32, 3, 4, 12, 4);
   const auto second = Schema::range(u32, 5, 4, 20, 4);
-  const Schema::Position pieces[] = {
-    Schema::Position(first, 0), Schema::Position(second, 12)};
-  const auto source =
-      Schema::composite(View::Vector<Schema::Position>(pieces, 2), 32, 4);
+  const Static::Vector<Schema::Position, 2> pieces = {
+    {
+      Schema::Position(first, 0),
+      Schema::Position(second, 12),
+    },
+  };
+  const auto source = Schema::composite(
+      View::Vector<Schema::Position>(pieces.get_data(), 2), 32, 4);
 
   Representation::compile(source, arena)
       .visit(
@@ -180,10 +266,14 @@ VALIDATION_TEST(TtxRepresentation, repeated_records) {
   Arena arena;
   Arena other_arena;
   const auto real = Schema::primitive(Schema::Value::R32);
-  const Schema::Position fields[] = {
-    Schema::Position(u32, 0), Schema::Position(real, 8)};
-  const auto record =
-      Schema::composite(View::Vector<Schema::Position>(fields, 2), 16, 4);
+  const Static::Vector<Schema::Position, 2> fields = {
+    {
+      Schema::Position(u32, 0),
+      Schema::Position(real, 8),
+    },
+  };
+  const auto record = Schema::composite(
+      View::Vector<Schema::Position>(fields.get_data(), 2), 16, 4);
   const auto source = Schema::range(record, 1000000000, 16, 16000000000ULL, 4);
 
   Representation::compile(source, arena)
@@ -211,21 +301,69 @@ VALIDATION_TEST(TtxRepresentation, repeated_records) {
 // stream, so byte comparison rejects the different contracts directly.
 VALIDATION_TEST(TtxRepresentation, boundary_mismatch) {
   Arena arena;
-  const Schema::Position pair_fields[] = {{u32, 0}, {u32, 4}};
-  const Schema::Position triple_fields[] = {{u32, 0}, {u32, 4}, {u32, 8}};
+  const Static::Vector<Schema::Position, 2> pair_fields = {
+    {
+      Schema::Position{
+        u32,
+        0,
+      },
+      {
+        u32,
+        4,
+      },
+    },
+  };
+  const Static::Vector<Schema::Position, 3> triple_fields = {
+    {
+      Schema::Position{
+        u32,
+        0,
+      },
+      {
+        u32,
+        4,
+      },
+      {
+        u32,
+        8,
+      },
+    },
+  };
   const Schema::Position single_field(u32, 0);
-  const auto pair =
-      Schema::composite(View::Vector<Schema::Position>(pair_fields, 2), 8, 4);
+  const auto pair = Schema::composite(
+      View::Vector<Schema::Position>(pair_fields.get_data(), 2), 8, 4);
   const auto triple = Schema::composite(
-      View::Vector<Schema::Position>(triple_fields, 3), 12, 4);
+      View::Vector<Schema::Position>(triple_fields.get_data(), 3), 12, 4);
   const auto single =
       Schema::composite(View::Vector<Schema::Position>(&single_field, 1), 4, 4);
-  const Schema::Position two_pairs[] = {{pair, 0}, {pair, 8}};
-  const Schema::Position one_three[] = {{single, 0}, {triple, 4}};
-  const auto a =
-      Schema::composite(View::Vector<Schema::Position>(two_pairs, 2), 16, 4);
-  const auto b =
-      Schema::composite(View::Vector<Schema::Position>(one_three, 2), 16, 4);
+  const Static::Vector<Schema::Position, 2> two_pairs = {
+    {
+      Schema::Position{
+        pair,
+        0,
+      },
+      {
+        pair,
+        8,
+      },
+    },
+  };
+  const Static::Vector<Schema::Position, 2> one_three = {
+    {
+      Schema::Position{
+        single,
+        0,
+      },
+      {
+        triple,
+        4,
+      },
+    },
+  };
+  const auto a = Schema::composite(
+      View::Vector<Schema::Position>(two_pairs.get_data(), 2), 16, 4);
+  const auto b = Schema::composite(
+      View::Vector<Schema::Position>(one_three.get_data(), 2), 16, 4);
 
   Representation::compile(a, arena).visit(
       [&](const Representation& left) {
@@ -244,17 +382,57 @@ VALIDATION_TEST(TtxRepresentation, boundary_mismatch) {
 // while preserving each nested struct boundary.
 VALIDATION_TEST(TtxRepresentation, boundary_patterns) {
   Arena arena;
-  const Schema::Position pair_fields[] = {{u32, 0}, {u32, 4}};
-  const auto pair =
-      Schema::composite(View::Vector<Schema::Position>(pair_fields, 2), 8, 4);
-  const Schema::Position record_fields[] = {{pair, 0}, {pair, 8}};
+  const Static::Vector<Schema::Position, 2> pair_fields = {
+    {
+      Schema::Position{
+        u32,
+        0,
+      },
+      {
+        u32,
+        4,
+      },
+    },
+  };
+  const auto pair = Schema::composite(
+      View::Vector<Schema::Position>(pair_fields.get_data(), 2), 8, 4);
+  const Static::Vector<Schema::Position, 2> record_fields = {
+    {
+      Schema::Position{
+        pair,
+        0,
+      },
+      {
+        pair,
+        8,
+      },
+    },
+  };
   const auto record = Schema::composite(
-      View::Vector<Schema::Position>(record_fields, 2), 16, 4);
+      View::Vector<Schema::Position>(record_fields.get_data(), 2), 16, 4);
   const auto repeated = Schema::range(record, 4, 16, 64, 4);
-  const Schema::Position listed[] = {
-    {record, 0}, {record, 16}, {record, 32}, {record, 48}};
-  const auto explicit_record =
-      Schema::composite(View::Vector<Schema::Position>(listed, 4), 64, 4);
+  const Static::Vector<Schema::Position, 4> listed = {
+    {
+      Schema::Position{
+        record,
+        0,
+      },
+      {
+        record,
+        16,
+      },
+      {
+        record,
+        32,
+      },
+      {
+        record,
+        48,
+      },
+    },
+  };
+  const auto explicit_record = Schema::composite(
+      View::Vector<Schema::Position>(listed.get_data(), 4), 64, 4);
 
   Representation::compile(repeated, arena)
       .visit(

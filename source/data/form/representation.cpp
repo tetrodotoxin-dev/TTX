@@ -115,11 +115,13 @@ auto ttx_representation::compile(
     Count pointer_size)
     -> Perimortem::Utility::Result<const ttx_representation&, Status> {
   const ttx_representation_allocator allocator = {
-    &arena, [](void* owner, Count bytes, Count) -> void* {
+    &arena,
+    [](void* owner, Count bytes, Count) -> void* {
       return static_cast<Perimortem::Memory::Allocator::Arena*>(owner)
           ->allocate(bytes)
           .get_data();
-    }};
+    },
+  };
   const ttx_representation* result = nullptr;
   const auto status =
       ttx_representation_compile(schema, pointer_size, allocator, &result);
@@ -137,11 +139,13 @@ auto ttx_representation::compose(
     Perimortem::Memory::Allocator::Arena& arena)
     -> Perimortem::Utility::Result<const ttx_representation&, Status> {
   const ttx_representation_allocator allocator = {
-    &arena, [](void* owner, Count bytes, Count) -> void* {
+    &arena,
+    [](void* owner, Count bytes, Count) -> void* {
       return static_cast<Perimortem::Memory::Allocator::Arena*>(owner)
           ->allocate(bytes)
           .get_data();
-    }};
+    },
+  };
   const ttx_representation* result = nullptr;
   const auto status = ttx_representation_compose(
       members.get_data(), members.get_size(), extent, alignment, allocator,

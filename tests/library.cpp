@@ -5,6 +5,7 @@
 
 #include <unistd.h>
 
+#include "perimortem/core/static/vector.hpp"
 #include "perimortem/core/diagnostics/log.hpp"
 #include "perimortem/core/null_terminated.hpp"
 
@@ -14,9 +15,9 @@ using namespace Perimortem;
 using namespace Perimortem::Core;
 
 auto Validation::open_library(View::Bytes name) -> System::Library {
-  U8 path[4096];
-  const auto size =
-      readlink("/proc/self/exe", reinterpret_cast<char*>(path), sizeof(path));
+  Static::Vector<U8, 4096> path;
+  const auto size = readlink(
+      "/proc/self/exe", reinterpret_cast<char*>(path.get_data()), sizeof(path));
   if (size <= 0 || Count(size) == sizeof(path)) {
     Diagnostics::Log::fatal("Cannot locate the fixture executable."_view);
   }
@@ -25,7 +26,7 @@ auto Validation::open_library(View::Bytes name) -> System::Library {
   while (end && path[end - 1] != '/') {
     --end;
   }
-  Memory::Dynamic::Bytes location(View::Bytes(path, end));
+  Memory::Dynamic::Bytes location(View::Bytes(path.get_data(), end));
   location.concat(name);
   Memory::Allocator::Arena errors;
   return System::Library::open(location.get_view(), errors)

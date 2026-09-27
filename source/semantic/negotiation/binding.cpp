@@ -6,7 +6,8 @@
 using namespace Ttx::Semantic::Negotiation;
 
 auto ttx_binding_provide(
-    const ttx_representation* representation, const void* api,
+    const ttx_representation* representation,
+    const void* api,
     ttx_storage requested) -> ttx_binding_status {
   if (!representation->compatible(*requested.representation)) {
     return TTX_BINDING_REJECTED;

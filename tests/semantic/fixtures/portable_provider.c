@@ -14,19 +14,27 @@ static U32 add(const void* receiver, U32 amount) {
 #if defined(__EMSCRIPTEN__)
 static const U8 bytes[] = {
   0x10, 0,    0, 0, 1, 0, 0, 0, 0x21, 0x40, 0x80, 0, 0x80, 0x10, 0, 1,
-  0x83, 0x11, 4, 1, 3, 0, 3, 2, 0x80, 0,    0,    1, 3,    0,    0, 1};
+  0x83, 0x11, 4, 1, 3, 0, 3, 2, 0x80, 0,    0,    1, 3,    0,    0, 1,
+};
 #else
-static const U8 bytes[] = {0x21, 0x80, 0, 1, 0x80, 0x20, 0, 1,
-                           0x83, 0x21, 8, 1, 3,    0,    1, 2,
-                           0x80, 0,    0, 1, 3,    0,    0, 1};
+static const U8 bytes[] = {
+  0x21, 0x80, 0, 1, 0x80, 0x20, 0, 1, 0x83, 0x21, 8, 1,
+  3,    0,    1, 2, 0x80, 0,    0, 1, 3,    0,    0, 1,
+};
 #endif
-static const ttx_representation form = {bytes, sizeof(bytes)};
+static const ttx_representation form = {
+  bytes,
+  sizeof(bytes),
+};
 static ttx_binding_status
     bind(const void* source, perimortem_uuid id, ttx_storage output) {
   if (id.high != 17 || id.low != 23) {
     return TTX_BINDING_UNSUPPORTED;
   }
-  const portable_counter api = {source, add};
+  const portable_counter api = {
+    source,
+    add,
+  };
   return ttx_binding_provide(&form, &api, output);
 }
 static ttx_binding_status supports(const void* source, perimortem_uuid id) {
@@ -35,7 +43,11 @@ static ttx_binding_status supports(const void* source, perimortem_uuid id) {
                                        : TTX_BINDING_UNSUPPORTED;
 }
 ttx_semantic_query portable_counter_open(void) {
-  return (ttx_semantic_query){&value, bind, supports};
+  return (ttx_semantic_query){
+    &value,
+    bind,
+    supports,
+  };
 }
 U32 portable_counter_calls(void) {
   return calls;

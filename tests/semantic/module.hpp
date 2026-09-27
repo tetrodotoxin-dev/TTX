@@ -4,10 +4,9 @@
 #pragma once
 
 #include "tests/library.hpp"
-
-#include "ttx/semantic/flows/swizzle.hpp"
 #include "tests/semantic/fixtures/heterogeneous_provider.h"
 #include "tests/semantic/fixtures/provider.h"
+#include "ttx/semantic/flows/swizzle.hpp"
 
 namespace Validation::FlowTests {
 

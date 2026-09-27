@@ -3,17 +3,18 @@
 
 #pragma once
 
-#include "ttx/data/protocol/block.hpp"
-#include "ttx/data/protocol/direct.hpp"
-#include "ttx/data/protocol/fragment.hpp"
-#include "ttx/data/protocol/shared.hpp"
-#include "ttx/semantic/transport/flow.h"
+#include "perimortem/system/uuid.hpp"
+
+#include "ttx/data/protocol/block/provider.hpp"
+#include "ttx/data/protocol/fragment/provider.hpp"
+#include "ttx/data/protocol/shared/lifetime.hpp"
 #include "ttx/semantic/negotiation/query.hpp"
+#include "ttx/semantic/transport/flow.h"
 
 namespace Ttx::Semantic::Transport {
 
 // Flow selects one synchronous access contract and retains its bound state.
-// The reader describes a representation, while the writer decides which of
+// The consumer describes a representation, while the provider decides which of
 // Direct, Shared, Block and Fragment it can provide. Operations use the first
 // compatible pair without repeating negotiation or discovering other roles.
 //
@@ -23,6 +24,57 @@ namespace Ttx::Semantic::Transport {
 // uses. Execution policies such as deferred work wrap these calls outside Flow.
 class Flow {
  public:
+  // A pair identifies the two sides of one agreement. Their shared spelling
+  // does not imply that either endpoint supplies the other's capabilities.
+  struct Contracts {
+    Perimortem::System::Uuid consumer;
+    Perimortem::System::Uuid provider;
+  };
+
+  static constexpr Contracts direct = {
+    Perimortem::System::Uuid{
+      TTX_DIRECT_CONSUMER_ID_HIGH,
+      TTX_DIRECT_CONSUMER_ID_LOW,
+    },
+    Perimortem::System::Uuid{
+      TTX_DIRECT_PROVIDER_ID_HIGH,
+      TTX_DIRECT_PROVIDER_ID_LOW,
+    },
+  };
+
+  static constexpr Contracts shared = {
+    Perimortem::System::Uuid{
+      TTX_SHARED_CONSUMER_ID_HIGH,
+      TTX_SHARED_CONSUMER_ID_LOW,
+    },
+    Perimortem::System::Uuid{
+      TTX_SHARED_PROVIDER_ID_HIGH,
+      TTX_SHARED_PROVIDER_ID_LOW,
+    },
+  };
+
+  static constexpr Contracts block = {
+    Perimortem::System::Uuid{
+      TTX_BLOCK_CONSUMER_ID_HIGH,
+      TTX_BLOCK_CONSUMER_ID_LOW,
+    },
+    Perimortem::System::Uuid{
+      TTX_BLOCK_PROVIDER_ID_HIGH,
+      TTX_BLOCK_PROVIDER_ID_LOW,
+    },
+  };
+
+  static constexpr Contracts fragment = {
+    Perimortem::System::Uuid{
+      TTX_FRAGMENT_CONSUMER_ID_HIGH,
+      TTX_FRAGMENT_CONSUMER_ID_LOW,
+    },
+    Perimortem::System::Uuid{
+      TTX_FRAGMENT_PROVIDER_ID_HIGH,
+      TTX_FRAGMENT_PROVIDER_ID_LOW,
+    },
+  };
+
   enum class Protocol : U8 { None, Direct, Shared, Block, Fragment };
 
   enum class Status : U8 {
@@ -45,21 +97,22 @@ class Flow {
   auto operator=(const Flow&) -> Flow& = delete;
   ~Flow() { close(); }
 
-  // Negotiation can precede destination allocation because the reader only
+  // Negotiation can precede destination allocation because the consumer only
   // needs to state which representation it accepts. Both overloads borrow
   // that representation. Later operations choose their own destination storage.
-  static auto reader(const Data::Form::Representation& representation)
+  static auto consumer(const Data::Form::Representation& representation)
       -> Negotiation::Query {
-    return Negotiation::Query(ttx_flow_reader(&representation));
+    return Negotiation::Query(ttx_flow_consumer(&representation));
   }
 
-  static auto reader(Data::Form::Storage storage) -> Negotiation::Query {
-    return reader(storage.get_representation());
+  static auto consumer(Data::Form::Storage storage) -> Negotiation::Query {
+    return consumer(storage.get_representation());
   }
 
   // A returned success establishes a usable Flow. Another connection requires
   // closing that agreement first so a retained Shared lifetime is not replaced.
-  auto connect(Negotiation::Query reader, Negotiation::Query writer) -> Status;
+  auto connect(Negotiation::Query consumer, Negotiation::Query provider)
+      -> Status;
 
   // Close ends the Shared lifetime after all operations using it have returned.
   auto close() -> void;
@@ -89,11 +142,9 @@ class Flow {
     case Protocol::Shared:
       return shared(state.shared.data);
     case Protocol::Block:
-      return block(
-          Data::Protocol::Block::View(state.block.reader),
-          Data::Protocol::Block::Access(state.block.writer));
+      return block(Data::Protocol::Block::Provider(state.block));
     case Protocol::Fragment:
-      return fragment(Data::Protocol::Fragment::Access(state.fragment));
+      return fragment(Data::Protocol::Fragment::Provider(state.fragment));
     default:
       // TODO: Decide whether to call an out of line fatal diagnostic here.
       // Log stays out of headers to avoid importing its source machinery. A
@@ -107,11 +158,8 @@ class Flow {
   union State {
     const void* direct;
     ttx_shared_lifetime shared;
-    struct {
-      ttx_block_view reader;
-      ttx_block_access writer;
-    } block;
-    ttx_fragment_access fragment;
+    ttx_block_provider block;
+    ttx_fragment_provider fragment;
 
     constexpr State() : direct(nullptr) {}
   } state;
