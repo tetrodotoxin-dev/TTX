@@ -3,7 +3,11 @@
 
 #include "tests/library.hpp"
 
+#ifdef PERI_WINDOWS
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
 
 #include "perimortem/core/static/vector.hpp"
 #include "perimortem/core/diagnostics/log.hpp"
@@ -16,14 +20,26 @@ using namespace Perimortem::Core;
 
 auto Validation::open_library(View::Bytes name) -> System::Library {
   Static::Vector<U8, 4096> path;
+#ifdef PERI_WINDOWS
+  Static::Vector<WCHAR, 4096> native;
+  const auto length =
+      GetModuleFileNameW(nullptr, native.get_data(), native.get_size());
+  const auto size = length && length < native.get_size()
+                        ? WideCharToMultiByte(
+                              CP_UTF8, WC_ERR_INVALID_CHARS, native.get_data(),
+                              length, reinterpret_cast<char*>(path.get_data()),
+                              path.get_size(), nullptr, nullptr)
+                        : 0;
+#else
   const auto size = readlink(
       "/proc/self/exe", reinterpret_cast<char*>(path.get_data()), sizeof(path));
+#endif
   if (size <= 0 || Count(size) == sizeof(path)) {
     Diagnostics::Log::fatal("Cannot locate the fixture executable."_view);
   }
 
   Count end = Count(size);
-  while (end && path[end - 1] != '/') {
+  while (end && path[end - 1] != '/' && path[end - 1] != '\\') {
     --end;
   }
   Memory::Dynamic::Bytes location(View::Bytes(path.get_data(), end));

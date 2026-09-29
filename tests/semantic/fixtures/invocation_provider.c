@@ -170,7 +170,7 @@ static ttx_binding_status
         ttx_fragment_provider_representation(), &api, requested);
   }
 
-  return TTX_BINDING_UNSUPPORTED;
+  return TTX_BINDING_UNKNOWN;
 }
 
 static invocation_statistics statistics(void) {
@@ -204,7 +204,7 @@ static ttx_binding_status supports(const void* self, perimortem_uuid id) {
   return state.protocol < 4 && id.high == contracts[state.protocol].high &&
                  id.low == contracts[state.protocol].low
              ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNSUPPORTED;
+             : TTX_BINDING_UNKNOWN;
 }
 
 static void

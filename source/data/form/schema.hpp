@@ -56,18 +56,15 @@ constexpr auto ttx_schema::primitive(
     ByteOrder order,
     Count pointer_size) -> ttx_schema {
   const Count width = get_width(type, pointer_size);
-  return {
-    width,
-    width,
-    static_cast<U8>(Kind::Value),
-    {
-      .value =
-          {
-            static_cast<U8>(type),
-            static_cast<U8>(order),
-          },
-    },
-  };
+  return ttx_schema(
+      width, width, static_cast<U8>(Kind::Value),
+      {
+        .value =
+            {
+              static_cast<U8>(type),
+              static_cast<U8>(order),
+            },
+      });
 }
 
 constexpr auto ttx_schema::pointer(const ttx_schema* target) -> Reference {
@@ -79,38 +76,32 @@ constexpr auto ttx_schema::callable(
     Perimortem::Core::View::Vector<Argument> arguments,
     Reference result,
     Count pointer_size) -> ttx_schema {
-  return {
-    pointer_size,
-    pointer_size,
-    static_cast<U8>(Kind::Callable),
-    {
-      .callable =
-          {
-            arguments.get_data(),
-            arguments.get_size(),
-            result,
-            static_cast<ttx_schema_convention>(convention),
-          },
-    },
-  };
+  return ttx_schema(
+      pointer_size, pointer_size, static_cast<U8>(Kind::Callable),
+      {
+        .callable =
+            {
+              arguments.get_data(),
+              arguments.get_size(),
+              result,
+              static_cast<ttx_schema_convention>(convention),
+            },
+      });
 }
 
 constexpr auto ttx_schema::composite(
     Perimortem::Core::View::Vector<Position> positions,
     Count extent,
     Count alignment) -> ttx_schema {
-  return {
-    extent,
-    alignment,
-    static_cast<U8>(Kind::Composite),
-    {
-      .composite =
-          {
-            positions.get_data(),
-            positions.get_size(),
-          },
-    },
-  };
+  return ttx_schema(
+      extent, alignment, static_cast<U8>(Kind::Composite),
+      {
+        .composite =
+            {
+              positions.get_data(),
+              positions.get_size(),
+            },
+      });
 }
 
 constexpr auto ttx_schema::range(
@@ -119,19 +110,16 @@ constexpr auto ttx_schema::range(
     Count distance,
     Count extent,
     Count alignment) -> ttx_schema {
-  return {
-    extent,
-    alignment,
-    static_cast<U8>(Kind::Range),
-    {
-      .range =
-          {
-            element,
-            repeats,
-            distance,
-          },
-    },
-  };
+  return ttx_schema(
+      extent, alignment, static_cast<U8>(Kind::Range),
+      {
+        .range =
+            {
+              element,
+              repeats,
+              distance,
+            },
+      });
 }
 
 constexpr auto ttx_schema_reference::get_extent(Count pointer_size) const

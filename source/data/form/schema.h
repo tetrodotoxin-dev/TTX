@@ -340,10 +340,8 @@ typedef struct ttx_schema {
 
   constexpr auto get_positions() const
       -> Perimortem::Core::View::Vector<Position> {
-    return {
-      data.composite.positions,
-      data.composite.count,
-    };
+    return Perimortem::Core::View::Vector<Position>(
+        data.composite.positions, data.composite.count);
   }
 
   constexpr auto get_range() const -> const Range& { return data.range; }

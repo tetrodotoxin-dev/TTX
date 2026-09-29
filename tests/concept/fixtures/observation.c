@@ -3,8 +3,8 @@
 
 #include "tests/concept/fixtures/observation.h"
 
-#include "ttx/concept/answers/constant.h"
-#include "ttx/concept/answers/none.h"
+#include "ttx/concept/policies/constant.h"
+#include "ttx/concept/policies/none.h"
 
 static ttx_binding_status
     bind(const void* source, perimortem_uuid id, ttx_storage output) {
@@ -14,9 +14,10 @@ static ttx_binding_status
     return ttx_binding_provide(subject->abstract_form, &api, output);
   }
   if (id.high == TTX_CONSTANT_ID_HIGH && id.low == TTX_CONSTANT_ID_LOW) {
-    return ttx_binding_provide(subject->marker_form, 0, output);
+    const ttx_abstract api = observation_abstract((observation_subject*)source);
+    return ttx_binding_provide(subject->marker_form, &api, output);
   }
-  return TTX_BINDING_UNSUPPORTED;
+  return TTX_BINDING_UNKNOWN;
 }
 
 // Constant describes the subject's semantic answers. It does not make its
@@ -62,7 +63,7 @@ static ttx_binding_status supports(const void* source, perimortem_uuid id) {
                  (id.high == TTX_CONSTANT_ID_HIGH &&
                   id.low == TTX_CONSTANT_ID_LOW)
              ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNSUPPORTED;
+             : TTX_BINDING_UNKNOWN;
 }
 
 ttx_abstract observation_abstract(observation_subject* subject) {

@@ -12,8 +12,9 @@ auto Query::supports(System::Uuid contract) const -> Binding::Status {
   }
 
   const auto status = value.supports(value.source, contract);
-  return status <= TTX_BINDING_REJECTED ? static_cast<Binding::Status>(status)
-                                        : Binding::Status::Rejected;
+  return status == TTX_BINDING_SATISFIED || status == TTX_BINDING_UNKNOWN
+             ? static_cast<Binding::Status>(status)
+             : Binding::Status::Rejected;
 }
 
 auto Query::bind(System::Uuid contract, Ttx::Data::Form::Storage requested)
@@ -23,6 +24,7 @@ auto Query::bind(System::Uuid contract, Ttx::Data::Form::Storage requested)
   }
 
   const auto status = value.bind(value.source, contract, requested.get_abi());
-  return status <= TTX_BINDING_REJECTED ? static_cast<Binding::Status>(status)
-                                        : Binding::Status::Rejected;
+  return status == TTX_BINDING_SATISFIED || status == TTX_BINDING_UNKNOWN
+             ? static_cast<Binding::Status>(status)
+             : Binding::Status::Rejected;
 }

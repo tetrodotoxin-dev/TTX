@@ -28,10 +28,7 @@ VALIDATION_TEST(TtxRepresentation, independent_lifetime) {
     auto value = u32;
     const Static::Vector<Schema::Position, 2> entries = {
       {
-        Schema::Position{
-          value,
-          0,
-        },
+        Schema::Position(value, 0),
         {
           value,
           8,
@@ -67,10 +64,7 @@ VALIDATION_TEST(TtxRepresentation, heterogeneous_index) {
   const auto real = Schema::primitive(Schema::Value::R32);
   const Static::Vector<Schema::Position, 2> entries = {
     {
-      Schema::Position{
-        u32,
-        0,
-      },
+      Schema::Position(u32, 0),
       {
         real,
         8,
@@ -85,10 +79,7 @@ VALIDATION_TEST(TtxRepresentation, heterogeneous_index) {
       12, 4);
   const Static::Vector<Schema::Position, 1> wrapper = {
     {
-      Schema::Position{
-        inner,
-        0,
-      },
+      Schema::Position(inner, 0),
     },
   };
   const auto outer = Schema::composite(
@@ -118,7 +109,8 @@ VALIDATION_TEST(TtxRepresentation, invalid_publication) {
   truncated.extent = 1;
   auto misaligned = u32;
   misaligned.alignment = 1;
-  const auto padding = Schema::composite({}, 8, 8);
+  const auto padding = Schema::composite(
+      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
   const Static::Vector<Schema, 3> failures = {
     {
       truncated,
@@ -133,13 +125,10 @@ VALIDATION_TEST(TtxRepresentation, invalid_publication) {
             [&](Status status) { EXPECT(status == Status::Invalid); });
   }
 
-  Schema cyclic{};
+  Schema cyclic = Schema();
   const Static::Vector<Schema::Position, 1> entry = {
     {
-      Schema::Position{
-        cyclic,
-        0,
-      },
+      Schema::Position(cyclic, 0),
     },
   };
   cyclic = Schema::composite(
@@ -179,16 +168,14 @@ VALIDATION_TEST(TtxRepresentation, singleton_range) {
 // may already have a usable publication in the slot, which failure must retain.
 VALIDATION_TEST(TtxRepresentation, publication_on_error) {
   Arena arena;
-  const Representation sentinel{};
+  const Representation sentinel = Representation();
   const Representation* output = &sentinel;
   auto source = u32;
   source.extent = 1;
-  const ttx_representation_allocator allocator = {
-    &arena,
-    [](void* owner, Count size, Count) -> void* {
-      return static_cast<Arena*>(owner)->allocate(size).get_data();
-    },
-  };
+  const ttx_representation_allocator allocator = ttx_representation_allocator(
+      &arena, [](void* owner, Count size, Count) -> void* {
+        return static_cast<Arena*>(owner)->allocate(size).get_data();
+      });
   EXPECT(
       ttx_representation_compile(&source, sizeof(void*), allocator, &output) ==
       TTX_DATA_INVALID);
@@ -199,14 +186,12 @@ VALIDATION_TEST(TtxRepresentation, publication_on_error) {
 // With no payload, no consumer can distinguish those source spellings.
 VALIDATION_TEST(TtxRepresentation, nested_units) {
   Arena arena;
-  const auto empty = Schema::composite({}, 0);
+  const auto empty =
+      Schema::composite(Perimortem::Core::View::Vector<Schema::Position>(), 0);
   const auto repeated = Schema::range(empty, 1000000000, 8, 0, 8);
   const Static::Vector<Schema::Position, 2> children = {
     {
-      Schema::Position{
-        empty,
-        0,
-      },
+      Schema::Position(empty, 0),
       {
         repeated,
         0,
@@ -303,10 +288,7 @@ VALIDATION_TEST(TtxRepresentation, boundary_mismatch) {
   Arena arena;
   const Static::Vector<Schema::Position, 2> pair_fields = {
     {
-      Schema::Position{
-        u32,
-        0,
-      },
+      Schema::Position(u32, 0),
       {
         u32,
         4,
@@ -315,10 +297,7 @@ VALIDATION_TEST(TtxRepresentation, boundary_mismatch) {
   };
   const Static::Vector<Schema::Position, 3> triple_fields = {
     {
-      Schema::Position{
-        u32,
-        0,
-      },
+      Schema::Position(u32, 0),
       {
         u32,
         4,
@@ -338,10 +317,7 @@ VALIDATION_TEST(TtxRepresentation, boundary_mismatch) {
       Schema::composite(View::Vector<Schema::Position>(&single_field, 1), 4, 4);
   const Static::Vector<Schema::Position, 2> two_pairs = {
     {
-      Schema::Position{
-        pair,
-        0,
-      },
+      Schema::Position(pair, 0),
       {
         pair,
         8,
@@ -350,10 +326,7 @@ VALIDATION_TEST(TtxRepresentation, boundary_mismatch) {
   };
   const Static::Vector<Schema::Position, 2> one_three = {
     {
-      Schema::Position{
-        single,
-        0,
-      },
+      Schema::Position(single, 0),
       {
         triple,
         4,
@@ -384,10 +357,7 @@ VALIDATION_TEST(TtxRepresentation, boundary_patterns) {
   Arena arena;
   const Static::Vector<Schema::Position, 2> pair_fields = {
     {
-      Schema::Position{
-        u32,
-        0,
-      },
+      Schema::Position(u32, 0),
       {
         u32,
         4,
@@ -398,10 +368,7 @@ VALIDATION_TEST(TtxRepresentation, boundary_patterns) {
       View::Vector<Schema::Position>(pair_fields.get_data(), 2), 8, 4);
   const Static::Vector<Schema::Position, 2> record_fields = {
     {
-      Schema::Position{
-        pair,
-        0,
-      },
+      Schema::Position(pair, 0),
       {
         pair,
         8,
@@ -413,10 +380,7 @@ VALIDATION_TEST(TtxRepresentation, boundary_patterns) {
   const auto repeated = Schema::range(record, 4, 16, 64, 4);
   const Static::Vector<Schema::Position, 4> listed = {
     {
-      Schema::Position{
-        record,
-        0,
-      },
+      Schema::Position(record, 0),
       {
         record,
         16,

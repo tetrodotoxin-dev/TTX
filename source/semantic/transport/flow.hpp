@@ -31,49 +31,37 @@ class Flow {
     Perimortem::System::Uuid provider;
   };
 
-  static constexpr Contracts direct = {
-    Perimortem::System::Uuid{
-      TTX_DIRECT_CONSUMER_ID_HIGH,
-      TTX_DIRECT_CONSUMER_ID_LOW,
-    },
-    Perimortem::System::Uuid{
-      TTX_DIRECT_PROVIDER_ID_HIGH,
-      TTX_DIRECT_PROVIDER_ID_LOW,
-    },
-  };
+  static constexpr Contracts direct = Contracts(
+      Perimortem::System::Uuid(
+          TTX_DIRECT_CONSUMER_ID_HIGH,
+          TTX_DIRECT_CONSUMER_ID_LOW),
+      Perimortem::System::Uuid(
+          TTX_DIRECT_PROVIDER_ID_HIGH,
+          TTX_DIRECT_PROVIDER_ID_LOW));
 
-  static constexpr Contracts shared = {
-    Perimortem::System::Uuid{
-      TTX_SHARED_CONSUMER_ID_HIGH,
-      TTX_SHARED_CONSUMER_ID_LOW,
-    },
-    Perimortem::System::Uuid{
-      TTX_SHARED_PROVIDER_ID_HIGH,
-      TTX_SHARED_PROVIDER_ID_LOW,
-    },
-  };
+  static constexpr Contracts shared = Contracts(
+      Perimortem::System::Uuid(
+          TTX_SHARED_CONSUMER_ID_HIGH,
+          TTX_SHARED_CONSUMER_ID_LOW),
+      Perimortem::System::Uuid(
+          TTX_SHARED_PROVIDER_ID_HIGH,
+          TTX_SHARED_PROVIDER_ID_LOW));
 
-  static constexpr Contracts block = {
-    Perimortem::System::Uuid{
-      TTX_BLOCK_CONSUMER_ID_HIGH,
-      TTX_BLOCK_CONSUMER_ID_LOW,
-    },
-    Perimortem::System::Uuid{
-      TTX_BLOCK_PROVIDER_ID_HIGH,
-      TTX_BLOCK_PROVIDER_ID_LOW,
-    },
-  };
+  static constexpr Contracts block = Contracts(
+      Perimortem::System::Uuid(
+          TTX_BLOCK_CONSUMER_ID_HIGH,
+          TTX_BLOCK_CONSUMER_ID_LOW),
+      Perimortem::System::Uuid(
+          TTX_BLOCK_PROVIDER_ID_HIGH,
+          TTX_BLOCK_PROVIDER_ID_LOW));
 
-  static constexpr Contracts fragment = {
-    Perimortem::System::Uuid{
-      TTX_FRAGMENT_CONSUMER_ID_HIGH,
-      TTX_FRAGMENT_CONSUMER_ID_LOW,
-    },
-    Perimortem::System::Uuid{
-      TTX_FRAGMENT_PROVIDER_ID_HIGH,
-      TTX_FRAGMENT_PROVIDER_ID_LOW,
-    },
-  };
+  static constexpr Contracts fragment = Contracts(
+      Perimortem::System::Uuid(
+          TTX_FRAGMENT_CONSUMER_ID_HIGH,
+          TTX_FRAGMENT_CONSUMER_ID_LOW),
+      Perimortem::System::Uuid(
+          TTX_FRAGMENT_PROVIDER_ID_HIGH,
+          TTX_FRAGMENT_PROVIDER_ID_LOW));
 
   enum class Protocol : U8 { None, Direct, Shared, Block, Fragment };
 
@@ -88,7 +76,7 @@ class Flow {
     Busy = TTX_DATA_BUSY,
     IoError = TTX_DATA_IO_ERROR,
     Rejected = TTX_FLOW_REJECTED,
-    BindingPending = TTX_FLOW_BINDING_PENDING,
+    Unknown = TTX_FLOW_UNKNOWN,
   };
 
   Flow() = default;

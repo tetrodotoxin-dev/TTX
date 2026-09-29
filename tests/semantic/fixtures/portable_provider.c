@@ -29,7 +29,7 @@ static const ttx_representation form = {
 static ttx_binding_status
     bind(const void* source, perimortem_uuid id, ttx_storage output) {
   if (id.high != 17 || id.low != 23) {
-    return TTX_BINDING_UNSUPPORTED;
+    return TTX_BINDING_UNKNOWN;
   }
   const portable_counter api = {
     source,
@@ -40,7 +40,7 @@ static ttx_binding_status
 static ttx_binding_status supports(const void* source, perimortem_uuid id) {
   (void)source;
   return id.high == 17 && id.low == 23 ? TTX_BINDING_SATISFIED
-                                       : TTX_BINDING_UNSUPPORTED;
+                                       : TTX_BINDING_UNKNOWN;
 }
 ttx_semantic_query portable_counter_open(void) {
   return (ttx_semantic_query){

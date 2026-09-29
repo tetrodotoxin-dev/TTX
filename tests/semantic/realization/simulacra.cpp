@@ -34,10 +34,8 @@ static Toolchain::Validation::Harness TtxSimulacra = {
 // record. Its facade owns those words while borrowing the foreign receiver.
 class Counter {
  public:
-  static constexpr System::Uuid contract_id{
-    COUNTER_ID_HIGH,
-    COUNTER_ID_LOW,
-  };
+  static constexpr auto contract_id =
+      System::Uuid(COUNTER_ID_HIGH, COUNTER_ID_LOW);
   using Api = counter_api;
   static auto accept(Api api) -> Bool { return api.add && api.read; }
 
@@ -58,7 +56,7 @@ class Foreign {
     api = open(&ttx_representation_compile);
   }
 
-  counter_fixture api = {};
+  counter_fixture api = counter_fixture();
 
  private:
   System::Library module;
@@ -77,17 +75,15 @@ VALIDATION_TEST(TtxSimulacra, support_without_abi) {
   measurement.stop();
 
   EXPECT_EQ(measurement.get_allocations(), Count(0));
-  EXPECT_EQ(measurement.get_copies(), Count(0));
+  if (const auto copies = measurement.get_copies()) {
+    EXPECT_EQ(*copies, Count(0));
+  }
   EXPECT_EQ(foreign.api.statistics().queries, U64(0));
 
   U64 output = 0x1234;
   const auto& form = Compiled<Native<U64>::reference>::get_representation();
   const Storage target(
-      ttx_storage{
-        &form,
-        reinterpret_cast<U8*>(&output),
-        sizeof(output),
-      });
+      ttx_storage(&form, reinterpret_cast<U8*>(&output), sizeof(output)));
   EXPECT(query.bind(Counter::contract_id, target) == Binding::Status::Rejected);
   EXPECT_EQ(output, U64(0x1234));
   EXPECT(query.supports<Counter>() == Binding::Status::Satisfied);
@@ -110,8 +106,8 @@ VALIDATION_TEST(TtxSimulacra, support_outcomes) {
 
   const Perimortem::Core::Static::Vector<Binding::Status, 3> statuses = {
     {
-      Binding::Status::Unsupported,
-      Binding::Status::Pending,
+      Binding::Status::Satisfied,
+      Binding::Status::Unknown,
       Binding::Status::Rejected,
     },
   };
@@ -121,8 +117,11 @@ VALIDATION_TEST(TtxSimulacra, support_outcomes) {
     EXPECT_EQ(foreign.api.statistics().queries, U64(0));
   }
 
-  foreign.api.reset(99, 0, 0);
-  EXPECT(query.supports<Counter>() == Binding::Status::Rejected);
+  const U8 invalid_statuses[] = {2, 99};
+  for (const auto invalid : invalid_statuses) {
+    foreign.api.reset(invalid, 0, 0);
+    EXPECT(query.supports<Counter>() == Binding::Status::Rejected);
+  }
   EXPECT(Query().supports<Counter>() == Binding::Status::Rejected);
 }
 
@@ -145,7 +144,9 @@ VALIDATION_TEST(TtxSimulacra, retained_c_calls) {
             EXPECT_EQ(answer, U64(2));
             EXPECT_EQ(counter.read(), answer);
             EXPECT_EQ(measurement.get_allocations(), Count(0));
-            EXPECT_EQ(measurement.get_copies(), Count(0));
+            if (const auto copies = measurement.get_copies()) {
+              EXPECT_EQ(*copies, Count(0));
+            }
           },
           [&](Binding::Failure) { EXPECT(False); });
 
@@ -158,9 +159,9 @@ VALIDATION_TEST(TtxSimulacra, refusal_boundaries) {
   ASSERT(foreign.api.query.bind);
   const Perimortem::Core::Static::Vector<ttx_binding_status, 4> statuses = {
     {
-      TTX_BINDING_UNSUPPORTED,
-      TTX_BINDING_PENDING,
+      TTX_BINDING_UNKNOWN,
       TTX_BINDING_REJECTED,
+      2,
       99,
     },
   };
@@ -173,7 +174,7 @@ VALIDATION_TEST(TtxSimulacra, refusal_boundaries) {
             [&](Binding::Failure error) {
               EXPECT_EQ(
                   static_cast<U8>(error),
-                  status == 99 ? TTX_BINDING_REJECTED : status);
+                  status == 2 || status == 99 ? TTX_BINDING_REJECTED : status);
             });
     EXPECT_EQ(foreign.api.statistics().queries, U64(1));
     EXPECT_EQ(foreign.api.statistics().calls, U64(0));
@@ -260,14 +261,11 @@ VALIDATION_TEST(TtxSimulacra, mismatched_callables) {
   memset(expected.get_data(), 0xa5, sizeof(expected));
   for (const auto* form : forms.get_view()) {
     memcpy(output.get_data(), expected.get_data(), sizeof(output));
-    const auto status = Query(foreign.api.query)
-                            .bind(
-                                Counter::contract_id, Storage(
-                                                          ttx_storage{
-                                                            form,
-                                                            output.get_data(),
-                                                            sizeof(output),
-                                                          }));
+    const auto status =
+        Query(foreign.api.query)
+            .bind(
+                Counter::contract_id,
+                Storage(ttx_storage(form, output.get_data(), sizeof(output))));
     EXPECT(status == Binding::Status::Rejected);
     EXPECT(memcmp(output.get_data(), expected.get_data(), sizeof(output)) == 0);
   }
@@ -285,14 +283,12 @@ class Local {
       return static_cast<Binding::Failure>(status);
     }
     if constexpr (__is_same(Contract, Counter)) {
-      const counter_api api{
-        nullptr,
-        [](const void*, U64 amount) -> U64 { return amount; },
-        [](const void*) -> U64 { return 0; },
-      };
+      const counter_api api = counter_api(
+          nullptr, [](const void*, U64 amount) -> U64 { return amount; },
+          [](const void*) -> U64 { return 0; });
       return Counter(api);
     }
-    return Binding::Failure::Unsupported;
+    return Binding::Failure::Unknown;
   }
   auto get_query() const -> Query { return fallback; }
 
@@ -304,12 +300,11 @@ class Local {
 VALIDATION_TEST(TtxSimulacra, native_policy) {
   Foreign foreign;
   ASSERT(foreign.api.query.bind);
-  const Perimortem::Core::Static::Vector<Binding::Status, 4> statuses = {
+  const Perimortem::Core::Static::Vector<Binding::Status, 3> statuses = {
     {
       Binding::Status::Satisfied,
-      Binding::Status::Unsupported,
+      Binding::Status::Unknown,
       Binding::Status::Rejected,
-      Binding::Status::Pending,
     },
   };
   for (auto status : statuses.get_view()) {
@@ -319,7 +314,7 @@ VALIDATION_TEST(TtxSimulacra, native_policy) {
         [&](const Counter& counter) {
           EXPECT(
               status == Binding::Status::Satisfied ||
-              status == Binding::Status::Unsupported);
+              status == Binding::Status::Unknown);
           EXPECT_EQ(counter.add(9), U64(9));
         },
         [&](Binding::Failure failure) {
@@ -327,6 +322,6 @@ VALIDATION_TEST(TtxSimulacra, native_policy) {
         });
     EXPECT_EQ(
         foreign.api.statistics().queries,
-        status == Binding::Status::Unsupported ? U64(1) : U64(0));
+        status == Binding::Status::Unknown ? U64(1) : U64(0));
   }
 }

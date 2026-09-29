@@ -36,6 +36,20 @@ auto Measurement::copy() -> void {
   }
 }
 
+auto Measurement::wraps_runtime() -> Bool {
+#ifdef PERI_LINUX
+  return True;
+#else
+  return False;
+#endif
+}
+
+auto Measurement::get_copies() const -> Perimortem::Core::Option<Count> {
+  return wraps_runtime() ? Perimortem::Core::Option<Count>(copies)
+                         : Perimortem::Core::Option<Count>();
+}
+
+#ifdef PERI_LINUX
 //
 // WARNING: The below is compiler jank and only sanctioned for test use!
 //
@@ -109,3 +123,5 @@ void* __wrap__ZnamSt11align_val_t(size_t size, std::align_val_t alignment) {
   return __real__ZnamSt11align_val_t(size, alignment);
 }
 }
+
+#endif

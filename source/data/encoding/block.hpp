@@ -99,7 +99,7 @@ class Block {
   }
 
  private:
-  Perimortem::Core::Static::Vector<U64, 8> chunks_64 = {};
+  Perimortem::Core::Static::Vector<U64, 8> chunks_64;
 };
 
 }  // namespace Ttx::Data::Encoding

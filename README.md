@@ -1,53 +1,71 @@
 # TTX
 
-TTX describes data formats and negotiates interfaces between independent
-implementations. A consumer agrees on both what an interface means and how its
-data and functions are represented before using it. The provider keeps its
-private state and implementation behind that agreement.
+TTX is a library for composing independently developed systems regardless
+of their backing runtime.
 
-The library has three layers:
+Instead of trying to unify every convention in a common runtime model, TTX
+defines canonical data forms and semantically composable interfaces built
+from policies and capabilities. These reusable building blocks allow systems
+to negotiate interoperability without exposing either system's runtime
+internals.
 
-- **[Data](source/data)** describes memory layouts, pointers and callable
-  signatures. It compiles those descriptions into a canonical representation
-  that participants can compare, and supplies protocols for borrowing data,
-  filling destination storage or reading individual values.
-- **[Semantic](source/semantic)** identifies contracts with UUIDs and binds them
-  to concrete interfaces. It checks the requested API representation before
-  exposing its operations. Flow establishes a data access agreement that later
-  operations can reuse.
-- **[Concept](source/concept)** builds on those interfaces to expose Abstracts,
-  their relationships and the policies governing their answers. Providers can
-  participate in the same graph while keeping different native object models.
+## Composable interfaces
 
-Tetrodotoxin uses these contracts to share meaning between Dialects, compilers
-and runtime modules. A Dialect defines its own semantics and exposes them through
-Abstracts. Other parts of the toolchain ask those objects for the contracts they
-need. An implementation can be replaced by another that fulfills the same
-contracts, including one written in a different language.
+TTX interfaces are composed of two primary parts: policies and capabilities.
+Policies are used to negotiate how data can be used, while capabilities
+expose operations that can be performed on that data under those policies.
 
-The public boundary uses C records and function pointers, with C++ interfaces
-over the same contracts. The implementation uses Perimortem for its native
-storage and runtime support.
+These are not mutually exclusive systems. A TTX abstract interface can be
+composed of any number of policies and capabilities. A policy can expose
+capabilities of its own, and a capability can carry policies governing its
+use. Each system can negotiate the minimum surface it needs when integrating
+with other systems.
+
+These categories are open to extension. Each system can define the contracts
+its domain needs and compose them through the same negotiation model. If a
+policy or capability can be used safely on its own, make it independently
+negotiable. A combined interface should also support decomposition into the
+minimum safe interface its provider is willing to expose. That smaller view
+must preserve the policies required to use it.
+
+## Semantic graph
+
+TTX represents these abstract interfaces and their relationships in a
+semantic graph. Each node is an abstract interface that can answer questions
+by exposing related interfaces. A consumer discovers the graph through those
+questions, following the relationships it needs and negotiating the
+interfaces it encounters.
+
+Each provider controls the relationships it exposes, which may lead to
+interfaces supplied by other systems. Independently owned models can
+therefore participate in the same semantic graph while keeping their own
+implementations. Questions continue through the policies of the interfaces
+encountered along the way, so the graph preserves the conditions under which
+access is provided.
+
+## Layers
+
+TTX has three core layers building up from raw data streams to the full TTX
+semantic graph:
+
+- [Data](source/data) defines canonical forms for data and callable
+  representations, with protocols for accessing and transferring data.
+- [Semantics](source/semantic) negotiates contracts and their representations,
+  connecting the agreed behavior to interfaces that can perform the work.
+- [Concepts](source/concept) exposes full abstract interfaces and their
+  composable relationships as a queryable graph. Each interface can offer
+  capabilities and policies through further negotiation.
 
 ## Building and testing
 
-On Linux x86_64, install Python 3 and the Bazel version specified in
-[.bazelversion](.bazelversion). Bazel downloads the pinned LLVM tools, target SDK
-and Perimortem dependency. The Linux target uses x86-64-v3 with RDRAND.
-
-From the repository root, build the shared library and run the tests:
+Python 3 and Bazel are required. The Bazel version is specified in
+[.bazelversion](.bazelversion).
 
 ```sh
 bazel build //:build
 bazel run //tests:test
-```
 
-For an optimized build, tests and benchmarks:
-
-```sh
 bazel build --config=release //:build
 bazel run --config=release //tests:test
 bazel run --config=release //benchmarks:run
 ```
-
-Build outputs are available under `.bin/bin/`.

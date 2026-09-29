@@ -34,7 +34,11 @@ typedef ttx_data_status (*interface_compile)(
     Count,
     ttx_representation_allocator,
     const ttx_representation**);
-PERIMORTEM_C counter_fixture
+PERIMORTEM_C
+#ifdef PERI_WINDOWS
+__declspec(dllexport)
+#endif
+counter_fixture
     interface_provider_open(interface_compile compiler);
 
 #endif

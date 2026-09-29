@@ -23,9 +23,11 @@ class Simulacra {
   // realization and supply it through its own policy. This shortcut requires
   // that actual Owner, which cannot be recovered by casting a foreign Binding's
   // receiver. Both paths return the same contract, allowing stateless receivers
-  // to remain null without using that value as a mode tag. Unsupported requests
-  // use the Core path. Rejected and Pending stop here to preserve the owner's
-  // policy even when its underlying Query could answer.
+  // to remain null without using that value as a mode tag. Unknown means this
+  // shortcut has not established the interface, so fulfillment asks the owner's
+  // Query. Rejected stops here because the owner has explicitly refused that
+  // request. The portable answer remains authoritative when the shortcut cannot
+  // settle it.
   template <typename Contract, typename Owner>
     requires requires(const Owner& owner) {
       owner.template fulfill_native<Contract>();
@@ -38,7 +40,7 @@ class Simulacra {
     return owner.template fulfill_native<Contract>().visit(
         [](const Contract& contract) -> Result { return contract; },
         [&](Negotiation::Binding::Failure failure) -> Result {
-          if (failure == Negotiation::Binding::Failure::Unsupported) {
+          if (failure == Negotiation::Binding::Failure::Unknown) {
             return fulfill<Contract>(owner.get_query());
           }
 

@@ -20,7 +20,8 @@ static Toolchain::Validation::Harness Pointers = {
 // finished bytes escape preparation, so no constexpr allocation or source
 // pointer is retained in the publication.
 static consteval auto recursive_bytes() -> Core::Static::Bytes<8> {
-  auto node = Schema::composite({}, 8, 8);
+  auto node = Schema::composite(
+      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
   const auto pointer = Schema::pointer(&node);
   const Schema::Position field(pointer, 0);
   node = Schema::composite(
@@ -61,10 +62,7 @@ VALIDATION_TEST(Pointers, reference_modifier) {
   EXPECT(indirect.is_pointer());
   const Perimortem::Core::Static::Vector<Schema::Position, 2> fields = {
     {
-      Schema::Position{
-        direct,
-        0,
-      },
+      Schema::Position(direct, 0),
       {
         indirect,
         8,
@@ -126,8 +124,10 @@ VALIDATION_TEST(Pointers, opaque_spelling) {
 // must not double the emitted bodies or change their reference numbering.
 VALIDATION_TEST(Pointers, recursive_sharing) {
   Validation::DataTests::Preparation prepare;
-  auto a = Schema::composite({}, 8, 8);
-  auto b = Schema::composite({}, 8, 8);
+  auto a = Schema::composite(
+      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
+  auto b = Schema::composite(
+      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
   const auto pa = Schema::pointer(&a), pb = Schema::pointer(&b);
   const Schema::Position ab(pb, 0), ba(pa, 0);
   a = Schema::composite(
@@ -158,10 +158,7 @@ VALIDATION_TEST(Pointers, recursive_sharing) {
   const auto integer = Schema::primitive(Schema::Value::U64);
   const Perimortem::Core::Static::Vector<Schema::Position, 2> different = {
     {
-      Schema::Position{
-        pa,
-        0,
-      },
+      Schema::Position(pa, 0),
       {
         integer,
         8,
@@ -178,7 +175,8 @@ VALIDATION_TEST(Pointers, recursive_sharing) {
 }
 
 VALIDATION_TEST(Pointers, inline_cycle_rejected) {
-  auto node = Schema::composite({}, 8, 8);
+  auto node = Schema::composite(
+      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
   const Schema::Position self(node, 0);
   node = Schema::composite(
       {
@@ -195,7 +193,8 @@ VALIDATION_TEST(Pointers, inline_cycle_rejected) {
 // containment and must not omit a function with no payload arguments.
 VALIDATION_TEST(Pointers, recursive_callable) {
   Validation::DataTests::Preparation prepare;
-  auto node = Schema::composite({}, 8, 8);
+  auto node = Schema::composite(
+      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
   const Schema::Argument self(node);
   const auto callback = Schema::callable(
       Schema::Convention::SystemVAMD64, {
@@ -238,10 +237,7 @@ VALIDATION_TEST(Pointers, pointer_run) {
   const auto pa = Schema::pointer(&a), pb = Schema::pointer(&b);
   const Perimortem::Core::Static::Vector<Schema::Position, 2> fields = {
     {
-      Schema::Position{
-        pa,
-        0,
-      },
+      Schema::Position(pa, 0),
       {
         pb,
         16,
@@ -363,11 +359,7 @@ VALIDATION_TEST(Pointers, pointer_width) {
       },
       [&](Status) { EXPECT(false); });
 
-  const Perimortem::Core::Static::Vector<Count, 1> coordinates = {
-    {
-      Count(0),
-    },
-  };
+  const Perimortem::Core::Static::Vector<Count, 1> coordinates;
   Count visits = 0;
   EXPECT(
       narrow_pointer.visit(coordinates, [&](Representation::Position position) {
@@ -416,10 +408,7 @@ VALIDATION_TEST(Pointers, composed_pointers) {
   Memory::Allocator::Arena arena;
   const Perimortem::Core::Static::Vector<Representation::Member, 2> members = {
     {
-      Representation::Member{
-        narrow_pointer,
-        0,
-      },
+      Representation::Member(narrow_pointer, 0),
       {
         narrow_pointer,
         4,
@@ -442,10 +431,7 @@ VALIDATION_TEST(Pointers, composed_pointers) {
 
   const Perimortem::Core::Static::Vector<Representation::Member, 2> mixed = {
     {
-      Representation::Member{
-        narrow_pointer,
-        0,
-      },
+      Representation::Member(narrow_pointer, 0),
       {
         wide_pointer,
         8,

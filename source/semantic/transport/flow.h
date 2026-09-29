@@ -32,7 +32,7 @@
 
 typedef U8 ttx_flow_status;
 #define TTX_FLOW_REJECTED ((ttx_flow_status)32)
-#define TTX_FLOW_BINDING_PENDING ((ttx_flow_status)33)
+#define TTX_FLOW_UNKNOWN ((ttx_flow_status)33)
 
 // Flow establishes one synchronous access agreement between already
 // bootstrapped Queries. Direct, Shared, Block and Fragment are independent
@@ -56,11 +56,14 @@ PERIMORTEM_C ttx_semantic_query
 // or operations are ready before this call returns. Shared additionally lends
 // one lifetime that remains acquired until Flow closes.
 //
-// BindingPending reports that the owner cannot yet answer this bind request.
-// No work continues after return, and retry belongs to the caller. Rejection
-// also stops negotiation. Once a protocol is selected, an acquisition failure
-// cannot silently choose a different agreement. Endpoint state, representations
-// and implementation code remain borrowed throughout subsequent Flow use.
+// Unknown means no candidate established an agreement. Flow may try another
+// protocol after an Unknown binding or incompatible payload, but an explicit
+// rejection stops that search. No work continues after return.
+//
+// Once a protocol is selected, acquisition reports Data operation failures
+// unchanged. Even Data's Unsupported does not reopen negotiation after that
+// selection. Endpoint state, representations and implementation code remain
+// borrowed throughout subsequent Flow use.
 PERIMORTEM_C ttx_flow_status ttx_flow_connect(
     ttx_flow* flow,
     ttx_semantic_query consumer,

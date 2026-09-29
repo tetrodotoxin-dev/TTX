@@ -31,11 +31,15 @@
 // their recursive Abstract results. Agreement therefore checks more than the
 // outer two pointer slots. The receiver's private layout remains unspecified.
 //
-// The record borrows its provider so graph owners can manage many views under
-// one lifetime. Source is nonnull and identifies the subject for that promised
-// lifetime, but retaining the token alone keeps neither state nor code alive.
-// The caller retains their lifetime owner, including the providers needed by
-// returned Abstracts.
+// This record is an observation view. Its supplying call or retained owner
+// keeps source and the operation table available while that view is used.
+// Copying the record copies access, with lifetime still supplied by that scope.
+// A later observation queries the provider again.
+//
+// Returning plain Abstract permits a caller to finish without releasing it.
+// An acquired answer must advertise its required lifetime policy in its return
+// contract, since hiding a release obligation behind Abstract can leak data.
+// Source is nonnull and identifies the subject within the supplying lifetime.
 typedef struct ttx_abstract {
   const void* source;
   const struct ttx_abstract_ops* operations;
@@ -80,10 +84,11 @@ typedef struct ttx_abstract_ops {
   // enclosing contract's stronger lifetime or a copy made by the consumer.
   perimortem_view_bytes (*get_data)(const void* source);
 
-  // The selected subject brings its own operation table, allowing resolution
-  // to cross between different provider representations. It satisfies this
-  // same Abstract contract, so the consumer can continue without recovering
-  // a native class or reinterpreting the original receiver's storage.
+  // Returns the Abstract represented by this observation. The provider decides
+  // which domain layers resolution removes and may return the current view.
+  // For an unchanged observation state, resolving the returned view again
+  // returns that same view. Equality identifies the receiver and operation
+  // table, not equivalent semantic content or a shared C++ value.
   ttx_abstract (*resolve)(const void* source);
 
   // Lookup and discovery use the same subject's policy. Visitation advertises

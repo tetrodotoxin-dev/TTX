@@ -39,10 +39,7 @@ VALIDATION_TEST(TtxFlow, heterogeneous_outputs) {
     const auto energy = Schema::primitive(Schema::Value::R64);
     const Static::Vector<Schema::Position, 3> fields = {
       {
-        Schema::Position{
-          tag,
-          offsetof(Record, tag),
-        },
+        Schema::Position(tag, offsetof(Record, tag)),
         {
           energy,
           offsetof(Record, energy),
@@ -63,10 +60,7 @@ VALIDATION_TEST(TtxFlow, heterogeneous_outputs) {
 
     const Static::Vector<Schema::Position, 3> reordered = {
       {
-        Schema::Position{
-          integer,
-          offsetof(Reordered, frame),
-        },
+        Schema::Position(integer, offsetof(Reordered, frame)),
         {
           tag,
           offsetof(Reordered, tag),
@@ -84,9 +78,7 @@ VALIDATION_TEST(TtxFlow, heterogeneous_outputs) {
               3,
             },
             sizeof(Reordered), alignof(Reordered)));
-    Validation::FlowTests::Reader reader{
-      input,
-    };
+    Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(input);
 
     Flow flow;
     ASSERT(
@@ -152,10 +144,7 @@ VALIDATION_TEST(TtxFlow, copy_padding_values) {
   const auto energy = Schema::primitive(Schema::Value::R64);
   const Static::Vector<Schema::Position, 3> fields = {
     {
-      Schema::Position{
-        tag,
-        offsetof(Record, tag),
-      },
+      Schema::Position(tag, offsetof(Record, tag)),
       {
         energy,
         offsetof(Record, energy),

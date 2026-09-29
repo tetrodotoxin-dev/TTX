@@ -28,14 +28,12 @@ static constexpr Count repetitions = 1024;
 
 struct Endpoint {
   Flow::Protocol protocol;
-  alignas(64) Static::Vector<U32, 512> values = {};
+  alignas(64) Static::Vector<U32, 512> values;
 };
 
 static Static::Vector<Endpoint, 4> endpoints = {
   {
-    Endpoint{
-      Flow::Protocol::Direct,
-    },
+    Endpoint(Flow::Protocol::Direct),
     {
       Flow::Protocol::Shared,
     },
@@ -53,17 +51,11 @@ static Static::Vector<Flow, 4> flows;
 // starts sixteen bytes into the same aligned region.
 alignas(64) static Static::Vector<U32, 516> destination;
 static const Storage output(
-    ttx_storage{
-      &form,
-      reinterpret_cast<U8*>(destination.get_data()),
-      2048,
-    });
-static const Storage unaligned_output(
-    ttx_storage{
-      &form,
-      reinterpret_cast<U8*>(destination.get_data() + 4),
-      2048,
-    });
+    ttx_storage(&form, reinterpret_cast<U8*>(destination.get_data()), 2048));
+static const Storage unaligned_output(ttx_storage(
+    &form,
+    reinterpret_cast<U8*>(destination.get_data() + 4),
+    2048));
 
 static auto representation(const void*) -> const Representation* {
   return &form;
@@ -73,109 +65,109 @@ static auto representation(const void*) -> const Representation* {
 // its ordinary preference search, including the earlier unsupported requests.
 // All four supply the same payload so transfer cost changes only with access.
 static auto writer(const Endpoint& endpoint) -> Query {
-  return Query({
-    &endpoint,
-    [](const void* source, perimortem_uuid contract,
-       ttx_storage requested) -> ttx_binding_status {
-      const auto& endpoint = *static_cast<const Endpoint*>(source);
-      const System::Uuid id(contract);
-      if (endpoint.protocol == Flow::Protocol::Direct &&
-          id == Ttx::Semantic::Transport::Flow::direct.provider) {
-        static const Ttx::Data::Protocol::Direct::Provider::Operations
-            operations = {
-              representation,
-              [](const void* source) -> const void* {
-                return static_cast<const Endpoint*>(source)->values.get_data();
-              },
-            };
-        return static_cast<ttx_binding_status>(
-            Binding::provide<Ttx::Data::Protocol::Direct::Provider>(
-                Ttx::Data::Protocol::Direct::Provider::Api(source, &operations),
-                Storage(requested)));
-      } else if (
-          endpoint.protocol == Flow::Protocol::Shared &&
-          id == Ttx::Semantic::Transport::Flow::shared.provider) {
-        static const Ttx::Data::Protocol::Shared::Provider::Operations
-            operations = {
-              representation,
-              [](const void* source,
-                 ttx_shared_lifetime* result) -> ttx_data_status {
-                *result = {
-                  static_cast<const Endpoint*>(source)->values.get_data(),
-                  source,
-                  [](const void*) {},
-                };
-                return TTX_DATA_SUCCESS;
-              },
-            };
-        return static_cast<ttx_binding_status>(
-            Binding::provide<Ttx::Data::Protocol::Shared::Provider>(
-                Ttx::Data::Protocol::Shared::Provider::Api(source, &operations),
-                Storage(requested)));
-      } else if (
-          endpoint.protocol == Flow::Protocol::Block &&
-          id == Ttx::Semantic::Transport::Flow::block.provider) {
-        static const Ttx::Data::Protocol::Block::Provider::Operations
-            operations = {
-              representation,
-              [](const void* source, ttx_storage target) -> ttx_data_status {
-                memmove(
-                    target.data,
-                    static_cast<const Endpoint*>(source)->values.get_data(),
-                    form.get_extent());
-                return TTX_DATA_SUCCESS;
-              },
-            };
-        return static_cast<ttx_binding_status>(
-            Binding::provide<Ttx::Data::Protocol::Block::Provider>(
-                Ttx::Data::Protocol::Block::Provider::Api(source, &operations),
-                Storage(requested)));
-      } else if (
-          endpoint.protocol == Flow::Protocol::Fragment &&
-          id == Ttx::Semantic::Transport::Flow::fragment.provider) {
-        static const Ttx::Data::Protocol::Fragment::Provider::Operations
-            operations = {
-              .representation = representation,
-              .get_u32 = [](const void* source, Count position,
-                            U32* result) -> ttx_data_status {
-                *result =
-                    static_cast<const Endpoint*>(source)->values[position / 4];
-                return TTX_DATA_SUCCESS;
-              },
-            };
-        return static_cast<ttx_binding_status>(
-            Binding::provide<Ttx::Data::Protocol::Fragment::Provider>(
-                Ttx::Data::Protocol::Fragment::Provider::Api(
-                    source, &operations),
-                Storage(requested)));
-      }
+  return Query(ttx_semantic_query(
+      &endpoint,
+      [](const void* source, perimortem_uuid contract,
+         ttx_storage requested) -> ttx_binding_status {
+        const auto& endpoint = *static_cast<const Endpoint*>(source);
+        const System::Uuid id(contract);
+        if (endpoint.protocol == Flow::Protocol::Direct &&
+            id == Ttx::Semantic::Transport::Flow::direct.provider) {
+          static const Ttx::Data::Protocol::Direct::Provider::Operations
+              operations = Ttx::Data::Protocol::Direct::Provider::Operations(
+                  representation, [](const void* source) -> const void* {
+                    return static_cast<const Endpoint*>(source)
+                        ->values.get_data();
+                  });
+          return static_cast<ttx_binding_status>(
+              Binding::provide<Ttx::Data::Protocol::Direct::Provider>(
+                  Ttx::Data::Protocol::Direct::Provider::Api(
+                      source, &operations),
+                  Storage(requested)));
+        } else if (
+            endpoint.protocol == Flow::Protocol::Shared &&
+            id == Ttx::Semantic::Transport::Flow::shared.provider) {
+          static const Ttx::Data::Protocol::Shared::Provider::Operations
+              operations = Ttx::Data::Protocol::Shared::Provider::Operations(
+                  representation,
+                  [](const void* source,
+                     ttx_shared_lifetime* result) -> ttx_data_status {
+                    *result = {
+                      static_cast<const Endpoint*>(source)->values.get_data(),
+                      source,
+                      [](const void*) {},
+                    };
+                    return TTX_DATA_SUCCESS;
+                  });
+          return static_cast<ttx_binding_status>(
+              Binding::provide<Ttx::Data::Protocol::Shared::Provider>(
+                  Ttx::Data::Protocol::Shared::Provider::Api(
+                      source, &operations),
+                  Storage(requested)));
+        } else if (
+            endpoint.protocol == Flow::Protocol::Block &&
+            id == Ttx::Semantic::Transport::Flow::block.provider) {
+          static const Ttx::Data::Protocol::Block::Provider::Operations
+              operations = Ttx::Data::Protocol::Block::Provider::Operations(
+                  representation,
+                  [](const void* source,
+                     ttx_storage target) -> ttx_data_status {
+                    memmove(
+                        target.data,
+                        static_cast<const Endpoint*>(source)->values.get_data(),
+                        form.get_extent());
+                    return TTX_DATA_SUCCESS;
+                  });
+          return static_cast<ttx_binding_status>(
+              Binding::provide<Ttx::Data::Protocol::Block::Provider>(
+                  Ttx::Data::Protocol::Block::Provider::Api(
+                      source, &operations),
+                  Storage(requested)));
+        } else if (
+            endpoint.protocol == Flow::Protocol::Fragment &&
+            id == Ttx::Semantic::Transport::Flow::fragment.provider) {
+          static const Ttx::Data::Protocol::Fragment::Provider::Operations
+              operations = {
+                .representation = representation,
+                .get_u32 = [](const void* source, Count position,
+                              U32* result) -> ttx_data_status {
+                  *result = static_cast<const Endpoint*>(source)
+                                ->values[position / 4];
+                  return TTX_DATA_SUCCESS;
+                },
+              };
+          return static_cast<ttx_binding_status>(
+              Binding::provide<Ttx::Data::Protocol::Fragment::Provider>(
+                  Ttx::Data::Protocol::Fragment::Provider::Api(
+                      source, &operations),
+                  Storage(requested)));
+        }
 
-      return TTX_BINDING_UNSUPPORTED;
-    },
-    [](const void* source, perimortem_uuid contract) -> ttx_binding_status {
-      const System::Uuid id(contract);
-      switch (static_cast<const Endpoint*>(source)->protocol) {
-      case Flow::Protocol::Direct:
-        return id == Ttx::Semantic::Transport::Flow::direct.provider
-                   ? TTX_BINDING_SATISFIED
-                   : TTX_BINDING_UNSUPPORTED;
-      case Flow::Protocol::Shared:
-        return id == Ttx::Semantic::Transport::Flow::shared.provider
-                   ? TTX_BINDING_SATISFIED
-                   : TTX_BINDING_UNSUPPORTED;
-      case Flow::Protocol::Block:
-        return id == Ttx::Semantic::Transport::Flow::block.provider
-                   ? TTX_BINDING_SATISFIED
-                   : TTX_BINDING_UNSUPPORTED;
-      case Flow::Protocol::Fragment:
-        return id == Ttx::Semantic::Transport::Flow::fragment.provider
-                   ? TTX_BINDING_SATISFIED
-                   : TTX_BINDING_UNSUPPORTED;
-      default:
-        return TTX_BINDING_UNSUPPORTED;
-      }
-    },
-  });
+        return TTX_BINDING_UNKNOWN;
+      },
+      [](const void* source, perimortem_uuid contract) -> ttx_binding_status {
+        const System::Uuid id(contract);
+        switch (static_cast<const Endpoint*>(source)->protocol) {
+        case Flow::Protocol::Direct:
+          return id == Ttx::Semantic::Transport::Flow::direct.provider
+                     ? TTX_BINDING_SATISFIED
+                     : TTX_BINDING_UNKNOWN;
+        case Flow::Protocol::Shared:
+          return id == Ttx::Semantic::Transport::Flow::shared.provider
+                     ? TTX_BINDING_SATISFIED
+                     : TTX_BINDING_UNKNOWN;
+        case Flow::Protocol::Block:
+          return id == Ttx::Semantic::Transport::Flow::block.provider
+                     ? TTX_BINDING_SATISFIED
+                     : TTX_BINDING_UNKNOWN;
+        case Flow::Protocol::Fragment:
+          return id == Ttx::Semantic::Transport::Flow::fragment.provider
+                     ? TTX_BINDING_SATISFIED
+                     : TTX_BINDING_UNKNOWN;
+        default:
+          return TTX_BINDING_UNKNOWN;
+        }
+      }));
 }
 
 static Toolchain::Validation::Harness Transfer = {

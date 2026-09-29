@@ -59,9 +59,7 @@ VALIDATION_TEST(Callables, canonical_words) {
 
   const Perimortem::Core::Static::Vector<Schema::Argument, 4> singles = {
     {
-      Schema::Argument{
-        integer,
-      },
+      Schema::Argument(integer),
       {
         integer,
       },
@@ -96,9 +94,7 @@ VALIDATION_TEST(Callables, signature_differences) {
   Validation::DataTests::Preparation prepare;
   const Perimortem::Core::Static::Vector<Schema::Argument, 3> mixed = {
     {
-      Schema::Argument{
-        integer,
-      },
+      Schema::Argument(integer),
       {
         real,
       },
@@ -109,10 +105,7 @@ VALIDATION_TEST(Callables, signature_differences) {
   };
   const Perimortem::Core::Static::Vector<Schema::Argument, 2> ordered = {
     {
-      Schema::Argument{
-        integer,
-        2,
-      },
+      Schema::Argument(integer, 2),
       {
         real,
       },
@@ -222,10 +215,7 @@ VALIDATION_TEST(Callables, invalid_signatures) {
       Status::Invalid);
   const Perimortem::Core::Static::Vector<Schema::Argument, 2> overflow = {
     {
-      Schema::Argument{
-        integer,
-        Count(-1),
-      },
+      Schema::Argument(integer, Count(-1)),
       {
         integer,
       },
@@ -277,10 +267,7 @@ VALIDATION_TEST(Callables, foreign_calls) {
       &vector);
   const Perimortem::Core::Static::Vector<Schema::Position, 3> fields = {
     {
-      Schema::Position{
-        sum,
-        __builtin_offsetof(ttx_test_callables, sum),
-      },
+      Schema::Position(sum, __builtin_offsetof(ttx_test_callables, sum)),
       {
         variadic,
         __builtin_offsetof(ttx_test_callables, variadic),
@@ -305,12 +292,7 @@ VALIDATION_TEST(Callables, foreign_calls) {
       static_cast<const U8*>(ttx_test_callable_table()), sizeof(output));
   EXPECT_EQ(output.sum(1, 2, 3, 4), U32(10));
   EXPECT_EQ(output.variadic(3, 1.0, 2.0, 3.0), R64(6));
-  const ttx_test_vector input = {
-    1,
-    2,
-    3,
-    4,
-  };
+  const ttx_test_vector input = {1, 2, 3, 4};
   const auto doubled = output.twice(input);
   for (Count i = 0; i < 4; ++i) {
     EXPECT_EQ(doubled[i], input[i] * 2);

@@ -138,7 +138,7 @@ static ttx_binding_status
     writer_bind(const void* source, perimortem_uuid id, ttx_storage requested) {
   if (id.high != TTX_FRAGMENT_PROVIDER_ID_HIGH ||
       id.low != TTX_FRAGMENT_PROVIDER_ID_LOW) {
-    return TTX_BINDING_UNSUPPORTED;
+    return TTX_BINDING_UNKNOWN;
   }
 
   const ttx_fragment_provider api = {
@@ -156,7 +156,7 @@ static ttx_binding_status writer_supports(
   return id.high == TTX_FRAGMENT_PROVIDER_ID_HIGH &&
                  id.low == TTX_FRAGMENT_PROVIDER_ID_LOW
              ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNSUPPORTED;
+             : TTX_BINDING_UNKNOWN;
 }
 
 static ttx_semantic_query source(heterogeneous_state* state) {
@@ -167,6 +167,9 @@ static ttx_semantic_query source(heterogeneous_state* state) {
   };
 }
 
+#ifdef PERI_WINDOWS
+__declspec(dllexport)
+#endif
 const heterogeneous_provider* heterogeneous_provider_open(
     provider_compile compiler) {
   compile_representation = compiler;

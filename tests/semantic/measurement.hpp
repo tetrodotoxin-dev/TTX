@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "perimortem/core/perimortem.h"
+#include "perimortem/core/option.hpp"
 
 namespace Validation::FlowTests {
 
@@ -11,7 +11,9 @@ namespace Validation::FlowTests {
 // allocation and copy calls linked into this executable. Code inside a foreign
 // library can allocate through its own runtime, so these counters make no
 // claim about that provider's hidden work. Positive controls exercise each
-// observed route before operation tests rely on a zero count.
+// observed route before operation tests rely on a zero count. Windows observes
+// Bibliotheca checkouts only. Its linker cannot wrap the executable's runtime
+// calls, so copy measurements are unavailable there.
 class Measurement {
  public:
   Measurement();
@@ -21,7 +23,8 @@ class Measurement {
 
   auto stop() -> void;
   auto get_allocations() const -> Count { return allocations; }
-  auto get_copies() const -> Count { return copies; }
+  auto get_copies() const -> Perimortem::Core::Option<Count>;
+  static auto wraps_runtime() -> Bool;
 
   // Linker wrappers call these hooks. The examples observe counts rather than
   // replacing an allocator or a copy implementation with test behavior.

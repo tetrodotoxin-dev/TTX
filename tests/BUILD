@@ -4,6 +4,7 @@
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@tetro_toolchain//:validation.bzl", "test")
+load("@tetro_toolchain//:library.bzl", "LINUX")
 
 package(default_testonly = True, default_visibility = ["//visibility:public"])
 
@@ -23,13 +24,6 @@ cc_library(
 cc_binary(
     name = "libflow_provider.so",
     srcs = ["semantic/fixtures/provider.c"],
-    copts = [
-        "-std=c17",
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-        "-pedantic-errors",
-    ],
     linkshared = True,
     deps = [":provider_contract"],
 )
@@ -37,13 +31,6 @@ cc_binary(
 cc_binary(
     name = "libheterogeneous_provider.so",
     srcs = ["semantic/fixtures/heterogeneous_provider.c"],
-    copts = [
-        "-std=c17",
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-        "-pedantic-errors",
-    ],
     linkshared = True,
     deps = [":provider_contract"],
 )
@@ -51,13 +38,6 @@ cc_binary(
 cc_binary(
     name = "libinterface_provider.so",
     srcs = ["semantic/fixtures/interface_provider.c"],
-    copts = [
-        "-std=c17",
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-        "-pedantic-errors",
-    ],
     linkshared = True,
     deps = [":provider_contract"],
 )
@@ -65,13 +45,6 @@ cc_binary(
 cc_binary(
     name = "libinvocation_provider.so",
     srcs = ["semantic/fixtures/invocation_provider.c"],
-    copts = [
-        "-std=c17",
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-        "-pedantic-errors",
-    ],
     linkshared = True,
     deps = [":provider_contract"],
 )
@@ -82,6 +55,13 @@ cc_binary(
         "concept/fixtures/subject.cpp",
         "concept/fixtures/subject.hpp",
     ],
+    linkshared = True,
+    deps = ["//:implementation"],
+)
+
+cc_binary(
+    name = "libcomposition.so",
+    srcs = ["concept/fixtures/composition.c", "concept/fixtures/composition.h"],
     linkshared = True,
     deps = ["//:implementation"],
 )
@@ -99,6 +79,7 @@ test(
         # These owners are loaded from the independent libraries above.
         exclude = [
             "concept/fixtures/subject.cpp",
+            "concept/fixtures/composition.c",
             "semantic/fixtures/heterogeneous_provider.c",
             "semantic/fixtures/interface_provider.c",
             "semantic/fixtures/invocation_provider.c",
@@ -107,13 +88,13 @@ test(
     ),
     data = [
         ":libabstract_subject.so",
+        ":libcomposition.so",
         ":libflow_provider.so",
         ":libheterogeneous_provider.so",
         ":libinterface_provider.so",
         ":libinvocation_provider.so",
     ],
-    linkopts = [
-        "-ldl",
+    linkopts = select({LINUX: [
         # ThinLTO can introduce memmove after discarding an unreferenced wrapper.
         # Retain the instrumentation entry until the linker rewrites those calls.
         "-Wl,--undefined=__wrap_memmove",
@@ -128,7 +109,7 @@ test(
         "-Wl,--wrap=_Znam",
         "-Wl,--wrap=_ZnwmSt11align_val_t",
         "-Wl,--wrap=_ZnamSt11align_val_t",
-    ],
+    ], "//conditions:default": []}),
     deps = [
         "//:implementation",
     ],

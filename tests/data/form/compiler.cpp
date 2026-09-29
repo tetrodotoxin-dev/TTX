@@ -28,10 +28,7 @@ VALIDATION_TEST(TtxCompiler, composite_and_range) {
   auto foreign_integer = integer;
   const Static::Vector<Schema::Position, 4> entries = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
       {
         integer,
         4,
@@ -69,10 +66,7 @@ VALIDATION_TEST(TtxCompiler, schema_validation) {
   Preparation prepare;
   Static::Vector<Schema::Position, 2> entries = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
       {
         integer,
         2,
@@ -162,7 +156,8 @@ VALIDATION_TEST(TtxCompiler, empty_equivalence) {
   const Static::Vector<Schema, 3> forms = {
     {
       Schema::range(integer, 0, 4, 0, 4),
-      Schema::composite({}, 0, 4),
+      Schema::composite(
+          Perimortem::Core::View::Vector<Schema::Position>(), 0, 4),
       Schema::range(real, 0, 4, 0, 4),
     },
   };
@@ -187,10 +182,7 @@ VALIDATION_TEST(TtxCompiler, padding_equivalence) {
   Preparation prepare;
   const Static::Vector<Schema::Position, 1> child = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
     },
   };
   const auto padded = Schema::composite(
@@ -207,10 +199,7 @@ VALIDATION_TEST(TtxCompiler, padding_equivalence) {
       4, 4);
   const Static::Vector<Schema::Position, 2> nested = {
     {
-      Schema::Position{
-        padded,
-        0,
-      },
+      Schema::Position(padded, 0),
       {
         compact,
         8,
@@ -219,10 +208,7 @@ VALIDATION_TEST(TtxCompiler, padding_equivalence) {
   };
   const Static::Vector<Schema::Position, 2> flat = {
     {
-      Schema::Position{
-        compact,
-        0,
-      },
+      Schema::Position(compact, 0),
       {
         compact,
         8,
@@ -251,10 +237,7 @@ VALIDATION_TEST(TtxCompiler, padding_equivalence) {
 
   const Static::Vector<Schema::Position, 2> shifted = {
     {
-      Schema::Position{
-        compact,
-        4,
-      },
+      Schema::Position(compact, 4),
       {
         compact,
         8,
@@ -277,10 +260,7 @@ VALIDATION_TEST(TtxCompiler, repeated_padding) {
   Preparation prepare;
   const Static::Vector<Schema::Position, 1> child = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
     },
   };
   const auto padded = Schema::composite(
@@ -306,10 +286,7 @@ VALIDATION_TEST(TtxCompiler, nested_group_match) {
   Preparation prepare;
   const Static::Vector<Schema::Position, 2> pair = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
       {
         integer,
         4,
@@ -324,10 +301,7 @@ VALIDATION_TEST(TtxCompiler, nested_group_match) {
       8, 4);
   const Static::Vector<Schema::Position, 2> fields = {
     {
-      Schema::Position{
-        group,
-        0,
-      },
+      Schema::Position(group, 0),
       {
         integer,
         8,
@@ -342,10 +316,7 @@ VALIDATION_TEST(TtxCompiler, nested_group_match) {
       12, 4);
   const Static::Vector<Schema::Position, 1> wrapper = {
     {
-      Schema::Position{
-        flat,
-        0,
-      },
+      Schema::Position(flat, 0),
     },
   };
   const auto nested = Schema::composite(

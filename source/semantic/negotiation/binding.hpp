@@ -15,14 +15,12 @@ namespace Ttx::Semantic::Negotiation::Binding {
 // only a Failure when negotiation could not establish that record.
 enum class Status : U8 {
   Satisfied = TTX_BINDING_SATISFIED,
-  Unsupported = TTX_BINDING_UNSUPPORTED,
-  Pending = TTX_BINDING_PENDING,
+  Unknown = TTX_BINDING_UNKNOWN,
   Rejected = TTX_BINDING_REJECTED,
 };
 
 enum class Failure : U8 {
-  Unsupported = TTX_BINDING_UNSUPPORTED,
-  Pending = TTX_BINDING_PENDING,
+  Unknown = TTX_BINDING_UNKNOWN,
   Rejected = TTX_BINDING_REJECTED,
 };
 

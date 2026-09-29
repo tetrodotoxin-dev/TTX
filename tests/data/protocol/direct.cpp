@@ -26,14 +26,14 @@ VALIDATION_TEST(TtxDirect, direct_without_bind) {
     prepare(u32),
     42,
   };
-  const Ttx::Data::Protocol::Direct::Provider::Operations operations = {
-    [](const void* state) -> const Representation* {
-      return &static_cast<const Source*>(state)->representation;
-    },
-    [](const void* state) -> const void* {
-      return &static_cast<const Source*>(state)->value;
-    },
-  };
+  const Ttx::Data::Protocol::Direct::Provider::Operations operations =
+      Ttx::Data::Protocol::Direct::Provider::Operations(
+          [](const void* state) -> const Representation* {
+            return &static_cast<const Source*>(state)->representation;
+          },
+          [](const void* state) -> const void* {
+            return &static_cast<const Source*>(state)->value;
+          });
 
   Ttx::Data::Protocol::Direct::Provider access(&source, operations);
   EXPECT(access.get_representation().compatible(prepare(u32)));

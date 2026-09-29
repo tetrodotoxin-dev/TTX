@@ -122,10 +122,7 @@ VALIDATION_TEST(TtxCompiled, repeated_publication) {
 VALIDATION_TEST(TtxCompiled, canonical_padding) {
   const Static::Vector<Schema::Position, 2> small_fields = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
       {
         real,
         4,
@@ -134,10 +131,7 @@ VALIDATION_TEST(TtxCompiled, canonical_padding) {
   };
   const Static::Vector<Schema::Position, 2> wide_fields = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
       {
         real,
         65536,

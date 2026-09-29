@@ -143,7 +143,7 @@ static ttx_binding_status
   if (matches(id, TTX_DIRECT_PROVIDER_ID_HIGH, TTX_DIRECT_PROVIDER_ID_LOW)) {
     ++state->binds[0];
     if (!(state->provides & PROVIDES_DIRECT)) {
-      return TTX_BINDING_UNSUPPORTED;
+      return TTX_BINDING_UNKNOWN;
     }
 
     const ttx_direct_provider api = {
@@ -156,7 +156,7 @@ static ttx_binding_status
       matches(id, TTX_SHARED_PROVIDER_ID_HIGH, TTX_SHARED_PROVIDER_ID_LOW)) {
     ++state->binds[1];
     if (!(state->provides & PROVIDES_SHARED)) {
-      return TTX_BINDING_UNSUPPORTED;
+      return TTX_BINDING_UNKNOWN;
     }
 
     const ttx_shared_provider api = {
@@ -169,7 +169,7 @@ static ttx_binding_status
       matches(id, TTX_BLOCK_PROVIDER_ID_HIGH, TTX_BLOCK_PROVIDER_ID_LOW)) {
     ++state->binds[2];
     if (!(state->provides & PROVIDES_BLOCK)) {
-      return TTX_BINDING_UNSUPPORTED;
+      return TTX_BINDING_UNKNOWN;
     }
 
     const ttx_block_provider api = {
@@ -183,7 +183,7 @@ static ttx_binding_status
           id, TTX_FRAGMENT_PROVIDER_ID_HIGH, TTX_FRAGMENT_PROVIDER_ID_LOW)) {
     ++state->binds[3];
     if (!(state->provides & PROVIDES_FRAGMENT)) {
-      return TTX_BINDING_UNSUPPORTED;
+      return TTX_BINDING_UNKNOWN;
     }
 
     const ttx_fragment_provider api = {
@@ -193,7 +193,7 @@ static ttx_binding_status
     return ttx_binding_provide(
         ttx_fragment_provider_representation(), &api, requested);
   } else {
-    return TTX_BINDING_UNSUPPORTED;
+    return TTX_BINDING_UNKNOWN;
   }
 
   return TTX_BINDING_SATISFIED;
@@ -217,7 +217,7 @@ static ttx_binding_status supports(const void* source, perimortem_uuid id) {
   }
 
   return state->provides & protocol ? TTX_BINDING_SATISFIED
-                                    : TTX_BINDING_UNSUPPORTED;
+                                    : TTX_BINDING_UNKNOWN;
 }
 
 static ttx_semantic_query writer(provider_state* state) {
@@ -476,7 +476,7 @@ static ttx_binding_status bootstrap_bind(
     perimortem_uuid id,
     ttx_storage requested) {
   if (!matches(id, TTX_DIRECT_PROVIDER_ID_HIGH, TTX_DIRECT_PROVIDER_ID_LOW)) {
-    return TTX_BINDING_UNSUPPORTED;
+    return TTX_BINDING_UNKNOWN;
   }
 
   const ttx_direct_provider api = {
@@ -493,7 +493,7 @@ static ttx_binding_status bootstrap_supports(
   (void)source;
   return matches(id, TTX_DIRECT_PROVIDER_ID_HIGH, TTX_DIRECT_PROVIDER_ID_LOW)
              ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNSUPPORTED;
+             : TTX_BINDING_UNKNOWN;
 }
 
 static ttx_semantic_query bootstrap_writer(void) {
@@ -955,7 +955,7 @@ static ttx_binding_status primitive_bind(
     ttx_storage requested) {
   if (!matches(
           id, TTX_FRAGMENT_PROVIDER_ID_HIGH, TTX_FRAGMENT_PROVIDER_ID_LOW)) {
-    return TTX_BINDING_UNSUPPORTED;
+    return TTX_BINDING_UNKNOWN;
   }
 
   const ttx_fragment_provider api = {
@@ -973,7 +973,7 @@ static ttx_binding_status primitive_supports(
   return matches(
              id, TTX_FRAGMENT_PROVIDER_ID_HIGH, TTX_FRAGMENT_PROVIDER_ID_LOW)
              ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNSUPPORTED;
+             : TTX_BINDING_UNKNOWN;
 }
 
 static ttx_semantic_query primitives(void) {
@@ -984,6 +984,9 @@ static ttx_semantic_query primitives(void) {
   };
 }
 
+#ifdef PERI_WINDOWS
+__declspec(dllexport)
+#endif
 const provider_api* flow_provider_open(provider_compile compiler) {
   compile_representation = compiler;
   if (!four_representation) {

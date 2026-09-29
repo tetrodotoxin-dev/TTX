@@ -31,7 +31,11 @@ typedef struct invocation_fixture {
   void (*configure)(U8 protocol, ttx_binding_status status, U8 fail_transfer);
 } invocation_fixture;
 
-PERIMORTEM_C invocation_fixture invocation_provider_open(
+PERIMORTEM_C
+#ifdef PERI_WINDOWS
+__declspec(dllexport)
+#endif
+invocation_fixture invocation_provider_open(
     const ttx_representation* record,
     const ttx_representation* inputs,
     const ttx_representation* outputs);

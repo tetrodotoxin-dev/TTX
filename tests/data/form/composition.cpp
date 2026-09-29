@@ -27,10 +27,7 @@ static auto check_pair(
   const Count width = child.get_extent();
   const Perimortem::Core::Static::Vector<Schema::Position, 2> positions = {
     {
-      Schema::Position{
-        child,
-        0,
-      },
+      Schema::Position(child, 0),
       {
         child,
         width,
@@ -46,10 +43,7 @@ static auto check_pair(
           width * 2, child.get_alignment()));
   const Perimortem::Core::Static::Vector<Representation::Member, 2> members = {
     {
-      Representation::Member{
-        form,
-        width,
-      },
+      Representation::Member(form, width),
       {
         form,
         0,
@@ -69,14 +63,12 @@ static auto check_pair(
           },
           [&](Status) { EXPECT(False); });
 
-  const ttx_representation_allocator allocator = {
-    &arena,
-    [](void* owner, Count size, Count) -> void* {
-      return static_cast<Memory::Allocator::Arena*>(owner)
-          ->allocate(size)
-          .get_data();
-    },
-  };
+  const ttx_representation_allocator allocator = ttx_representation_allocator(
+      &arena, [](void* owner, Count size, Count) -> void* {
+        return static_cast<Memory::Allocator::Arena*>(owner)
+            ->allocate(size)
+            .get_data();
+      });
   const Representation* output = nullptr;
   ASSERT(
       compose_pair(&form, width, child.get_alignment(), allocator, &output) ==
@@ -88,10 +80,7 @@ VALIDATION_TEST(Composition, records_and_cycles) {
   const auto integer = Schema::primitive(Schema::Value::U32);
   const Perimortem::Core::Static::Vector<Schema::Position, 2> fields = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
       {
         integer,
         8,
@@ -107,7 +96,8 @@ VALIDATION_TEST(Composition, records_and_cycles) {
           16, 8),
       result);
 
-  auto recursive = Schema::composite({}, 8, 8);
+  auto recursive = Schema::composite(
+      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
   const Schema::Position pointer(Schema::pointer(&recursive), 0);
   recursive = Schema::composite(
       {
@@ -136,10 +126,7 @@ VALIDATION_TEST(Composition, records_and_cycles) {
       Schema::callable(Schema::Convention::SystemVAMD64, {});
   const Perimortem::Core::Static::Vector<Schema::Position, 2> calls = {
     {
-      Schema::Position{
-        function,
-        0,
-      },
+      Schema::Position(function, 0),
       {
         no_arguments,
         8,
@@ -180,10 +167,7 @@ VALIDATION_TEST(Composition, invalid_placements) {
   const auto& form = prepare(integer);
   const Perimortem::Core::Static::Vector<Representation::Member, 2> members = {
     {
-      Representation::Member{
-        form,
-        0,
-      },
+      Representation::Member(form, 0),
       {
         form,
         2,
@@ -209,11 +193,13 @@ VALIDATION_TEST(Composition, invalid_placements) {
             [&](Status status) { EXPECT(status == Status::Invalid); });
   }
 
-  Representation::compose({}, 8, 8, arena)
+  Representation::compose(
+      Perimortem::Core::View::Vector<Representation::Member>(), 8, 8, arena)
       .visit(
           [&](const Representation&) { EXPECT(False); },
           [&](Status status) { EXPECT(status == Status::Invalid); });
-  Representation::compose({}, 0, 1, arena)
+  Representation::compose(
+      Perimortem::Core::View::Vector<Representation::Member>(), 0, 1, arena)
       .visit(
           [&](const Representation& empty) {
             EXPECT_EQ(empty.get_extent(), Count(0));

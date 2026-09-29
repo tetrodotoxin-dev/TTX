@@ -21,8 +21,10 @@
 // any operations. Supports answers that semantic question using only the UUID.
 // For example, an unsigned policy can exclude negative values without exposing
 // a callable interface. The answer transfers no bytes and requires no agreed
-// Representation. Pending preserves missing evidence and Rejected preserves
-// a policy's refusal, just as they do during binding.
+// Representation. Satisfied establishes that promise, Unknown leaves the
+// question unsettled, and Rejected records an explicit refusal. An unfamiliar
+// UUID therefore need not be rejected. These answers are observations, with
+// no implied background work or obligation to become determined later.
 //
 // Bind asks the stronger question: can this provider supply the promised API
 // in the concrete form the caller can consume? Success populates that admitted

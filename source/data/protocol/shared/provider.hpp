@@ -22,10 +22,7 @@ class Provider {
   }
 
   constexpr Provider(const void* source, const Operations& operations)
-      : value{
-          source,
-          &operations,
-        } {}
+      : value(source, &operations) {}
 
   constexpr explicit Provider(ttx_shared_provider value) : value(value) {}
 

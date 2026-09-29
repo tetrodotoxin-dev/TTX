@@ -35,7 +35,7 @@ VALIDATION_TEST(TtxFlow, consumer_contracts) {
         .visit(
             [&](Consumer) { EXPECT(false); },
             [&](Binding::Failure failure) {
-              EXPECT(failure == Binding::Failure::Unsupported);
+              EXPECT(failure == Binding::Failure::Unknown);
             });
   }
 }
@@ -59,9 +59,7 @@ VALIDATION_TEST(TtxFlow, direct_preference) {
           40,
         },
   };
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
   Flow flow;
   ASSERT(
@@ -92,15 +90,13 @@ VALIDATION_TEST(TtxFlow, disjoint_protocols) {
   Module::State writer = {
     .provides = PROVIDES_DIRECT,
   };
-  Validation::FlowTests::Reader reader{
-    four,
-    PROVIDES_FRAGMENT,
-  };
+  Validation::FlowTests::Reader reader =
+      Validation::FlowTests::Reader(four, PROVIDES_FRAGMENT);
 
   Flow flow;
   EXPECT(
       flow.connect(reader.query(), module.writer(writer)) ==
-      Flow::Status::Unsupported);
+      Flow::Status::Unknown);
 
   for (Count i = 0; i < 4; ++i) {
     EXPECT_EQ(reader.binds[i], Count(1));
@@ -112,7 +108,7 @@ VALIDATION_TEST(TtxFlow, disjoint_protocols) {
 
 // Identity acceptance is followed by one ABI agreement. A U32 reader cannot
 // cast or copy an R32 representation merely because their byte widths match.
-// A policy rejection or pending bind also stops the search without a fallback.
+// Unknown tries the remaining candidates, while explicit rejection stops.
 VALIDATION_TEST(TtxFlow, negotiation_failures) {
   Preparation prepare;
   const auto& four = prepare(four_schema);
@@ -124,9 +120,7 @@ VALIDATION_TEST(TtxFlow, negotiation_failures) {
     .provides = 15,
   };
   const auto wrong = prepare(Schema::range(real, 4, 4, 16, 4));
-  Validation::FlowTests::Reader reader{
-    wrong,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(wrong);
 
   Flow flow;
   EXPECT(
@@ -135,22 +129,26 @@ VALIDATION_TEST(TtxFlow, negotiation_failures) {
   EXPECT_EQ(writer.binds[3], Count(1));
   EXPECT_EQ(writer.acquires, Count(0));
 
-  Validation::FlowTests::Reader pending{
-    four,
-    0,
-  };
-  pending.decline = Binding::Status::Pending;
+  Validation::FlowTests::Reader undetermined =
+      Validation::FlowTests::Reader(four, 0);
+  undetermined.decline = Binding::Status::Unknown;
   flow.close();
   EXPECT(
-      flow.connect(pending.query(), module.writer(writer)) ==
-      Flow::Status::BindingPending);
-  EXPECT_EQ(pending.binds[1], Count(0));
+      flow.connect(undetermined.query(), module.writer(writer)) ==
+      Flow::Status::Unknown);
+  for (Count index = 0; index != 4; ++index) {
+    EXPECT_EQ(undetermined.binds[index], Count(1));
+  }
 
-  pending.decline = Binding::Status::Rejected;
+  undetermined.decline = Binding::Status::Rejected;
   flow.close();
   EXPECT(
-      flow.connect(pending.query(), module.writer(writer)) ==
+      flow.connect(undetermined.query(), module.writer(writer)) ==
       Flow::Status::Rejected);
+  EXPECT_EQ(undetermined.binds[0], Count(2));
+  for (Count index = 1; index != 4; ++index) {
+    EXPECT_EQ(undetermined.binds[index], Count(1));
+  }
 }
 
 // Exhaust the four protocol cooperation matrix using independent C and C++
@@ -176,17 +174,15 @@ VALIDATION_TEST(TtxFlow, protocol_matrix) {
       Module::State writer = {
         .provides = source,
       };
-      Validation::FlowTests::Reader reader{
-        four,
-        target,
-      };
+      Validation::FlowTests::Reader reader =
+          Validation::FlowTests::Reader(four, target);
 
       Flow flow;
       const auto status = flow.connect(reader.query(), module.writer(writer));
 
       const U8 common = source & target;
       if (!common) {
-        EXPECT(status == Flow::Status::Unsupported);
+        EXPECT(status == Flow::Status::Unknown);
         continue;
       }
 
@@ -223,9 +219,7 @@ VALIDATION_TEST(TtxFlow, protocol_abi_match) {
     .provides = PROVIDES_DIRECT | PROVIDES_BLOCK,
   };
   const auto wrong = prepare(Schema::range(real, 4, 4, 16, 4));
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
   reader.direct_schema = &wrong;
 
   Flow flow;
@@ -255,24 +249,23 @@ VALIDATION_TEST(TtxFlow, fresh_bind_results) {
     published,
   };
 
-  const Query query({
-    &owner,
-    [](const void* source, perimortem_uuid id,
-       ttx_storage answer) -> ttx_binding_status {
-      auto& owner = *const_cast<Owner*>(static_cast<const Owner*>(source));
-      if (owner.calls++) {
-        return TTX_BINDING_SATISFIED;
-      }
+  const Query query(ttx_semantic_query(
+      &owner,
+      [](const void* source, perimortem_uuid id,
+         ttx_storage answer) -> ttx_binding_status {
+        auto& owner = *const_cast<Owner*>(static_cast<const Owner*>(source));
+        if (owner.calls++) {
+          return TTX_BINDING_SATISFIED;
+        }
 
-      const auto native = static_cast<ttx_semantic_query>(owner.query);
-      return native.bind(native.source, id, answer);
-    },
-    [](const void* source, perimortem_uuid id) -> ttx_binding_status {
-      return static_cast<ttx_binding_status>(
-          static_cast<const Owner*>(source)->query.supports(
-              Perimortem::System::Uuid(id)));
-    },
-  });
+        const auto native = static_cast<ttx_semantic_query>(owner.query);
+        return native.bind(native.source, id, answer);
+      },
+      [](const void* source, perimortem_uuid id) -> ttx_binding_status {
+        return static_cast<ttx_binding_status>(
+            static_cast<const Owner*>(source)->query.supports(
+                Perimortem::System::Uuid(id)));
+      }));
 
   query
       .bind<Ttx::Data::Protocol::Direct::Provider>(

@@ -13,34 +13,30 @@ using namespace Validation::FlowTests;
 // from the C++ facade or accepting another promise with the same byte shape.
 VALIDATION_TEST(TtxFlow, explicit_contract) {
   using Ttx::Data::Protocol::Direct::Provider;
-  static constexpr Perimortem::System::Uuid selected{
-    41,
-    73,
-  };
+  static constexpr Perimortem::System::Uuid selected =
+      Perimortem::System::Uuid(41, 73);
   static const auto& form = Ttx::Data::Form::Compiled<
       Ttx::Data::Form::Native<U32>::reference>::get_representation();
   U32 payload = 42;
-  const Query query({
-    &payload,
-    [](const void* source, perimortem_uuid contract,
-       ttx_storage requested) -> ttx_binding_status {
-      if (Perimortem::System::Uuid(contract) != selected) {
-        return TTX_BINDING_REJECTED;
-      }
+  const Query query(ttx_semantic_query(
+      &payload,
+      [](const void* source, perimortem_uuid contract,
+         ttx_storage requested) -> ttx_binding_status {
+        if (Perimortem::System::Uuid(contract) != selected) {
+          return TTX_BINDING_REJECTED;
+        }
 
-      static const Provider::Operations operations = {
-        [](const void*) -> const Representation* { return &form; },
-        [](const void* source) -> const void* { return source; },
-      };
-      return static_cast<ttx_binding_status>(Binding::provide<Provider>(
-          Provider::Api(source, &operations), Storage(requested)));
-    },
-    [](const void*, perimortem_uuid contract) -> ttx_binding_status {
-      return Perimortem::System::Uuid(contract) == selected
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
-    },
-  });
+        static const Provider::Operations operations = Provider::Operations(
+            [](const void*) -> const Representation* { return &form; },
+            [](const void* source) -> const void* { return source; });
+        return static_cast<ttx_binding_status>(Binding::provide<Provider>(
+            Provider::Api(source, &operations), Storage(requested)));
+      },
+      [](const void*, perimortem_uuid contract) -> ttx_binding_status {
+        return Perimortem::System::Uuid(contract) == selected
+                   ? TTX_BINDING_SATISFIED
+                   : TTX_BINDING_REJECTED;
+      }));
 
   query.bind<Provider>(selected).visit(
       [&](Provider provider) {
@@ -70,10 +66,8 @@ VALIDATION_TEST(TtxFlow, bootstrap_bind) {
   // provider authors the same form independently, including bind's signature.
   const auto& query_schema = Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
       ttx_semantic_query>::reference>::get_representation();
-  Validation::FlowTests::Reader receiver{
-    query_schema,
-    PROVIDES_DIRECT | PROVIDES_SHARED,
-  };
+  Validation::FlowTests::Reader receiver = Validation::FlowTests::Reader(
+      query_schema, PROVIDES_DIRECT | PROVIDES_SHARED);
 
   Flow bootstrap;
   ASSERT(
@@ -88,14 +82,12 @@ VALIDATION_TEST(TtxFlow, bootstrap_bind) {
       Ttx::Semantic::Negotiation::Binding::Status::Satisfied);
   EXPECT(
       imported.supports(Ttx::Semantic::Transport::Flow::block.provider) ==
-      Ttx::Semantic::Negotiation::Binding::Status::Unsupported);
-  Validation::FlowTests::Reader data{
-    four,
-  };
+      Ttx::Semantic::Negotiation::Binding::Status::Unknown);
+  Validation::FlowTests::Reader data = Validation::FlowTests::Reader(four);
   Flow flow;
   ASSERT(flow.connect(data.query(), imported) == Flow::Status::Success);
 
-  Static::Vector<U32, 4> target = {};
+  Static::Vector<U32, 4> target;
   ASSERT(Copy::flow(flow, storage(four, target)) == Status::Success);
   EXPECT_EQ(target[3], U32(4));
 }

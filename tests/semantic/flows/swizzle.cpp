@@ -42,16 +42,14 @@ VALIDATION_TEST(TtxFlow, swizzle_protocols) {
             40,
           },
     };
-    Validation::FlowTests::Reader reader{
-      four,
-    };
+    Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
     Flow flow;
     ASSERT(
         flow.connect(reader.query(), module.writer(writer)) ==
         Flow::Status::Success);
 
-    Static::Vector<U32, 2> a = {}, b = {};
+    Static::Vector<U32, 2> a, b;
     EXPECT(Swizzle::flow(flow, mapping, storage(pair, a)) == Status::Success);
     EXPECT_EQ(a[0], U32(40));
     EXPECT_EQ(a[1], U32(10));
@@ -74,31 +72,20 @@ VALIDATION_TEST(TtxFlow, mapping_admission) {
 
   const auto pair = prepare(Schema::range(integer, 2, 4, 8, 4));
   const auto repeated = [](const void*, Count) -> Count { return 0; };
-  Swizzle::Mapping::create({
-                             &four,
-                             &pair,
-                             nullptr,
-                             repeated,
-                           })
+  Swizzle::Mapping::create(
+      ttx_swizzle_selection(&four, &pair, nullptr, repeated))
       .visit([&](auto&) {}, [&](Status) { EXPECT(false); });
 
-  Swizzle::Mapping::create({
-                             &four,
-                             &pair,
-                             nullptr,
-                             [](const void*, Count) -> Count { return 16; },
-                           })
+  Swizzle::Mapping::create(ttx_swizzle_selection(
+                               &four, &pair, nullptr,
+                               [](const void*, Count) -> Count { return 16; }))
       .visit(
           [&](auto&) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Bounds); });
 
   const auto wrong = prepare(Schema::range(real, 2, 4, 8, 4));
-  Swizzle::Mapping::create({
-                             &four,
-                             &wrong,
-                             nullptr,
-                             repeated,
-                           })
+  Swizzle::Mapping::create(
+      ttx_swizzle_selection(&four, &wrong, nullptr, repeated))
       .visit(
           [&](auto&) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Incompatible); });
@@ -124,9 +111,7 @@ VALIDATION_TEST(TtxFlow, swizzle_wrong_target) {
           4,
         },
   };
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
   Flow flow;
   ASSERT(
@@ -169,9 +154,7 @@ VALIDATION_TEST(TtxFlow, swizzle_overlap) {
           40,
         },
   };
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
   Flow flow;
   ASSERT(
@@ -230,16 +213,14 @@ VALIDATION_TEST(TtxFlow, swizzle_and_slice) {
             40,
           },
     };
-    Validation::FlowTests::Reader reader{
-      four,
-    };
+    Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
     Flow flow;
     ASSERT(
         flow.connect(reader.query(), module.writer(writer)) ==
         Flow::Status::Success);
 
-    Static::Vector<U32, 2> output = {};
+    Static::Vector<U32, 2> output;
     EXPECT(Swizzle::flow(flow, red, storage(pair, output)) == Status::Success);
     EXPECT_EQ(output[0], U32(10));
     EXPECT_EQ(output[1], U32(10));
@@ -274,9 +255,7 @@ VALIDATION_TEST(TtxFlow, swizzle_failure) {
           40,
         },
   };
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
   Flow flow;
   ASSERT(
@@ -327,16 +306,15 @@ VALIDATION_TEST(TtxFlow, swizzle_byte_order) {
                       0x12345678,
                     },
               };
-              Validation::FlowTests::Reader reader{
-                four,
-              };
+              Validation::FlowTests::Reader reader =
+                  Validation::FlowTests::Reader(four);
 
               Flow flow;
               ASSERT(
                   flow.connect(reader.query(), module.writer(writer)) ==
                   Flow::Status::Success);
 
-              alignas(U32) Static::Vector<U8, 4> output = {};
+              alignas(U32) Static::Vector<U8, 4> output;
               EXPECT(
                   Swizzle::flow(flow, mapping, storage(big, output)) ==
                   Status::Success);
@@ -393,7 +371,7 @@ VALIDATION_TEST(TtxFlow, repeated_named_value) {
             ASSERT(
                 flow.connect(Flow::consumer(four), module.writer(writer)) ==
                 Flow::Status::Success);
-            Static::Vector<U32, 5> output = {};
+            Static::Vector<U32, 5> output;
             const auto target = storage(five, output);
 
             Measurement measurement;
@@ -445,10 +423,7 @@ VALIDATION_TEST(TtxFlow, repeated_byte_orders) {
       Schema::primitive(Schema::Value::U32, Schema::ByteOrder::Big);
   const Static::Vector<Schema::Position, 2> fields = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
       {
         big,
         4,
@@ -483,7 +458,7 @@ VALIDATION_TEST(TtxFlow, repeated_byte_orders) {
               ASSERT(
                   flow.connect(Flow::consumer(four), module.writer(writer)) ==
                   Flow::Status::Success);
-              alignas(U32) Static::Vector<U8, 8> bytes = {};
+              alignas(U32) Static::Vector<U8, 8> bytes;
               ASSERT(
                   Swizzle::flow(flow, mapping, storage(output_form, bytes)) ==
                   Status::Success);

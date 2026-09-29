@@ -71,10 +71,7 @@ VALIDATION_TEST(TtxEncoding, struct_bytes) {
   Preparation prepare;
   const Static::Vector<Schema::Position, 3> fields = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
       {
         integer,
         8,
@@ -137,10 +134,7 @@ VALIDATION_TEST(TtxEncoding, padding_bytes) {
   Preparation prepare;
   const Static::Vector<Schema::Position, 4> fields = {
     {
-      Schema::Position{
-        byte,
-        0,
-      },
+      Schema::Position(byte, 0),
       {
         byte,
         1,
@@ -158,10 +152,7 @@ VALIDATION_TEST(TtxEncoding, padding_bytes) {
   const auto bytes = Schema::range(byte, 3, 1, 3);
   const Static::Vector<Schema::Position, 2> grouped = {
     {
-      Schema::Position{
-        bytes,
-        0,
-      },
+      Schema::Position(bytes, 0),
       {
         integer,
         4,
@@ -267,10 +258,7 @@ VALIDATION_TEST(TtxEncoding, split_run_prefix) {
   const auto second = Schema::range(integer, 2, 8, 12, 4);
   const Static::Vector<Schema::Position, 2> split = {
     {
-      Schema::Position{
-        first,
-        0,
-      },
+      Schema::Position(first, 0),
       {
         second,
         8,
@@ -279,10 +267,7 @@ VALIDATION_TEST(TtxEncoding, split_run_prefix) {
   };
   const Static::Vector<Schema::Position, 4> flat = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
       {
         integer,
         4,
@@ -314,10 +299,7 @@ VALIDATION_TEST(TtxEncoding, gapped_batches) {
   const auto repeated = Schema::range(pair, 3, 12, 32, 4);
   const Static::Vector<Schema::Position, 6> fields = {
     {
-      Schema::Position{
-        integer,
-        0,
-      },
+      Schema::Position(integer, 0),
       {
         integer,
         4,
@@ -354,10 +336,7 @@ VALIDATION_TEST(TtxEncoding, interleaved_runs) {
   const auto odd = Schema::range(signed_byte, 2, 4, 5);
   const Static::Vector<Schema::Position, 2> ranges = {
     {
-      Schema::Position{
-        even,
-        0,
-      },
+      Schema::Position(even, 0),
       {
         odd,
         2,
@@ -366,10 +345,7 @@ VALIDATION_TEST(TtxEncoding, interleaved_runs) {
   };
   const Static::Vector<Schema::Position, 5> fields = {
     {
-      Schema::Position{
-        byte,
-        0,
-      },
+      Schema::Position(byte, 0),
       {
         signed_byte,
         2,
@@ -416,10 +392,7 @@ VALIDATION_TEST(TtxEncoding, independent_bodies) {
   auto other_cell = cell;
   const Static::Vector<Schema::Position, 2> ordered = {
     {
-      Schema::Position{
-        cell,
-        0,
-      },
+      Schema::Position(cell, 0),
       {
         other_cell,
         8,
@@ -428,10 +401,7 @@ VALIDATION_TEST(TtxEncoding, independent_bodies) {
   };
   const Static::Vector<Schema::Position, 2> reversed = {
     {
-      Schema::Position{
-        other_cell,
-        8,
-      },
+      Schema::Position(other_cell, 8),
       {
         cell,
         0,
@@ -493,14 +463,12 @@ VALIDATION_TEST(TtxEncoding, final_allocation) {
     alignas(Representation) Static::Vector<U8, 128> bytes;
     Count allocations = 0;
   } owner;
-  const ttx_representation_allocator allocator = {
-    &owner,
-    [](void* source, Count size, Count) -> void* {
-      auto& owner = *static_cast<Owner*>(source);
-      ++owner.allocations;
-      return size <= sizeof(owner.bytes) ? owner.bytes.get_data() : nullptr;
-    },
-  };
+  const ttx_representation_allocator allocator = ttx_representation_allocator(
+      &owner, [](void* source, Count size, Count) -> void* {
+        auto& owner = *static_cast<Owner*>(source);
+        ++owner.allocations;
+        return size <= sizeof(owner.bytes) ? owner.bytes.get_data() : nullptr;
+      });
   const Representation* output = nullptr;
   auto invalid = integer;
   invalid.data.value.type = 11;

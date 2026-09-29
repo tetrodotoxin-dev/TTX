@@ -33,7 +33,10 @@ namespace Ttx::Semantic::Negotiation {
 //
 // A consumer needing operations binds directly. Probing first would add a call
 // without proving the representation agreement that bind still has to make.
-// Both observations preserve Pending and Rejected at the encountered policy.
+// Both observations return Satisfied, Unknown or Rejected. Unknown leaves the
+// question unsettled and carries no asynchronous work. Delegation belongs to
+// the encountered policy, so callers retain its answer without resolving around
+// it or treating uncertainty as rejection.
 // The supplying state and code remain borrowed through these observations and
 // every use of a returned interface.
 class Query {
@@ -71,13 +74,8 @@ class Query {
       -> Perimortem::Utility::Result<Interface, Binding::Failure> {
     const auto& form = Binding::representation<Interface>();
     if constexpr (__is_same(typename Interface::Api, void)) {
-      const auto status = bind(
-          contract, Data::Form::Storage(
-                        ttx_storage{
-                          &form,
-                          nullptr,
-                          0,
-                        }));
+      const auto status =
+          bind(contract, Data::Form::Storage(ttx_storage(&form, nullptr, 0)));
       if (status != Binding::Status::Satisfied) {
         return static_cast<Binding::Failure>(status);
       }
@@ -86,12 +84,9 @@ class Query {
     } else {
       // The actual API type supplies storage, including its alignment. A failed
       // exchange never publishes this local value as a callable interface.
-      typename Interface::Api api = {};
-      const ttx_storage target{
-        &form,
-        reinterpret_cast<U8*>(&api),
-        sizeof(api),
-      };
+      typename Interface::Api api = typename Interface::Api();
+      const ttx_storage target =
+          ttx_storage(&form, reinterpret_cast<U8*>(&api), sizeof(api));
       if (ttx_storage_check(target) != TTX_DATA_SUCCESS) {
         return Binding::Failure::Rejected;
       }
@@ -112,7 +107,7 @@ class Query {
   }
 
  private:
-  ttx_semantic_query value = {};
+  ttx_semantic_query value = ttx_semantic_query();
 };
 
 }  // namespace Ttx::Semantic::Negotiation

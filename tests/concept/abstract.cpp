@@ -7,8 +7,10 @@
 #include "tests/concept/fixtures/subject.hpp"
 #include "tests/library.hpp"
 #include "toolchain/validation/unit_test.hpp"
-#include "ttx/concept/answers/constant.hpp"
-#include "ttx/concept/answers/none.hpp"
+#include "ttx/concept/policies/constant.hpp"
+#include "ttx/concept/policies/none.hpp"
+#include "ttx/concept/policies/ordered.hpp"
+#include "ttx/concept/policies/unknown.hpp"
 
 using namespace Perimortem;
 using namespace Ttx::Concept;
@@ -27,17 +29,15 @@ struct Requirement {
 };
 
 VALIDATION_TEST(Abstracts, c_observations) {
-  observation_subject owner{
-    &Binding::representation<Abstract>(),
-    &Binding::representation<Answers::Constant>(),
-    0,
-  };
+  observation_subject owner = observation_subject(
+      &Binding::representation<Abstract>(),
+      &Binding::representation<Policies::Constant>(), 0);
   const Abstract subject(observation_abstract(&owner));
   subject.get_query().bind<Abstract>().visit(
       [&](Abstract acquired) { EXPECT(acquired == subject); },
       [&](Binding::Failure) { EXPECT(False); });
-  subject.bind<Answers::Constant>().visit(
-      [](Answers::Constant) {}, [&](Binding::Failure) { EXPECT(False); });
+  subject.bind<Policies::Constant>().visit(
+      [](Policies::Constant) {}, [&](Binding::Failure) { EXPECT(False); });
 
   // Save the byte itself, since a new observation ends the first view's
   // retention promise. A Constant marker does not change that rule.
@@ -56,7 +56,7 @@ VALIDATION_TEST(Abstracts, c_observations) {
   };
   subject.visit_concepts(Abstract::Visitor(receive));
   EXPECT_EQ(visited, Count(1));
-  EXPECT(subject.resolve_concept("missing"_view) == Answers::None::get_none());
+  EXPECT(subject.resolve_concept("missing"_view) == Policies::None::get_none());
 }
 
 VALIDATION_TEST(Abstracts, local_cast) {
@@ -91,8 +91,8 @@ VALIDATION_TEST(Abstracts, native_supports) {
   struct Owner {
     auto get_data() const -> Core::View::Bytes { return "provider"_view; }
     auto supports(System::Uuid id) const -> Binding::Status {
-      return id == Answers::Constant::contract_id ? Binding::Status::Satisfied
-                                                  : Binding::Status::Rejected;
+      return id == Policies::Constant::contract_id ? Binding::Status::Satisfied
+                                                   : Binding::Status::Rejected;
     }
   } owner;
   const auto subject = Abstract::provide(owner);
@@ -100,8 +100,103 @@ VALIDATION_TEST(Abstracts, native_supports) {
     explicit View(Abstract subject) : Abstract(subject) {}
   } view(subject);
   EXPECT(Abstract::provide(view) == subject);
-  EXPECT(view.supports<Answers::Constant>() == Binding::Status::Satisfied);
-  EXPECT(view.supports<Answers::None>() == Binding::Status::Rejected);
+  EXPECT(view.supports<Policies::Constant>() == Binding::Status::Satisfied);
+  EXPECT(view.supports<Policies::None>() == Binding::Status::Rejected);
   EXPECT(view.cast<Owner>());
   EXPECT_NOT(view.cast<View>());
+}
+
+// Optional native operations may be overloaded without changing the portable
+// call signature. Each lookup must select the callable overload rather than
+// mistaking an overloaded name for an absent operation.
+VALIDATION_TEST(Abstracts, overloaded_provider) {
+  struct Owner {
+    auto get_data() const -> Core::View::Bytes { return Core::View::Bytes(); }
+    auto bind_interface(System::Uuid, Ttx::Data::Form::Storage output) const
+        -> Binding::Status {
+      return Binding::provide<Policies::Unknown>(
+          Abstract::provide(*this).get_abi(), output);
+    }
+    auto bind_interface(System::Uuid) const -> Binding::Status {
+      return Binding::Status::Unknown;
+    }
+    auto resolve() const -> Abstract {
+      return Policies::Unknown::get_unknown();
+    }
+    auto resolve(Count) const -> Abstract { return Policies::None::get_none(); }
+    auto resolve_concept(Core::View::Bytes) const -> Abstract {
+      return Policies::Unknown::get_unknown();
+    }
+    auto resolve_concept(Count) const -> Abstract {
+      return Policies::None::get_none();
+    }
+    auto visit_concepts(Abstract::Visitor visitor) const -> void {
+      visitor("query"_view, Policies::Unknown::get_unknown());
+    }
+    auto visit_concepts(Count) const -> void {}
+  } owner;
+  const auto subject = Abstract::provide(owner);
+  subject.bind<Policies::Unknown>().visit(
+      [&](Policies::Unknown) {}, [&](Binding::Failure) { EXPECT(False); });
+  EXPECT(subject.resolve() == Policies::Unknown::get_unknown());
+  EXPECT(
+      subject.resolve_concept("query"_view) ==
+      Policies::Unknown::get_unknown());
+  Count visited = 0;
+  auto receive = [&](Core::View::Bytes route, Abstract value) {
+    EXPECT(route == "query"_view);
+    EXPECT(value == Policies::Unknown::get_unknown());
+    ++visited;
+  };
+  subject.visit_concepts(Abstract::Visitor(receive));
+  EXPECT_EQ(visited, Count(1));
+}
+
+// A complete question can have an answer even when this provider has no
+// vocabulary for the consumer's proposed constituent questions.
+VALIDATION_TEST(Abstracts, qualified_question) {
+  using namespace Ttx;
+  const System::Uuid qualified =
+      System::Uuid(0x274605faccbb48b0ULL, 0x89c84603372550d1ULL);
+  struct Subject {
+    System::Uuid qualified;
+    mutable Count probes = 0;
+    auto get_data() const -> Core::View::Bytes { return Core::View::Bytes(); }
+    auto supports(System::Uuid id) const -> Binding::Status {
+      ++probes;
+      return id == qualified ? Binding::Status::Satisfied
+                             : Binding::Status::Unknown;
+    }
+    auto bind_interface(System::Uuid id, Data::Form::Storage target) const
+        -> Binding::Status {
+      return id == qualified ? Binding::provide<Abstract>(
+                                   Abstract::provide(*this).get_abi(), target)
+                             : Binding::Status::Unknown;
+    }
+  } owner{qualified};
+  const auto subject = Concept::Abstract::provide(owner);
+  EXPECT(
+      subject.supports<Concept::Policies::Ordered>() ==
+      Binding::Status::Unknown);
+  const auto probes = owner.probes;
+  ttx_abstract answer = ttx_abstract();
+  const Data::Form::Storage output(
+      {&Binding::representation<Concept::Abstract>(),
+       reinterpret_cast<U8*>(&answer), sizeof(answer)});
+  EXPECT(
+      subject.bind_interface(qualified, output) == Binding::Status::Satisfied);
+  EXPECT(Concept::Abstract(answer) == subject);
+  EXPECT_EQ(owner.probes, probes);
+}
+
+// Omitting lookup leaves route questions undetermined. A provider establishes
+// absence by implementing that question and returning None explicitly.
+VALIDATION_TEST(Abstracts, omitted_lookup_is_unknown) {
+  struct Owner {
+    auto get_data() const -> Core::View::Bytes { return Core::View::Bytes(); }
+  } owner;
+  const auto answer =
+      Abstract::provide(owner).resolve_concept("unrecognized"_view);
+  EXPECT(answer.supports<Policies::Unknown>() == Binding::Status::Satisfied);
+  EXPECT(answer.supports<Policies::None>() == Binding::Status::Unknown);
 }

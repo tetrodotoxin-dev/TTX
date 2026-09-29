@@ -26,16 +26,14 @@ VALIDATION_TEST(TtxFlow, shared_lifetime) {
           4,
         },
   };
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
   Flow flow;
   ASSERT(
       flow.connect(reader.query(), module.writer(writer)) ==
       Flow::Status::Success);
 
-  Static::Vector<U32, 4> a = {}, b = {};
+  Static::Vector<U32, 4> a, b;
   EXPECT(Copy::flow(flow, storage(four, a)) == Status::Success);
   EXPECT(Copy::flow(flow, storage(four, b)) == Status::Success);
 
@@ -61,9 +59,7 @@ VALIDATION_TEST(TtxFlow, shared_failure) {
     .provides = PROVIDES_SHARED | PROVIDES_BLOCK,
     .failure = 1,
   };
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
   Flow flow;
   EXPECT(
@@ -108,16 +104,10 @@ VALIDATION_TEST(TtxFlow, release_reentrancy) {
           4,
         },
   };
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
   Flow flow;
 
-  OnRelease observer{
-    flow,
-    reader,
-    module.writer(second),
-  };
+  OnRelease observer = OnRelease(flow, reader, module.writer(second));
   first.observer = &observer;
   first.released = [](void* object) { static_cast<OnRelease*>(object)->run(); };
 
@@ -129,7 +119,7 @@ VALIDATION_TEST(TtxFlow, release_reentrancy) {
   EXPECT(observer.was_closed);
   EXPECT(observer.result == Flow::Status::Success);
 
-  Static::Vector<U32, 4> output = {};
+  Static::Vector<U32, 4> output;
   EXPECT(Copy::flow(flow, storage(four, output)) == Status::Success);
   EXPECT_EQ(output[3], U32(4));
 }

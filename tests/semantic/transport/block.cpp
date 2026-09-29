@@ -27,9 +27,7 @@ VALIDATION_TEST(TtxFlow, block_destinations) {
           4,
         },
   };
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
   Flow flow;
   ASSERT(
@@ -37,7 +35,7 @@ VALIDATION_TEST(TtxFlow, block_destinations) {
       Flow::Status::Success);
   EXPECT_EQ(writer.commits, Count(0));
 
-  Static::Vector<U32, 5> a = {}, b = {};
+  Static::Vector<U32, 5> a, b;
   a[4] = 99;
   b[4] = 71;
   ASSERT(Copy::flow(flow, storage(four, a)) == Status::Success);
@@ -68,9 +66,7 @@ VALIDATION_TEST(TtxFlow, block_failure) {
     .provides = PROVIDES_BLOCK,
     .failure = 1,
   };
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
   Flow flow;
   ASSERT(

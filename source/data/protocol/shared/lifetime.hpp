@@ -12,7 +12,7 @@ namespace Ttx::Data::Protocol::Shared {
 // owner first so release callbacks can reenter without releasing it twice.
 class Lifetime {
  public:
-  constexpr Lifetime() : value{} {}
+  constexpr Lifetime() : value() {}
 
   constexpr explicit Lifetime(ttx_shared_lifetime value) : value(value) {}
 
@@ -37,12 +37,12 @@ class Lifetime {
 
   auto take_abi() -> ttx_shared_lifetime {
     auto result = value;
-    value = {};
+    value = ttx_shared_lifetime();
     return result;
   }
 
  private:
-  ttx_shared_lifetime value = {};
+  ttx_shared_lifetime value = ttx_shared_lifetime();
 };
 
 }  // namespace Ttx::Data::Protocol::Shared

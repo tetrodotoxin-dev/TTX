@@ -45,7 +45,7 @@ struct Reader {
       PROVIDES_DIRECT | PROVIDES_SHARED | PROVIDES_BLOCK | PROVIDES_FRAGMENT;
   Perimortem::Core::Static::Vector<Count, 4> binds = {};
   Count descriptions = 0;
-  Binding::Status decline = Binding::Status::Unsupported;
+  Binding::Status decline = Binding::Status::Unknown;
   const Representation* direct_schema = nullptr;
   auto query() -> Query;
 };

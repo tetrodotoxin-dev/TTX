@@ -19,7 +19,7 @@ static auto consumer_supports(const void*, perimortem_uuid contract)
   return id == Flow::direct.consumer || id == Flow::shared.consumer ||
                  id == Flow::block.consumer || id == Flow::fragment.consumer
              ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNSUPPORTED;
+             : TTX_BINDING_UNKNOWN;
 }
 
 auto ttx_flow_consumer(const ttx_representation* required)
@@ -27,44 +27,41 @@ auto ttx_flow_consumer(const ttx_representation* required)
   // One representation requirement serves every accepted transport. The UUID
   // selects permission to use that transport, so sharing the API does not make
   // another consumer policy accept protocols it has not advertised.
-  static const Data::Protocol::Consumer::Operations operations = {
-    [](const void* source) -> const ttx_representation* {
-      return static_cast<const ttx_representation*>(source);
-    },
-  };
-  return {
-    required,
-    [](const void* source, perimortem_uuid contract,
-       ttx_storage requested) -> ttx_binding_status {
-      const auto status = consumer_supports(source, contract);
-      if (status != TTX_BINDING_SATISFIED) {
-        return status;
-      }
-      return static_cast<ttx_binding_status>(
-          Binding::provide<Data::Protocol::Consumer>(
-              Data::Protocol::Consumer::Api(source, &operations),
-              Storage(requested)));
-    },
-    consumer_supports,
-  };
+  static const Data::Protocol::Consumer::Operations operations =
+      Data::Protocol::Consumer::Operations(
+          [](const void* source) -> const ttx_representation* {
+            return static_cast<const ttx_representation*>(source);
+          });
+  return ttx_semantic_query(
+      required,
+      [](const void* source, perimortem_uuid contract,
+         ttx_storage requested) -> ttx_binding_status {
+        const auto status = consumer_supports(source, contract);
+        if (status != TTX_BINDING_SATISFIED) {
+          return status;
+        }
+        return static_cast<ttx_binding_status>(
+            Binding::provide<Data::Protocol::Consumer>(
+                Data::Protocol::Consumer::Api(source, &operations),
+                Storage(requested)));
+      },
+      consumer_supports);
 }
 
 static auto failure(Ttx::Semantic::Negotiation::Binding::Failure status)
     -> Flow::Status {
   switch (status) {
-  case Ttx::Semantic::Negotiation::Binding::Failure::Unsupported:
-    return Flow::Status::Unsupported;
-  case Ttx::Semantic::Negotiation::Binding::Failure::Pending:
-    return Flow::Status::BindingPending;
+  case Ttx::Semantic::Negotiation::Binding::Failure::Unknown:
+    return Flow::Status::Unknown;
   default:
     return Flow::Status::Rejected;
   }
 }
 
-// A candidate needs both bindings and an agreed payload ABI. Unsupported or
-// incompatible candidates let us try another independent protocol, while a
-// pending or rejected binding preserves the owner's decision. Comparing the
-// ABI here keeps data access and lifetime acquisition after that agreement.
+// A candidate needs both bindings and an agreed payload ABI. Unknown leaves
+// room for another independent protocol, as does a payload mismatch. Rejected
+// stops the search at the owner's refusal. Comparing the ABI here keeps data
+// access and lifetime acquisition after that agreement.
 template <typename Provider, typename Install>
 static auto cooperate(
     Ttx::Semantic::Negotiation::Query consumer,
@@ -94,13 +91,13 @@ static auto cooperate(
 auto Flow::connect(
     Ttx::Semantic::Negotiation::Query consumer,
     Ttx::Semantic::Negotiation::Query provider) -> Status {
-  Status unavailable = Status::Unsupported;
+  Status unavailable = Status::Unknown;
   auto next = [&](Status result) {
     if (result == Status::Incompatible) {
       unavailable = result;
     }
 
-    return result == Status::Unsupported || result == Status::Incompatible;
+    return result == Status::Unknown || result == Status::Incompatible;
   };
 
   auto result = cooperate<Data::Protocol::Direct::Provider>(
@@ -157,11 +154,11 @@ auto Flow::connect(
         protocol = Protocol::Fragment;
         state.fragment = source.get_abi();
       });
-  return result == Status::Unsupported ? unavailable : result;
+  return result == Status::Unknown ? unavailable : result;
 }
 
 auto Flow::close() -> void {
-  ttx_shared_lifetime lifetime = {};
+  ttx_shared_lifetime lifetime = ttx_shared_lifetime();
   if (protocol == Protocol::Shared) {
     lifetime = state.shared;
   }

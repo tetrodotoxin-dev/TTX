@@ -42,7 +42,7 @@ static ttx_binding_status
   }
 
   if (id.high != COUNTER_ID_HIGH || id.low != COUNTER_ID_LOW) {
-    return TTX_BINDING_UNSUPPORTED;
+    return TTX_BINDING_UNKNOWN;
   }
 
   if (state.omit) {
@@ -77,7 +77,7 @@ static ttx_binding_status supports(const void* source, perimortem_uuid id) {
 
   return id.high == COUNTER_ID_HIGH && id.low == COUNTER_ID_LOW
              ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNSUPPORTED;
+             : TTX_BINDING_UNKNOWN;
 }
 
 static counter_statistics statistics(void) {

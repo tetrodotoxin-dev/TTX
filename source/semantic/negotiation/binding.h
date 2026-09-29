@@ -26,8 +26,15 @@
 // cannot acquire a lifetime. Ordinary Flow can materialize a record when
 // needed.
 //
-// Unsupported permits policy forwarding. Pending and Rejected stop at the
-// encountered policy. Failure supplies no usable API, even if a materializing
+// Satisfied establishes the requested promise. Unknown supplies no determined
+// answer, whether the contract is unfamiliar or the provider lacks evidence.
+// Rejected is an explicit refusal of this request, not the inverse of success.
+// A composing policy may delegate an Unknown question through its own authority.
+// Consumers cannot bypass that policy by inspecting its underlying receiver.
+//
+// Every answer is synchronous. Unknown schedules no work and promises no later
+// answer. A subsequent observation asks again under the publication's policy.
+// Neither Unknown nor Rejected supplies a usable API, even if a materializing
 // provider touched the destination. Callers publish the record only on success.
 //
 // TODO: We need to figure out if we want to support hot reloading. Right now
@@ -36,8 +43,7 @@
 // should consider the invalidation case.
 typedef U8 ttx_binding_status;
 #define TTX_BINDING_SATISFIED ((ttx_binding_status)0)
-#define TTX_BINDING_UNSUPPORTED ((ttx_binding_status)1)
-#define TTX_BINDING_PENDING ((ttx_binding_status)2)
+#define TTX_BINDING_UNKNOWN ((ttx_binding_status)1)
 #define TTX_BINDING_REJECTED ((ttx_binding_status)3)
 
 // Ready records use the same byte agreement as any other data publication.

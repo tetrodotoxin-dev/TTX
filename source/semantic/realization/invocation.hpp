@@ -25,10 +25,10 @@ class Invocation {
         call.invoke(call.receiver, inputs, outputs));
   }
 
-  auto close() -> void { call = {}; }
+  auto close() -> void { call = ttx_invocation(); }
 
  private:
-  ttx_invocation call = {};
+  ttx_invocation call = ttx_invocation();
 };
 
 }  // namespace Ttx::Semantic::Realization

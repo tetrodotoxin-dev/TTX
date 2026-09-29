@@ -20,10 +20,7 @@ class Consumer {
   }
 
   constexpr Consumer(const void* source, const Operations& operations)
-      : value{
-          source,
-          &operations,
-        } {}
+      : value(source, &operations) {}
 
   constexpr explicit Consumer(ttx_consumer value) : value(value) {}
 

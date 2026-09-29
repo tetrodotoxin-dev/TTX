@@ -16,13 +16,10 @@ auto Invocation::connect(
     Perimortem::System::Uuid contract,
     const Representation& inputs,
     const Representation& outputs) -> Binding::Status {
-  ttx_invocation next = {};
-  const Storage target(
-      ttx_storage{
-        ttx_invocation_representation(),
-        reinterpret_cast<U8*>(&next),
-        sizeof(next),
-      });
+  ttx_invocation next = ttx_invocation();
+  const Storage target(ttx_storage(
+      ttx_invocation_representation(), reinterpret_cast<U8*>(&next),
+      sizeof(next)));
   const auto status = instance.bind(contract, target);
   if (status != Binding::Status::Satisfied) {
     return status;

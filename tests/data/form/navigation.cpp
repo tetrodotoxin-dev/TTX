@@ -48,10 +48,7 @@ VALIDATION_TEST(TtxNavigation, composite_coordinate) {
   Preparation prepare;
   const Static::Vector<Schema::Position, 2> members = {
     {
-      Schema::Position{
-        small,
-        0,
-      },
+      Schema::Position(small, 0),
       {
         integer,
         8,
@@ -66,10 +63,7 @@ VALIDATION_TEST(TtxNavigation, composite_coordinate) {
       16, 4);
   const Static::Vector<Schema::Position, 1> entries = {
     {
-      Schema::Position{
-        record,
-        16,
-      },
+      Schema::Position(record, 16),
     },
   };
   const auto root = Schema::composite(
@@ -95,10 +89,7 @@ VALIDATION_TEST(TtxNavigation, padded_range_walk) {
   Preparation prepare;
   const Static::Vector<Schema::Position, 2> fields = {
     {
-      Schema::Position{
-        small,
-        0,
-      },
+      Schema::Position(small, 0),
       {
         integer,
         8,
@@ -135,10 +126,7 @@ VALIDATION_TEST(TtxNavigation, physical_coordinates) {
   Preparation prepare;
   const Static::Vector<Schema::Position, 2> fields = {
     {
-      Schema::Position{
-        small,
-        0,
-      },
+      Schema::Position(small, 0),
       {
         integer,
         8,
@@ -173,7 +161,8 @@ VALIDATION_TEST(TtxNavigation, physical_coordinates) {
 // entry, while callers holding a Representation can use the typed operations.
 VALIDATION_TEST(TtxNavigation, empty_and_invalid) {
   Preparation prepare;
-  const auto empty = Schema::composite({}, 0);
+  const auto empty =
+      Schema::composite(Perimortem::Core::View::Vector<Schema::Position>(), 0);
   const auto& prepared = prepare(empty);
 
   prepared.next(0).visit(

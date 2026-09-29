@@ -56,9 +56,7 @@ auto Module::selection() const -> Swizzle::Mapping {
           });
 }
 auto Module::select(const Flow& flow, Storage target) const -> Status {
-  const provider_operations operations = {
-    ttx_swizzle,
-  };
+  const provider_operations operations = provider_operations(ttx_swizzle);
   const auto result =
       api->select(&operations, flow.get_abi(), target.get_abi());
   return static_cast<Status>(result);

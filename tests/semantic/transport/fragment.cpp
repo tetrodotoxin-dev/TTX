@@ -30,9 +30,7 @@ VALIDATION_TEST(TtxFlow, fragment_failure) {
           40,
         },
   };
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
   Flow flow;
   ASSERT(
@@ -76,16 +74,14 @@ VALIDATION_TEST(TtxFlow, fragment_retry) {
           40,
         },
   };
-  Validation::FlowTests::Reader reader{
-    four,
-  };
+  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
 
   Flow flow;
   ASSERT(
       flow.connect(reader.query(), module.writer(writer)) ==
       Flow::Status::Success);
 
-  Static::Vector<U32, 4> output = {};
+  Static::Vector<U32, 4> output;
   EXPECT(Copy::flow(flow, storage(four, output)) == Status::IoError);
 
   writer.failure = 0;
