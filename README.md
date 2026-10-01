@@ -48,11 +48,11 @@ access is provided.
 TTX has three core layers building up from raw data streams to the full TTX
 semantic graph:
 
-- [Data](source/data) defines canonical forms for data and callable
+- [Data](source/ttx/data) defines canonical forms for data and callable
   representations, with protocols for accessing and transferring data.
-- [Semantics](source/semantic) negotiates contracts and their representations,
+- [Semantics](source/ttx/semantic) negotiates contracts and their representations,
   connecting the agreed behavior to interfaces that can perform the work.
-- [Concepts](source/concept) exposes full abstract interfaces and their
+- [Concepts](source/ttx/concept) exposes full abstract interfaces and their
   composable relationships as a queryable graph. Each interface can offer
   capabilities and policies through further negotiation.
 
@@ -63,9 +63,9 @@ Python 3 and Bazel are required. The Bazel version is specified in
 
 ```sh
 bazel build //:build
-bazel run //tests:test
+bazel run //validation:unit_tests
 
 bazel build --config=release //:build
-bazel run --config=release //tests:test
-bazel run --config=release //benchmarks:run
+bazel run --config=release //validation:unit_tests
+bazel run --config=release //validation:benchmarks
 ```

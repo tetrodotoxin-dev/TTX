@@ -1,0 +1,53 @@
+// # Tetrodotoxin
+// Copyright (c) 2023-present Matt Kaes and contributors
+
+#pragma once
+
+#include "ttx/semantic/negotiation/query.hpp"
+
+namespace Ttx::Semantic::Realization {
+
+// A simulacrum supplies the answers promised by a contract. Its concrete API
+// is acquired through the same checked storage binding as any other record.
+// C++ can retain the resulting typed view and invoke it without repeating UUID
+// negotiation or inspecting the provider's private object representation.
+class Simulacra {
+ public:
+  template <typename Contract>
+  static auto fulfill(Negotiation::Query query)
+      -> Perimortem::Utility::Result<Contract, Negotiation::Binding::Failure> {
+    return query.template bind<Contract>();
+  }
+
+  // An explicitly supplied native provider may already know the exact
+  // contract's realization and supply it through its own policy. This shortcut
+  // requires a reference to that native provider. Casting a foreign binding's
+  // receiver to its presumed C++ type is undefined behavior. Both paths return
+  // the same contract, allowing stateless receivers to remain null without
+  // using that value as a mode tag. Unknown means this shortcut has not
+  // established the interface, so fulfillment asks the provider's Query.
+  // Rejected stops here because the provider has explicitly refused that
+  // request. The portable answer remains authoritative when the shortcut cannot
+  // settle it.
+  template <typename Contract, typename Provider>
+    requires(!__is_const(Provider) && requires(Provider& provider) {
+      provider.template fulfill_native<Contract>();
+      provider.get_query();
+    })
+  static auto fulfill(Provider& provider)
+      -> Perimortem::Utility::Result<Contract, Negotiation::Binding::Failure> {
+    using Result =
+        Perimortem::Utility::Result<Contract, Negotiation::Binding::Failure>;
+    return provider.template fulfill_native<Contract>().visit(
+        [](const Contract& contract) -> Result { return contract; },
+        [&](Negotiation::Binding::Failure failure) -> Result {
+          if (failure == Negotiation::Binding::Failure::Unknown) {
+            return fulfill<Contract>(provider.get_query());
+          }
+
+          return failure;
+        });
+  }
+};
+
+}  // namespace Ttx::Semantic::Realization
