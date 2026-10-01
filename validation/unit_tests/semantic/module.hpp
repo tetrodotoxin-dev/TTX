@@ -4,9 +4,12 @@
 #pragma once
 
 #include "validation/unit_tests/library.hpp"
+
+#include "perimortem/core/null_terminated.hpp"
+
+#include "ttx/semantic/flows/swizzle.hpp"
 #include "validation/unit_tests/semantic/fixtures/heterogeneous_provider.h"
 #include "validation/unit_tests/semantic/fixtures/provider.h"
-#include "ttx/semantic/flows/swizzle.hpp"
 
 namespace Validation::FlowTests {
 
@@ -18,8 +21,8 @@ class Module {
   using Heterogeneous = heterogeneous_state;
   using Primitives = provider_values;
   explicit Module(
-      const char* library = "libflow_provider.so",
-      const char* entry = "flow_provider_open");
+      Perimortem::Core::View::Bytes library = "libflow_provider.so"_view,
+      Perimortem::Core::View::Bytes entry = "flow_provider_open"_view);
   Module(const Module&) = delete;
   auto operator=(const Module&) -> Module& = delete;
   auto writer(State& state) const -> Ttx::Semantic::Negotiation::Query;

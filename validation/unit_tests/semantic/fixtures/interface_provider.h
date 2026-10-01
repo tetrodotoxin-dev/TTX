@@ -4,6 +4,7 @@
 #ifndef VALIDATION_INTERFACE_PROVIDER_H
 #define VALIDATION_INTERFACE_PROVIDER_H
 
+#include "toolchain/export.h"
 #include "ttx/semantic/negotiation/query.h"
 
 #define COUNTER_ID_HIGH ((U64)0x2d4fc0031eda431bULL)
@@ -34,10 +35,7 @@ typedef ttx_data_status (*interface_compile)(
     Count,
     ttx_representation_allocator,
     const ttx_representation**);
-PERIMORTEM_C
-#ifdef PERI_WINDOWS
-__declspec(dllexport)
-#endif
+C_LINKAGE EXPORTED(TTX_TEST)
 counter_fixture
     interface_provider_open(interface_compile compiler);
 

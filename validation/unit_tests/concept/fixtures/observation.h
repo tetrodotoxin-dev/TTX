@@ -12,6 +12,6 @@ typedef struct observation_subject {
   U8 value;
 } observation_subject;
 
-PERIMORTEM_C ttx_abstract observation_abstract(observation_subject* subject);
+C_LINKAGE ttx_abstract observation_abstract(observation_subject* subject);
 
 #endif

@@ -28,8 +28,7 @@ typedef struct ttx_fragment_provider_operations {
   ttx_data_status (*get_s64)(void* source, Count position, S64* result);
   ttx_data_status (*get_r32)(void* source, Count position, R32* result);
   ttx_data_status (*get_r64)(void* source, Count position, R64* result);
-  ttx_data_status (
-      *get_pointer)(void* source, Count position, void** result);
+  ttx_data_status (*get_pointer)(void* source, Count position, void** result);
   ttx_data_status (
       *get_v64)(void* source, Count position, ttx_vector64* result);
   ttx_data_status (
@@ -46,7 +45,6 @@ typedef struct ttx_fragment_provider {
 } ttx_fragment_provider;
 
 // Describe the callable API independently of the payload it transports.
-PERIMORTEM_C const ttx_representation* ttx_fragment_provider_representation(
-    void);
+C_LINKAGE const ttx_representation* ttx_fragment_provider_representation(void);
 
 #endif

@@ -6,7 +6,7 @@
 
 #include "ttx/data/form/representation.h"
 
-PERIMORTEM_C ttx_data_status compose_pair(
+C_LINKAGE ttx_data_status compose_pair(
     const ttx_representation*,
     Count,
     Count,

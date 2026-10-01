@@ -16,7 +16,8 @@ using namespace Validation::FlowTests;
 VALIDATION_TEST(TtxFlow, heterogeneous_outputs) {
   Preparation prepare;
 
-  Module module("libheterogeneous_provider.so", "heterogeneous_provider_open");
+  Module module(
+      "libheterogeneous_provider.so"_view, "heterogeneous_provider_open"_view);
   ASSERT(module.is_set());
 
   {
@@ -125,7 +126,8 @@ VALIDATION_TEST(TtxFlow, heterogeneous_outputs) {
 // the caller's padding bytes while populating those fields in their ABI slots.
 VALIDATION_TEST(TtxFlow, copy_padding_values) {
   Preparation prepare;
-  Module module("libheterogeneous_provider.so", "heterogeneous_provider_open");
+  Module module(
+      "libheterogeneous_provider.so"_view, "heterogeneous_provider_open"_view);
   ASSERT(module.is_set());
   Module::Heterogeneous state = {
     .seed = 7,

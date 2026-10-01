@@ -15,7 +15,7 @@ typedef struct ttx_test_callables {
   ttx_test_vector (*twice)(ttx_test_vector);
 } ttx_test_callables;
 
-PERIMORTEM_C const ttx_schema* ttx_test_callable_schema(void);
-PERIMORTEM_C const void* ttx_test_callable_table(void);
+C_LINKAGE const ttx_schema* ttx_test_callable_schema(void);
+C_LINKAGE const void* ttx_test_callable_table(void);
 
 #endif

@@ -14,6 +14,6 @@
 #define TTX_UNKNOWN_ID_HIGH 0x84c6c053b3254f7aULL
 #define TTX_UNKNOWN_ID_LOW 0xa873409b31bcf608ULL
 
-PERIMORTEM_C ttx_abstract ttx_unknown(void);
+C_LINKAGE ttx_abstract ttx_unknown(void);
 
 #endif

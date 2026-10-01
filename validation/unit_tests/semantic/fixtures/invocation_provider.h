@@ -4,6 +4,7 @@
 #ifndef VALIDATION_INVOCATION_PROVIDER_H
 #define VALIDATION_INVOCATION_PROVIDER_H
 
+#include "toolchain/export.h"
 #include "ttx/semantic/realization/invocation.h"
 
 #define INVOCATION_METHOD_HIGH 0x7a2c283c70c0447dULL
@@ -31,10 +32,7 @@ typedef struct invocation_fixture {
   void (*configure)(U8 protocol, ttx_binding_status status, U8 fail_transfer);
 } invocation_fixture;
 
-PERIMORTEM_C
-#ifdef PERI_WINDOWS
-__declspec(dllexport)
-#endif
+C_LINKAGE EXPORTED(TTX_TEST)
 invocation_fixture invocation_provider_open(
     const ttx_representation* record,
     const ttx_representation* inputs,

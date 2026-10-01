@@ -50,11 +50,11 @@ typedef U8 ttx_binding_status;
 // The supplying record and the admitted destination both have the geometry
 // their descriptors promise otherwise the binding is rejected. Mismatched
 // descriptors leave the destination untouched.
-PERIMORTEM_C ttx_binding_status ttx_binding_provide(
+C_LINKAGE ttx_binding_status ttx_binding_provide(
     const ttx_representation* representation,
     const void* api,
     ttx_storage requested);
 
-PERIMORTEM_C ttx_binding_status ttx_binding_marker(ttx_storage requested);
+C_LINKAGE ttx_binding_status ttx_binding_marker(ttx_storage requested);
 
 #endif

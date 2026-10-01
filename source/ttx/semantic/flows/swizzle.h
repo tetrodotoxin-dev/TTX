@@ -51,7 +51,7 @@ typedef struct ttx_swizzle_mapping {
 // its cause without certifying a partial result. Overlapping Fragment reflow
 // has no snapshot guarantee. Block requires separate input materialization and
 // is Unsupported here because this operation owns no intermediate buffer.
-PERIMORTEM_C ttx_data_status ttx_swizzle(
+C_LINKAGE ttx_data_status ttx_swizzle(
     const ttx_flow* flow,
     ttx_swizzle_mapping mapping,
     ttx_storage target);

@@ -24,6 +24,6 @@ typedef struct ttx_block_provider {
 } ttx_block_provider;
 
 // Describe the callable API independently of the payload it transports.
-PERIMORTEM_C const ttx_representation* ttx_block_provider_representation(void);
+C_LINKAGE const ttx_representation* ttx_block_provider_representation(void);
 
 #endif

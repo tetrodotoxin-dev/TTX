@@ -168,22 +168,22 @@ typedef struct ttx_representation_allocator {
 // Four and eight are supported for both data and function pointers. An
 // unsupported width declines before requesting output storage from the
 // allocator.
-PERIMORTEM_C ttx_data_status ttx_representation_compile(
+C_LINKAGE ttx_data_status ttx_representation_compile(
     ttx_schema_reference schema,
     Count pointer_size,
     ttx_representation_allocator allocator,
     const ttx_representation** result);
-PERIMORTEM_C ttx_data_status ttx_representation_compose(
+C_LINKAGE ttx_data_status ttx_representation_compose(
     const ttx_representation_member* members,
     Count count,
     Count extent,
     Count alignment,
     ttx_representation_allocator allocator,
     const ttx_representation** result);
-PERIMORTEM_C U8 ttx_representation_compatible(
+C_LINKAGE U8 ttx_representation_compatible(
     const ttx_representation* source,
     const ttx_representation* destination);
-PERIMORTEM_C ttx_data_status ttx_representation_next(
+C_LINKAGE ttx_data_status ttx_representation_next(
     const ttx_representation* source,
     Count offset,
     ttx_representation_position* result);
@@ -198,13 +198,13 @@ typedef struct ttx_representation_visitor {
   ttx_data_status (*visit)(void* source, ttx_representation_position position);
 } ttx_representation_visitor;
 
-PERIMORTEM_C ttx_data_status ttx_representation_visit(
+C_LINKAGE ttx_data_status ttx_representation_visit(
     const ttx_representation* source,
     ttx_representation_visitor visitor);
 
 // The coordinates are a borrowed, strictly increasing selection of primitive
 // starts. Unselected repetitions consume no callbacks or expanded inventory.
-PERIMORTEM_C ttx_data_status ttx_representation_visit_selected(
+C_LINKAGE ttx_data_status ttx_representation_visit_selected(
     const ttx_representation* source,
     const Count* coordinates,
     Count count,

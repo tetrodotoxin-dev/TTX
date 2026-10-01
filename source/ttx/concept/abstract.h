@@ -72,10 +72,8 @@ typedef struct ttx_abstract_ops {
   // therefore selects an implementation without invoking its value operations.
   // Requested storage describes the complete API the caller can consume.
   // An Abstract request supplies this same view after checking its descriptor.
-  ttx_binding_status (*bind)(
-      void* source,
-      perimortem_uuid contract,
-      ttx_storage requested);
+  ttx_binding_status (
+      *bind)(void* source, perimortem_uuid contract, ttx_storage requested);
 
   // The data observation supplies bytes without another Abstract to inspect.
   // They have no implied encoding or Constant promise, even when another edge
@@ -94,11 +92,10 @@ typedef struct ttx_abstract_ops {
   // Lookup and discovery use the same subject's policy. Visitation advertises
   // the answers visible through that policy and gives their order no meaning.
   // The receiver must not invalidate the traversed state during a callback.
-  ttx_abstract (
-      *resolve_concept)(void* source, perimortem_view_bytes route);
+  ttx_abstract (*resolve_concept)(void* source, perimortem_view_bytes route);
   void (*visit_concepts)(void* source, ttx_concept_visitor visitor);
 } ttx_abstract_ops;
 
-PERIMORTEM_C const ttx_representation* ttx_abstract_representation(void);
+C_LINKAGE const ttx_representation* ttx_abstract_representation(void);
 
 #endif

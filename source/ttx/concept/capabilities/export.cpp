@@ -6,6 +6,6 @@
 using namespace Ttx::Concept;
 using namespace Ttx::Semantic::Negotiation;
 
-PERIMORTEM_C const ttx_representation* ttx_export_representation() {
+C_LINKAGE const ttx_representation* ttx_export_representation() {
   return &Binding::representation<Capabilities::Export>();
 }

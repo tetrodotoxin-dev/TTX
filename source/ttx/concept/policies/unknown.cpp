@@ -34,6 +34,6 @@ auto Policies::Unknown::get_unknown() -> Unknown {
   return Unknown(Abstract::provide(subject).get_abi());
 }
 
-PERIMORTEM_C ttx_abstract ttx_unknown(void) {
+C_LINKAGE ttx_abstract ttx_unknown(void) {
   return Policies::Unknown::get_unknown().get_abi();
 }

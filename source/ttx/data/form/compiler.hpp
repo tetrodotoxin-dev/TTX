@@ -5,6 +5,7 @@
 
 #include "perimortem/core/static/vector.hpp"
 #include "perimortem/core/hash.hpp"
+#include "perimortem/core/scalar.hpp"
 
 #include "perimortem/memory/const/vector.hpp"
 
@@ -590,7 +591,7 @@ class Compiler {
     // Rounding table capacity to a power of two lets bucket lookup use a mask.
     // This capacity only affects scratch storage, leaving emitted order intact.
     if (size) {
-      size = Count(1) << Perimortem::Core::Math::log2(size - 1);
+      size = Count(1) << Perimortem::Core::Scalar::log2(size - 1);
     }
 
     buckets.resize(size);
@@ -1056,7 +1057,7 @@ class Compiler {
       if (heap.get_size() > 1 && entry.count > 1) {
         const Count next =
             heap.get_size() > 2
-                ? Perimortem::Core::Math::min(heap[1].offset, heap[2].offset)
+                ? Perimortem::Core::Scalar::min(heap[1].offset, heap[2].offset)
                 : heap[1].offset;
         const Count gap = next - entry.offset;
         const Count prefix = gap / entry.distance + (gap % entry.distance != 0);
@@ -1301,8 +1302,8 @@ class Compiler {
   }
 
   constexpr auto choose_depth(const Limits& limits) -> Status {
-    using Perimortem::Core::Math::log2;
-    using Perimortem::Core::Math::max;
+    using Perimortem::Core::Scalar::log2;
+    using Perimortem::Core::Scalar::max;
     Count required = max(Count(1), (log2(limits.common) + 7) / 8);
     required = max(required, (log2(limits.reference) + 8) / 8);
     required = max(required, (log2(limits.distance) + 9) / 8);

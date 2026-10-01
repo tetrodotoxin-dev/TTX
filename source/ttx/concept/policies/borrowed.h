@@ -31,5 +31,5 @@ typedef struct ttx_borrowed_ops {
   void (*release)(void* source);
 } ttx_borrowed_ops;
 
-PERIMORTEM_C const ttx_representation* ttx_borrowed_representation(void);
+C_LINKAGE const ttx_representation* ttx_borrowed_representation(void);
 #endif

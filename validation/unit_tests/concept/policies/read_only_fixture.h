@@ -19,7 +19,7 @@ typedef struct test_read {
 // The C provider publishes a heap value during the callback. Borrow can retain
 // it after that observation. freed is supplied by the test and outlives all
 // views.
-PERIMORTEM_C void test_read_only_open(
+C_LINKAGE void test_read_only_open(
     const ttx_representation* read,
     U32* freed,
     void* receiver,

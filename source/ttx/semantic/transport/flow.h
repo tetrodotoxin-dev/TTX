@@ -35,10 +35,10 @@ typedef U8 ttx_flow_status;
 #define TTX_FLOW_UNKNOWN ((ttx_flow_status)33)
 
 // Flow establishes one synchronous access agreement between a provider Query
-// and either a custom consumer Query or the built in representation requirement.
-// Direct, Shared, Block and Fragment are independent contracts tried in that
-// preference order. The first compatible pair wins, and Flow retains only that
-// protocol's state for later operations.
+// and either a custom consumer Query or the built in representation
+// requirement. Direct, Shared, Block and Fragment are independent contracts
+// tried in that preference order. The first compatible pair wins, and Flow
+// retains only that protocol's state for later operations.
 //
 // The consumer needs no target Storage during establishment. Each operation can
 // supply its own storage without negotiating again. The opaque handle keeps
@@ -46,10 +46,10 @@ typedef U8 ttx_flow_status;
 // representation.
 typedef struct ttx_flow ttx_flow;
 
-// The built in consumer accepts all four Data protocols for this representation.
-// It supplies no provider state or mutable Query. Operations lend their own
-// destination Storage after Flow has selected an agreement. The caller retains
-// this representation through every use of that agreement.
+// The built in consumer accepts all four Data protocols for this
+// representation. It supplies no provider state or mutable Query. Operations
+// lend their own destination Storage after Flow has selected an agreement. The
+// caller retains this representation through every use of that agreement.
 typedef struct ttx_flow_requirement {
   const ttx_representation* representation;
 } ttx_flow_requirement;
@@ -66,14 +66,14 @@ typedef struct ttx_flow_requirement {
 // unchanged. Even Data's Unsupported does not reopen negotiation after that
 // selection. Consumer and provider state, representations and code remain
 // borrowed throughout subsequent Flow use.
-PERIMORTEM_C ttx_flow_status ttx_flow_connect(
+C_LINKAGE ttx_flow_status ttx_flow_connect(
     ttx_flow* flow,
     ttx_semantic_query consumer,
     ttx_semantic_query provider);
 
 // A built in requirement needs no consumer Query. Custom consumer policies use
 // ttx_flow_connect so their own support and binding answers remain observable.
-PERIMORTEM_C ttx_flow_status ttx_flow_connect_requirement(
+C_LINKAGE ttx_flow_status ttx_flow_connect_requirement(
     ttx_flow* flow,
     ttx_flow_requirement consumer,
     ttx_semantic_query provider);

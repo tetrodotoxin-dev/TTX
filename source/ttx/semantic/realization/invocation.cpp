@@ -7,7 +7,7 @@ using namespace Ttx::Semantic::Realization;
 using namespace Ttx::Semantic::Negotiation;
 using namespace Ttx::Data::Form;
 
-PERIMORTEM_C const ttx_representation* ttx_invocation_representation() {
+C_LINKAGE const ttx_representation* ttx_invocation_representation() {
   return &Compiled<Native<ttx_invocation>::reference>::get_representation();
 }
 

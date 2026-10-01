@@ -29,5 +29,5 @@ typedef struct ttx_borrow_ops {
   ttx_binding_status (*borrow)(void* source, ttx_borrowed* output);
 } ttx_borrow_ops;
 
-PERIMORTEM_C const ttx_representation* ttx_borrow_representation(void);
+C_LINKAGE const ttx_representation* ttx_borrow_representation(void);
 #endif

@@ -16,7 +16,9 @@ auto Library::open(Core::View::Bytes path, Memory::Allocator::Arena& errors)
           [&](System::Library& library) -> Result {
             return library
                 .symbol(
-                    Core::NullTerminated::to_view(TTX_LIBRARY_ENTRY), errors)
+                    Core::NullTerminated::to_view(
+                        TTX_LIBRARY_ENTRY, sizeof(TTX_LIBRARY_ENTRY) - 1),
+                    errors)
                 .visit(
                     [&](void* entry) -> Result {
                       return Library(

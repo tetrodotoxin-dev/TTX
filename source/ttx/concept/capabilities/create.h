@@ -38,5 +38,5 @@ typedef struct ttx_create_ops {
       void (*receive)(void* receiver, ttx_abstract subject));
 } ttx_create_ops;
 
-PERIMORTEM_C const ttx_representation* ttx_create_representation(void);
+C_LINKAGE const ttx_representation* ttx_create_representation(void);
 #endif

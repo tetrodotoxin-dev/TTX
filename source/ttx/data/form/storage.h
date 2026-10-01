@@ -25,6 +25,6 @@ typedef struct ttx_storage {
 // Admission checks capacity and alignment against the prepared geometry.
 // Borrowing storage for another result needs no further compilation or walk
 // through the immutable description.
-PERIMORTEM_C ttx_data_status ttx_storage_check(ttx_storage storage);
+C_LINKAGE ttx_data_status ttx_storage_check(ttx_storage storage);
 
 #endif

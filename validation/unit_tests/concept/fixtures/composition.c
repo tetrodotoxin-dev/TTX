@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <string.h>
 
+#include "toolchain/export.h"
 #include "ttx/concept/policies/constant.h"
 #include "ttx/concept/policies/none.h"
 
@@ -135,9 +136,7 @@ static const borrowed_expression_ops qualified_operations = {
   {{supports, bind, data, resolve, lookup, visit}, release},
   evaluate};
 
-#ifdef PERI_WINDOWS
-__declspec(dllexport)
-#endif
+C_LINKAGE EXPORTED(TTX_TEST)
 ttx_abstract
     composition_open(composition_state* state, composition_forms forms) {
   state->weak = (composition_subject){state, 0};
@@ -145,9 +144,7 @@ ttx_abstract
   state->forms = forms;
   return abstract_view(&state->weak);
 }
-#ifdef PERI_WINDOWS
-__declspec(dllexport)
-#endif
+C_LINKAGE EXPORTED(TTX_TEST)
 ttx_binding_status
     composition_acquire(composition_state* state, borrowed_expression* output) {
   if (!state->qualified) {

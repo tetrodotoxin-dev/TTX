@@ -14,7 +14,7 @@ typedef struct portable_counter {
   U32 (*add)(void* receiver, U32 amount);
 } portable_counter;
 
-PERIMORTEM_C ttx_semantic_query portable_counter_open(void);
-PERIMORTEM_C U32 portable_counter_calls(void);
+C_LINKAGE ttx_semantic_query portable_counter_open(void);
+C_LINKAGE U32 portable_counter_calls(void);
 
 #endif

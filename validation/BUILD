@@ -3,12 +3,25 @@
 
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("@tetro_toolchain//:validation.bzl", "benchmark", "test")
-load("@tetro_toolchain//:library.bzl", "LINUX")
+load("@tetro_toolchain//source/bazel:library.bzl", "LINUX")
+load("@tetro_toolchain//source/bazel:validation.bzl", "benchmark", "test")
 
-package(default_testonly = True, default_visibility = ["//visibility:public"])
+package(
+    default_testonly = True,
+    default_visibility = ["//visibility:public"],
+)
 
-filegroup(name = "sources", testonly = False, srcs = glob(["**"]))
+filegroup(
+    name = "sources",
+    testonly = False,
+    srcs = glob(["**"]),
+)
+
+test(
+    name = "sdk_components",
+    srcs = ["components.cpp"],
+    deps = ["//:implementation"],
+)
 
 # Foreign providers stay in separate libraries so the suite exercises loading,
 # borrowed code lifetime and independent C declarations. Building them in this
@@ -25,6 +38,7 @@ cc_binary(
     name = "libflow_provider.so",
     srcs = ["unit_tests/semantic/fixtures/provider.c"],
     linkshared = True,
+    local_defines = ["TTX_TEST_EXPORT=1"],
     deps = [":provider_contract"],
 )
 
@@ -32,6 +46,7 @@ cc_binary(
     name = "libheterogeneous_provider.so",
     srcs = ["unit_tests/semantic/fixtures/heterogeneous_provider.c"],
     linkshared = True,
+    local_defines = ["TTX_TEST_EXPORT=1"],
     deps = [":provider_contract"],
 )
 
@@ -39,6 +54,7 @@ cc_binary(
     name = "libinterface_provider.so",
     srcs = ["unit_tests/semantic/fixtures/interface_provider.c"],
     linkshared = True,
+    local_defines = ["TTX_TEST_EXPORT=1"],
     deps = [":provider_contract"],
 )
 
@@ -46,6 +62,7 @@ cc_binary(
     name = "libinvocation_provider.so",
     srcs = ["unit_tests/semantic/fixtures/invocation_provider.c"],
     linkshared = True,
+    local_defines = ["TTX_TEST_EXPORT=1"],
     deps = [":provider_contract"],
 )
 
@@ -56,6 +73,7 @@ cc_binary(
         "unit_tests/concept/fixtures/subject.hpp",
     ],
     linkshared = True,
+    local_defines = ["TTX_TEST_EXPORT=1"],
     deps = ["//:implementation"],
 )
 
@@ -66,6 +84,7 @@ cc_binary(
         "unit_tests/concept/fixtures/composition.h",
     ],
     linkshared = True,
+    local_defines = ["TTX_TEST_EXPORT=1"],
     deps = ["//:implementation"],
 )
 
@@ -97,22 +116,25 @@ test(
         ":libinterface_provider.so",
         ":libinvocation_provider.so",
     ],
-    linkopts = select({LINUX: [
-        # ThinLTO can introduce memmove after discarding an unreferenced wrapper.
-        # Retain the instrumentation entry until the linker rewrites those calls.
-        "-Wl,--undefined=__wrap_memmove",
-        "-Wl,--wrap=memmove",
-        "-Wl,--wrap=__asan_memmove",
-        "-Wl,--wrap=malloc",
-        "-Wl,--wrap=calloc",
-        "-Wl,--wrap=realloc",
-        "-Wl,--wrap=aligned_alloc",
-        "-Wl,--wrap=posix_memalign",
-        "-Wl,--wrap=_Znwm",
-        "-Wl,--wrap=_Znam",
-        "-Wl,--wrap=_ZnwmSt11align_val_t",
-        "-Wl,--wrap=_ZnamSt11align_val_t",
-    ], "//conditions:default": []}),
+    linkopts = select({
+        LINUX: [
+            # ThinLTO can introduce memmove after discarding an unreferenced wrapper.
+            # Retain the instrumentation entry until the linker rewrites those calls.
+            "-Wl,--undefined=__wrap_memmove",
+            "-Wl,--wrap=memmove",
+            "-Wl,--wrap=__asan_memmove",
+            "-Wl,--wrap=malloc",
+            "-Wl,--wrap=calloc",
+            "-Wl,--wrap=realloc",
+            "-Wl,--wrap=aligned_alloc",
+            "-Wl,--wrap=posix_memalign",
+            "-Wl,--wrap=_Znwm",
+            "-Wl,--wrap=_Znam",
+            "-Wl,--wrap=_ZnwmSt11align_val_t",
+            "-Wl,--wrap=_ZnamSt11align_val_t",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//:implementation",
     ],

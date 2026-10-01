@@ -39,5 +39,5 @@ typedef struct ttx_import_ops {
       void (*receive)(void* receiver, ttx_abstract subject));
 } ttx_import_ops;
 
-PERIMORTEM_C const ttx_representation* ttx_import_representation(void);
+C_LINKAGE const ttx_representation* ttx_import_representation(void);
 #endif

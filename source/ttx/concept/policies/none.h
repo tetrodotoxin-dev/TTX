@@ -16,6 +16,6 @@
 #define TTX_NONE_ID_HIGH 0x84c6c053b3254f7aULL
 #define TTX_NONE_ID_LOW 0xa873409b31bcf607ULL
 
-PERIMORTEM_C ttx_abstract ttx_none(void);
+C_LINKAGE ttx_abstract ttx_none(void);
 
 #endif

@@ -24,6 +24,6 @@
 // This permits generators to fulfill Copy without retaining a source buffer.
 // A random number generator can promise a representation of any supported size
 // and produce each value when observed.
-PERIMORTEM_C ttx_data_status ttx_copy(const ttx_flow* flow, ttx_storage target);
+C_LINKAGE ttx_data_status ttx_copy(const ttx_flow* flow, ttx_storage target);
 
 #endif

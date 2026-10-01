@@ -29,5 +29,5 @@ typedef struct ttx_export_ops {
   ttx_binding_status (*expose)(void* source, ttx_abstract subject);
 } ttx_export_ops;
 
-PERIMORTEM_C const ttx_representation* ttx_export_representation(void);
+C_LINKAGE const ttx_representation* ttx_export_representation(void);
 #endif

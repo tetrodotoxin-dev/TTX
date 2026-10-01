@@ -19,6 +19,6 @@ typedef struct ttx_shared_lifetime {
 
 // Clear the obligation before calling `release` so reentry cannot release
 // twice.
-PERIMORTEM_C void ttx_shared_release(ttx_shared_lifetime* lifetime);
+C_LINKAGE void ttx_shared_release(ttx_shared_lifetime* lifetime);
 
 #endif

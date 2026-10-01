@@ -34,6 +34,6 @@ auto Policies::None::get_none() -> None {
   return None(Abstract::provide(subject).get_abi());
 }
 
-PERIMORTEM_C ttx_abstract ttx_none(void) {
+C_LINKAGE ttx_abstract ttx_none(void) {
   return Policies::None::get_none().get_abi();
 }

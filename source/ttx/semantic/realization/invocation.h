@@ -24,10 +24,9 @@ typedef struct ttx_invocation {
   void* receiver;
   const ttx_representation* inputs;
   const ttx_representation* outputs;
-  ttx_data_status (
-      *invoke)(void* receiver, const void* inputs, void* outputs);
+  ttx_data_status (*invoke)(void* receiver, const void* inputs, void* outputs);
 } ttx_invocation;
 
-PERIMORTEM_C const ttx_representation* ttx_invocation_representation(void);
+C_LINKAGE const ttx_representation* ttx_invocation_representation(void);
 
 #endif

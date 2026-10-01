@@ -14,7 +14,7 @@ typedef struct visitation_probe {
   Count stop;
 } visitation_probe;
 
-PERIMORTEM_C ttx_data_status observe_representation(
+C_LINKAGE ttx_data_status observe_representation(
     const ttx_representation* representation,
     const Count* coordinates,
     Count count,

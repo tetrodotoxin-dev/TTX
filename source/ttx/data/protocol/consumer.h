@@ -22,6 +22,6 @@ typedef struct ttx_consumer {
 } ttx_consumer;
 
 // Describe the callable API independently of the payload it transports.
-PERIMORTEM_C const ttx_representation* ttx_consumer_representation(void);
+C_LINKAGE const ttx_representation* ttx_consumer_representation(void);
 
 #endif

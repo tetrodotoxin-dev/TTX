@@ -5,11 +5,12 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "validation/unit_tests/semantic/fixtures/provider.h"
-#include "validation/unit_tests/semantic/fixtures/provider_representation.h"
+#include "toolchain/export.h"
 #include "ttx/data/protocol/block/provider.h"
 #include "ttx/data/protocol/direct/provider.h"
 #include "ttx/data/protocol/fragment/provider.h"
+#include "validation/unit_tests/semantic/fixtures/provider.h"
+#include "validation/unit_tests/semantic/fixtures/provider_representation.h"
 
 static const ttx_schema u32 = {
   4,
@@ -984,10 +985,8 @@ static ttx_semantic_query primitives(void) {
   };
 }
 
-#ifdef PERI_WINDOWS
-__declspec(dllexport)
-#endif
-const provider_api* flow_provider_open(provider_compile compiler) {
+C_LINKAGE EXPORTED(TTX_TEST) const provider_api* flow_provider_open(
+    provider_compile compiler) {
   compile_representation = compiler;
   if (!four_representation) {
     four_representation = prepare_representation(&four);

@@ -22,6 +22,6 @@ typedef struct ttx_direct_provider {
 } ttx_direct_provider;
 
 // Describe the callable API independently of the payload it transports.
-PERIMORTEM_C const ttx_representation* ttx_direct_provider_representation(void);
+C_LINKAGE const ttx_representation* ttx_direct_provider_representation(void);
 
 #endif

@@ -4,9 +4,10 @@
 
 #include <stddef.h>
 
-#include "validation/unit_tests/semantic/fixtures/provider_representation.h"
+#include "toolchain/export.h"
 #include "ttx/data/protocol/fragment/provider.h"
 #include "ttx/semantic/transport/flow.h"
+#include "validation/unit_tests/semantic/fixtures/provider_representation.h"
 
 typedef struct record {
   U16 tag;
@@ -167,11 +168,9 @@ static ttx_semantic_query source(heterogeneous_state* state) {
   };
 }
 
-#ifdef PERI_WINDOWS
-__declspec(dllexport)
-#endif
-const heterogeneous_provider* heterogeneous_provider_open(
-    provider_compile compiler) {
+C_LINKAGE EXPORTED(TTX_TEST) const
+    heterogeneous_provider* heterogeneous_provider_open(
+        provider_compile compiler) {
   compile_representation = compiler;
   if (!prepared) {
     prepared = prepare_representation(&schema);

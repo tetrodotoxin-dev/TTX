@@ -19,7 +19,8 @@ VALIDATION_TEST(NativeEntry, scoped_negotiation) {
   const auto library = Validation::open_library("libabstract_subject.so"_view);
   const auto entry =
       reinterpret_cast<ttx_library_entry>(Validation::find_symbol(
-          library, Core::NullTerminated::to_view(TTX_LIBRARY_ENTRY)));
+          library, Core::NullTerminated::to_view(
+                       TTX_LIBRARY_ENTRY, sizeof(TTX_LIBRARY_ENTRY) - 1)));
   ttx_binding_status admission = TTX_BINDING_UNKNOWN;
   const ttx_semantic_query host = ttx_semantic_query(
       &admission,

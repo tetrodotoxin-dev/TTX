@@ -1,6 +1,5 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
-#include <string.h>
 
 #include "perimortem/core/diagnostics/log.hpp"
 #include "perimortem/core/null_terminated.hpp"
@@ -8,13 +7,12 @@
 #include "validation/unit_tests/semantic/fixtures.hpp"
 using namespace Validation::FlowTests;
 
-Module::Module(const char* library, const char* entry_name)
-    : module(
-          Validation::open_library(
-              Perimortem::Core::NullTerminated::to_view(library))) {
-  auto entry = Validation::find_symbol(
-      module, Perimortem::Core::NullTerminated::to_view(entry_name));
-  if (!strcmp(entry_name, "flow_provider_open")) {
+Module::Module(
+    Perimortem::Core::View::Bytes library,
+    Perimortem::Core::View::Bytes entry_name)
+    : module(Validation::open_library(library)) {
+  auto entry = Validation::find_symbol(module, entry_name);
+  if (entry_name == "flow_provider_open"_view) {
     api = reinterpret_cast<
         const provider_api* (*)(decltype(&ttx_representation_compile))>(entry)(
         ttx_representation_compile);

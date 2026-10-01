@@ -26,6 +26,6 @@ typedef struct ttx_shared_provider {
 } ttx_shared_provider;
 
 // Describe the callable API independently of the payload it transports.
-PERIMORTEM_C const ttx_representation* ttx_shared_provider_representation(void);
+C_LINKAGE const ttx_representation* ttx_shared_provider_representation(void);
 
 #endif
