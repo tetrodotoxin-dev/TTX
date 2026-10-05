@@ -17,12 +17,22 @@ namespace Ttx::Concept::Policies {
 // abstract could be used to infer ordering and that consumers are allowed to
 // assume that no meaningful information is provided by ordering, even if its
 // stable for every subsequent visit.
-class Ordered : public Abstract {
+class Ordered {
  public:
   static constexpr auto contract_id =
       Perimortem::System::Uuid(TTX_ORDERED_ID_HIGH, TTX_ORDERED_ID_LOW);
   using Api = ttx_abstract;
-  using Abstract::Abstract;
+
+  explicit constexpr Ordered(Api api) : api(api) {}
+
+  static auto accept(Api api) -> Bool { return Abstract::accept(api); }
+
+  constexpr auto get_abi() const -> Api { return api; }
+
+  constexpr auto get_abstract() const -> Abstract { return Abstract(api); }
+
+ private:
+  Api api;
 };
 
 }  // namespace Ttx::Concept::Policies

@@ -7,23 +7,32 @@
 #include "ttx/concept/policies/none.h"
 
 static ttx_binding_status
-    bind(void* source, perimortem_uuid id, ttx_storage output) {
-  const observation_subject* subject = source;
+    bind(void* context, perimortem_uuid id, ttx_storage output) {
+  observation_subject* subject = context;
+  ++subject->binds;
+  if (subject->answer != TTX_BINDING_SATISFIED) {
+    return subject->answer;
+  }
+
   if (id.high == TTX_ABSTRACT_ID_HIGH && id.low == TTX_ABSTRACT_ID_LOW) {
-    const ttx_abstract api = observation_abstract((observation_subject*)source);
+    const ttx_abstract api = subject->selected.operations
+                                 ? subject->selected
+                                 : observation_abstract(subject);
     return ttx_binding_provide(subject->abstract_form, &api, output);
   }
+
   if (id.high == TTX_CONSTANT_ID_HIGH && id.low == TTX_CONSTANT_ID_LOW) {
-    const ttx_abstract api = observation_abstract((observation_subject*)source);
+    const ttx_abstract api = observation_abstract(subject);
     return ttx_binding_provide(subject->marker_form, &api, output);
   }
+
   return TTX_BINDING_UNKNOWN;
 }
 
 // Constant describes the subject's semantic answers. It does not make its
 // byte observation a constant, nor extend the returned buffer's lifetime.
-static perimortem_view_bytes data(void* source) {
-  observation_subject* subject = (observation_subject*)source;
+static perimortem_view_bytes data(void* context) {
+  observation_subject* subject = context;
   ++subject->value;
   const perimortem_view_bytes bytes = {
     &subject->value,
@@ -32,19 +41,23 @@ static perimortem_view_bytes data(void* source) {
   return bytes;
 }
 
-static ttx_abstract resolve(void* source) {
-  return observation_abstract((observation_subject*)source);
+static ttx_abstract resolve(void* context) {
+  observation_subject* source = context;
+  return observation_abstract(source);
 }
 
-static ttx_abstract lookup(void* source, perimortem_view_bytes route) {
+static ttx_abstract lookup(void* context, perimortem_view_bytes route) {
+  observation_subject* source = context;
   if (route.size == 3 && route.data[0] == 7 && route.data[1] == 0 &&
       route.data[2] == 9) {
     return resolve(source);
   }
+
   return ttx_none();
 }
 
-static void visit(void* source, ttx_concept_visitor visitor) {
+static void visit(void* context, ttx_concept_visitor visitor) {
+  observation_subject* source = context;
   const U8 route[] = {
     7,
     0,
@@ -54,11 +67,11 @@ static void visit(void* source, ttx_concept_visitor visitor) {
     route,
     sizeof(route),
   };
-  visitor.receive(visitor.source, bytes, resolve(source));
+  visitor.callback(visitor.context, bytes, resolve(source));
 }
 
-static ttx_binding_status supports(void* source, perimortem_uuid id) {
-  (void)source;
+static ttx_binding_status supports(void* context, perimortem_uuid id) {
+  (void)context;
   return (id.high == TTX_ABSTRACT_ID_HIGH && id.low == TTX_ABSTRACT_ID_LOW) ||
                  (id.high == TTX_CONSTANT_ID_HIGH &&
                   id.low == TTX_CONSTANT_ID_LOW)

@@ -24,7 +24,8 @@ VALIDATION_TEST(SdkComponents, core_runtime) {
 }
 
 VALIDATION_TEST(SdkComponents, unknown_policy) {
-  const auto value = Ttx::Concept::Policies::Unknown::get_unknown();
+  const auto value =
+      Ttx::Concept::Policies::Unknown::get_unknown().get_abstract();
   EXPECT_EQ(
       value.supports<Ttx::Concept::Policies::Unknown>(),
       Ttx::Semantic::Negotiation::Binding::Status::Satisfied);

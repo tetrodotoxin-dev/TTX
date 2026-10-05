@@ -1,11 +1,11 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "validation/unit_tests/semantic/fixtures.hpp"
+
 #include <stddef.h>
 
 #include "perimortem/core/static/vector.hpp"
-
-#include "validation/unit_tests/semantic/fixtures.hpp"
 
 using namespace Validation::FlowTests;
 
@@ -79,11 +79,12 @@ VALIDATION_TEST(TtxFlow, heterogeneous_outputs) {
               3,
             },
             sizeof(Reordered), alignof(Reordered)));
-    Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(input);
+    Validation::FlowTests::Consumer consumer =
+        Validation::FlowTests::Consumer(input);
 
     Flow flow;
     ASSERT(
-        flow.connect(reader.query(), module.writer(state)) ==
+        flow.connect(consumer.query(), module.provider(state)) ==
         Flow::Status::Success);
 
     ASSERT(Copy::flow(flow, storage(input, output)) == Status::Success);
@@ -163,7 +164,7 @@ VALIDATION_TEST(TtxFlow, copy_padding_values) {
           alignof(Record)));
   Flow flow;
   ASSERT(
-      flow.connect(Flow::consumer(representation), module.writer(state)) ==
+      flow.connect(Flow::consumer(representation), module.provider(state)) ==
       Flow::Status::Success);
   ASSERT(Copy::flow(flow, storage(representation, output)) == Status::Success);
   EXPECT_EQ(output.tag, U16(8));

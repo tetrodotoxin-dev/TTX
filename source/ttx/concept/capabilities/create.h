@@ -11,31 +11,31 @@
 // Exposes the capability to create an Abstract from the supplied argument
 // graph. The provider interprets the arguments through their routes and
 // contracts. None represents intentionally absent arguments. If creation
-// succeeds, `create` calls `receive` once with the created Abstract and returns
-// Satisfied after the callback finishes.
+// succeeds, `create` calls `callback` once with the created Abstract and
+// returns Satisfied after the callback finishes.
 //
-// The caller can supply callback state through receiver, which is passed
-// unchanged to `receive`. The arguments and receiver state remain available
-// until `create` returns. The created Abstract is available during the
-// callback. The consumer can use its capabilities, copy observations or
+// The caller can supply callback state through `callback_context`, which is
+// passed unchanged to `callback`. The arguments and callback state remain
+// available until `create` returns. The created Abstract is available during
+// the callback. The consumer can use its capabilities, copy observations or
 // negotiate retained access, allowing providers to create objects in temporary
 // storage.
 //
-// A `create` call returning Unknown or Rejected guarantees that `receive` was
+// A `create` call returning Unknown or Rejected guarantees that `callback` was
 // never called. Unknown leaves the creation request undetermined. Rejected
 // explicitly refuses it.
 typedef struct ttx_create {
-  void* source;
+  void* context;
   const struct ttx_create_ops* operations;
 } ttx_create;
 
 typedef struct ttx_create_ops {
   ttx_abstract_ops abstract;
   ttx_binding_status (*create)(
-      void* source,
+      void* context,
       ttx_abstract arguments,
-      void* receiver,
-      void (*receive)(void* receiver, ttx_abstract subject));
+      void* callback_context,
+      void (*callback)(void* context, ttx_abstract abstract));
 } ttx_create_ops;
 
 C_LINKAGE const ttx_representation* ttx_create_representation(void);

@@ -1,9 +1,10 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "validation/unit_tests/data/form/preparation.hpp"
+
 #include "perimortem/core/static/vector.hpp"
 
-#include "validation/unit_tests/data/form/preparation.hpp"
 #include "toolchain/validation/unit_test.hpp"
 #include "ttx/data/form/compiled.hpp"
 #include "ttx/data/form/compiler.hpp"
@@ -18,7 +19,7 @@ static Toolchain::Validation::Harness Pointers = {
 
 // Constant evaluation may build a temporary reference to itself. Only the
 // finished bytes escape preparation, so no constexpr allocation or source
-// pointer is retained in the publication.
+// pointer is retained in the canonical form.
 static consteval auto recursive_bytes() -> Core::Static::Bytes<8> {
   auto node = Schema::composite(
       Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);

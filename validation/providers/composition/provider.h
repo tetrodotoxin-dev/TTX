@@ -11,20 +11,20 @@
 #define ADDITIONAL_ID_LOW 0xb14106da734161a3ULL
 
 typedef struct expression {
-  void* source;
+  void* context;
   const struct expression_ops* operations;
 } expression;
 typedef struct expression_ops {
-  ttx_abstract_ops abstract;
   U64 (*evaluate)(void*);
+  ttx_abstract_ops abstract;
 } expression_ops;
 typedef struct borrowed_expression {
-  void* source;
+  void* context;
   const struct borrowed_expression_ops* operations;
 } borrowed_expression;
 typedef struct borrowed_expression_ops {
-  ttx_borrowed_ops borrowed;
   U64 (*evaluate)(void*);
+  ttx_borrowed_ops borrowed;
 } borrowed_expression_ops;
 
 typedef struct composition_subject {

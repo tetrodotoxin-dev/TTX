@@ -15,18 +15,18 @@
 // When access can be retained, `borrow` writes a Borrowed answer to output and
 // returns Satisfied. The caller then owes one release through that answer.
 // Each successful call creates a separate release obligation, even when the
-// provider returns the same receiver for several requests.
+// provider returns the same context for several requests.
 //
 // Unknown leaves the borrowing request undetermined. Rejected explicitly
 // refuses it. The caller consumes output only when `borrow` returns Satisfied.
 typedef struct ttx_borrow {
-  void* source;
+  void* context;
   const struct ttx_borrow_ops* operations;
 } ttx_borrow;
 
 typedef struct ttx_borrow_ops {
   ttx_abstract_ops abstract;
-  ttx_binding_status (*borrow)(void* source, ttx_borrowed* output);
+  ttx_binding_status (*borrow)(void* context, ttx_borrowed* output);
 } ttx_borrow_ops;
 
 C_LINKAGE const ttx_representation* ttx_borrow_representation(void);

@@ -15,7 +15,7 @@
 // integer arguments can use the same storage while exposing different
 // contracts.
 typedef struct ttx_callable_field {
-  ttx_abstract subject;
+  ttx_abstract abstract;
   Count offset;
 } ttx_callable_field;
 
@@ -41,7 +41,7 @@ typedef struct ttx_callable_description {
   ttx_callable_frame outputs;
 } ttx_callable_description;
 
-// Exposes the capability to describe an operation that another object can
+// Exposes the capability to describe an operation that another provider can
 // supply. `describe` fills output and returns Satisfied when it can supply that
 // description. Unknown leaves the request undetermined. Rejected explicitly
 // refuses it. The caller consumes output only when `describe` returns
@@ -49,11 +49,11 @@ typedef struct ttx_callable_description {
 typedef struct ttx_callable_operations {
   ttx_abstract_ops abstract;
   ttx_binding_status (
-      *describe)(void* source, ttx_callable_description* output);
+      *describe)(void* context, ttx_callable_description* output);
 } ttx_callable_operations;
 
 typedef struct ttx_callable {
-  void* source;
+  void* context;
   const ttx_callable_operations* operations;
 } ttx_callable;
 

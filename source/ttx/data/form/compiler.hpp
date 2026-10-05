@@ -58,7 +58,7 @@ namespace Ttx::Data::Form {
 // Reading the first byte and masking with 0x0F establishes the block size as
 // 4 * F bytes. The other nibble can contain part of C without making that
 // bootstrap ambiguous. Every struct header repeats the same F because a
-// reference needs one common block size throughout the publication.
+// reference needs one common block size throughout the canonical form.
 //
 // Element blocks describe occurrences of a primitive, struct or callable:
 //
@@ -94,9 +94,9 @@ namespace Ttx::Data::Form {
 //
 // Argument blocks have O=0 and D=0. N repeats consecutive identical formal
 // parameters, not an array parameter. No argument sorting takes place. A
-// receiver is an explicit ordinary argument. Native arrays must be supplied
+// context is an explicit ordinary argument. Native arrays must be supplied
 // through a pointer to their storage form. Nontrivial C++ objects likewise
-// need a provider thunk with the declared C boundary. The variadic profile
+// need a provider function with the declared C boundary. The variadic profile
 // implies a trailing ellipsis whose concrete argument types belong to each
 // call site. No signature interpretation or call is needed to transfer a table.
 //
@@ -286,7 +286,8 @@ namespace Ttx::Data::Form {
 //     Round the complete buffer size up to eight bytes. Hashing, runtime
 //     versus constant evaluation, and allocation policy cannot affect the
 //     output. Compiler owns temporary preparation and the caller owns the final
-//     buffer, so construction storage disappears from the published descriptor.
+//     buffer, so construction storage disappears from the resolve_references
+//     descriptor.
 //
 // For example, U8 at offsets zero, one and two followed by U32 at offset four
 // becomes one U8 descriptor with N three and D one, then one U32 descriptor
@@ -308,7 +309,7 @@ class Compiler {
   constexpr Compiler(Compiler&&) = default;
 
   // Preparation owns one content inventory. Source graphs can disappear after
-  // success because publication consumes only these normalized records.
+  // success because encoding consumes only these normalized records.
   constexpr auto compile(
       Schema::Reference source,
       Count selected = sizeof(void*)) -> Status {
@@ -366,6 +367,7 @@ class Compiler {
     return prefix_size() +
            Perimortem::Core::Data::align<8>(block_count * 4 * depth);
   }
+
   constexpr auto get_depth() const -> U8 { return depth; }
 
   // Preparation has settled indices and the common depth. Each content record
@@ -380,6 +382,7 @@ class Compiler {
     if (prefix_size()) {
       writer << U64(0x100000010);
     }
+
     for (Count item = first; item; item = bodies[item - 1].next) {
       const auto& body = bodies[item - 1];
       const auto& head = records[body.first];
@@ -388,8 +391,8 @@ class Compiler {
             .encode(depth)
             .write(writer, depth);
       } else {
-        const auto returned =
-            published(Element(1, 0, 0, head.type, head.attributes & 7));
+        const auto returned = resolve_references(
+            Element(1, 0, 0, head.type, head.attributes & 7));
         Encoding::Callable(
             head.count, head.offset, returned, head.attributes & Void)
             .encode(depth)
@@ -397,7 +400,9 @@ class Compiler {
       }
 
       for (Count i = 1; i < body.size; ++i) {
-        published(records[body.first + i]).encode(depth).write(writer, depth);
+        resolve_references(records[body.first + i])
+            .encode(depth)
+            .write(writer, depth);
       }
     }
 
@@ -438,6 +443,7 @@ class Compiler {
     constexpr Body() = default;
     constexpr Body(const Schema* schema, U64 hash)
         : schema(schema), hash(hash) {}
+
     constexpr Body(Count first, Count size, U64 hash)
         : first(first), size(size), hash(hash) {}
   };
@@ -545,7 +551,7 @@ class Compiler {
                                : Schema::get_width(entry.get_value());
   }
 
-  constexpr auto published(Element entry) const -> Element {
+  constexpr auto resolve_references(Element entry) const -> Element {
     if (entry.references()) {
       entry.type = bodies[entry.type].block;
     }
@@ -1322,6 +1328,7 @@ class Compiler {
   Count first = 0;
   Count block_count = 0;
   U8 depth = 0;
+
   constexpr auto prefix_size() const -> Count {
     return has_pointers && pointer_size == 4 ? 8 : 0;
   }

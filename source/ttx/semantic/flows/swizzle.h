@@ -14,8 +14,8 @@
 typedef struct ttx_swizzle_selection {
   const ttx_representation* input;
   const ttx_representation* output;
-  void* source;
-  Count (*position)(void* source, Count output_coordinate);
+  void* context;
+  Count (*position)(void* context, Count output_coordinate);
 } ttx_swizzle_selection;
 
 // Repeating red in five output slots still makes one observation of red. Its

@@ -14,12 +14,12 @@
 // A policy that needs deferred work owns that execution outside this contract.
 
 typedef struct ttx_block_provider_operations {
-  const ttx_representation* (*representation)(void* source);
-  ttx_data_status (*commit)(void* source, ttx_storage target);
+  const ttx_representation* (*representation)(void* context);
+  ttx_data_status (*commit)(void* context, ttx_storage target);
 } ttx_block_provider_operations;
 
 typedef struct ttx_block_provider {
-  void* source;
+  void* context;
   const ttx_block_provider_operations* operations;
 } ttx_block_provider;
 

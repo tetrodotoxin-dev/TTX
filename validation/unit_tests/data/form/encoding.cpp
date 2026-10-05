@@ -1,10 +1,10 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/abi/receiver.hpp"
+#include "validation/unit_tests/data/form/preparation.hpp"
+
 #include "perimortem/core/static/vector.hpp"
 
-#include "validation/unit_tests/data/form/preparation.hpp"
 #include "ttx/data/form/compiled.hpp"
 
 using namespace Perimortem::Core;
@@ -463,14 +463,16 @@ VALIDATION_TEST(TtxEncoding, final_allocation) {
   struct Allocation {
     alignas(Representation) Static::Vector<U8, 128> bytes;
     Count allocations = 0;
+
+    static auto allocate(void* context, Count size, Count) -> void* {
+      auto& allocation = *static_cast<Allocation*>(context);
+      ++allocation.allocations;
+      return size <= sizeof(allocation.bytes) ? allocation.bytes.get_data()
+                                              : nullptr;
+    }
   } allocation;
-  const ttx_representation_allocator allocator = ttx_representation_allocator(
-      &allocation, [](void* source, Count size, Count) -> void* {
-        auto& allocation = Ttx::Abi::Receiver::get<Allocation>(source);
-        ++allocation.allocations;
-        return size <= sizeof(allocation.bytes) ? allocation.bytes.get_data()
-                                                : nullptr;
-      });
+  const ttx_representation_allocator allocator =
+      ttx_representation_allocator(&allocation, Allocation::allocate);
   const Representation* output = nullptr;
   auto invalid = integer;
   invalid.data.value.type = 11;

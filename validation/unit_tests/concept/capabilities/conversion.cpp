@@ -11,6 +11,7 @@
 #include "ttx/concept/capabilities/import.hpp"
 #include "ttx/concept/policies/constant.hpp"
 #include "ttx/concept/policies/none.hpp"
+#include "ttx/concept/policies/unknown.h"
 
 using namespace Perimortem;
 using namespace Ttx;
@@ -19,181 +20,251 @@ using namespace Ttx::Semantic::Negotiation;
 
 static Toolchain::Validation::Harness Conversion = {.name = "TTX::Conversion"};
 
-class DefaultImport {
- public:
-  auto get_data() const -> Core::View::Bytes { return Core::View::Bytes(); }
-  auto supports(System::Uuid id) const -> Binding::Status {
-    return id == Capabilities::Import::contract_id ? Binding::Status::Satisfied
-                                                   : Binding::Status::Unknown;
-  }
-  auto bind_interface(System::Uuid id, Data::Form::Storage output)
-      -> Binding::Status {
-    return id == Capabilities::Import::contract_id
-               ? Binding::provide<Capabilities::Import>(
-                     Capabilities::Import::provide(*this).get_abi(), output)
-               : Binding::Status::Unknown;
-  }
-};
-
 class Report {
  public:
-  auto get_data() const -> Core::View::Bytes { return Core::View::Bytes(); }
   Count calls = 0;
   U8 value = 0;
   Binding::Status status = Binding::Status::Satisfied;
-  auto supports(System::Uuid id) const -> Binding::Status {
-    return id == Capabilities::Export::contract_id ? status
-                                                   : Binding::Status::Unknown;
+
+  static auto supports(void* context, perimortem_uuid id)
+      -> ttx_binding_status {
+    auto& report = *static_cast<Report*>(context);
+    if (System::Uuid(id) == Abstract::contract_id) {
+      return TTX_BINDING_SATISFIED;
+    }
+
+    return System::Uuid(id) == Capabilities::Export::contract_id
+               ? static_cast<ttx_binding_status>(report.status)
+               : TTX_BINDING_UNKNOWN;
   }
-  auto bind_interface(System::Uuid id, Data::Form::Storage output)
-      -> Binding::Status {
-    if (id == Capabilities::Export::contract_id &&
-        status != Binding::Status::Satisfied) {
+
+  static auto bind(void* context, perimortem_uuid id, ttx_storage output)
+      -> ttx_binding_status {
+    const auto status = supports(context, id);
+    if (status != TTX_BINDING_SATISFIED) {
       return status;
     }
-    return id == Capabilities::Export::contract_id
-               ? Binding::provide<Capabilities::Export>(
-                     Capabilities::Export::provide(*this).get_abi(), output)
-               : Binding::Status::Unknown;
+
+    if (System::Uuid(id) == Abstract::contract_id) {
+      return static_cast<ttx_binding_status>(Binding::provide<Abstract>(
+          resolve(context), Data::Form::Storage(output)));
+    }
+
+    return static_cast<ttx_binding_status>(
+        Binding::provide<Capabilities::Export>(
+            {context, &operations}, Data::Form::Storage(output)));
   }
-  auto expose(Abstract subject) -> Binding::Status {
-    ++calls;
-    value = subject.get_data()[0];
-    return Binding::Status::Satisfied;
+
+  static auto data(void*) -> perimortem_view_bytes { return {}; }
+
+  static auto resolve(void* context) -> ttx_abstract {
+    return {context, &operations.abstract};
   }
+
+  static auto lookup(void*, perimortem_view_bytes) -> ttx_abstract {
+    return ttx_none();
+  }
+
+  static void visit(void*, ttx_concept_visitor) {}
+
+  static auto expose(void* context, ttx_abstract subject)
+      -> ttx_binding_status {
+    auto& report = *static_cast<Report*>(context);
+    ++report.calls;
+    report.value = Abstract(subject).get_data()[0];
+    return TTX_BINDING_SATISFIED;
+  }
+
+  static constexpr ttx_export_ops operations = {
+    {supports, bind, data, resolve, lookup, visit},
+    expose};
 };
 
-// Each imported answer lives on visit's stack. The reporting service belongs
-// to the test caller and can be published on that answer or one of its routes.
+// Each imported answer lives in the visit call. Its reporting service has an
+// independent context, so root binding can return that service directly.
 class ImportedByte {
  public:
   U8 value;
   Report* report;
   bool at_root;
-  auto get_data() const -> Core::View::Bytes {
-    return Core::View::Bytes(&value, 1);
+
+  static auto data(void* context) -> perimortem_view_bytes {
+    return {&static_cast<ImportedByte*>(context)->value, 1};
   }
-  auto supports(System::Uuid id) const -> Binding::Status {
-    return report && at_root ? report->supports(id) : Binding::Status::Unknown;
-  }
-  auto bind_interface(System::Uuid id, Data::Form::Storage output)
-      -> Binding::Status {
-    if (report && at_root && id == Capabilities::Export::contract_id) {
-      const auto status = report->supports(id);
-      if (status != Binding::Status::Satisfied) {
-        return status;
-      }
-      return Binding::provide<Capabilities::Export>(
-          Capabilities::Export::provide(*this).get_abi(), output);
+
+  static auto supports(void* context, perimortem_uuid id)
+      -> ttx_binding_status {
+    auto& subject = *static_cast<ImportedByte*>(context);
+    if (System::Uuid(id) == Abstract::contract_id) {
+      return TTX_BINDING_SATISFIED;
     }
-    return Binding::Status::Unknown;
+
+    return subject.report && subject.at_root
+               ? Report::supports(subject.report, id)
+               : TTX_BINDING_UNKNOWN;
   }
-  auto expose(Abstract subject) -> Binding::Status {
-    return report->expose(subject);
+
+  static auto bind(void* context, perimortem_uuid id, ttx_storage output)
+      -> ttx_binding_status {
+    auto& subject = *static_cast<ImportedByte*>(context);
+    if (System::Uuid(id) == Abstract::contract_id) {
+      return static_cast<ttx_binding_status>(Binding::provide<Abstract>(
+          resolve(context), Data::Form::Storage(output)));
+    }
+
+    return subject.report && subject.at_root
+               ? Report::bind(subject.report, id, output)
+               : TTX_BINDING_UNKNOWN;
   }
-  auto resolve_concept(Core::View::Bytes route) const -> Abstract {
-    return report && !at_root && route == "report"_view
-               ? Abstract::provide(*report)
-               : Policies::None::get_none();
+
+  static auto resolve(void* context) -> ttx_abstract {
+    return {context, &operations};
   }
+
+  static auto lookup(void* context, perimortem_view_bytes route)
+      -> ttx_abstract {
+    auto& subject = *static_cast<ImportedByte*>(context);
+    return subject.report && !subject.at_root &&
+                   Core::View::Bytes(route.data, route.size) == "report"_view
+               ? Report::resolve(subject.report)
+               : ttx_none();
+  }
+
+  static void visit(void*, ttx_concept_visitor) {}
+
+  static constexpr ttx_abstract_ops operations = {supports, bind,   data,
+                                                  resolve,  lookup, visit};
 };
 
 class ByteImport {
  public:
-  auto get_data() const -> Core::View::Bytes { return Core::View::Bytes(); }
   Report* report = nullptr;
   bool at_root = false;
   Binding::Status status = Binding::Status::Satisfied;
   Count reads = 0;
   bool observing = false;
-  auto supports(System::Uuid id) const -> Binding::Status {
-    return id == Capabilities::Import::contract_id ? Binding::Status::Satisfied
-                                                   : Binding::Status::Unknown;
+
+  static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
+    const System::Uuid contract(id);
+    return contract == Abstract::contract_id ||
+                   contract == Capabilities::Import::contract_id
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_UNKNOWN;
   }
-  auto bind_interface(System::Uuid id, Data::Form::Storage output)
-      -> Binding::Status {
-    return id == Capabilities::Import::contract_id
-               ? Binding::provide<Capabilities::Import>(
-                     Capabilities::Import::provide(*this).get_abi(), output)
-               : Binding::Status::Unknown;
-  }
-  template <typename Receive>
-  auto visit(
-      const void* input,
-      const Data::Form::Representation& representation,
-      Receive& receive) -> Binding::Status {
-    if (status != Binding::Status::Satisfied) {
-      return status;
+
+  static auto bind(void* context, perimortem_uuid id, ttx_storage output)
+      -> ttx_binding_status {
+    if (System::Uuid(id) == Abstract::contract_id) {
+      return static_cast<ttx_binding_status>(Binding::provide<Abstract>(
+          resolve(context), Data::Form::Storage(output)));
     }
-    if (!representation.compatible(
+
+    if (System::Uuid(id) == Capabilities::Import::contract_id) {
+      return static_cast<ttx_binding_status>(
+          Binding::provide<Capabilities::Import>(
+              {context, &operations}, Data::Form::Storage(output)));
+    }
+
+    return TTX_BINDING_UNKNOWN;
+  }
+
+  static auto data(void*) -> perimortem_view_bytes { return {}; }
+
+  static auto resolve(void* context) -> ttx_abstract {
+    return {context, &operations.abstract};
+  }
+
+  static auto lookup(void*, perimortem_view_bytes) -> ttx_abstract {
+    return ttx_unknown();
+  }
+
+  static void visit_concepts(void*, ttx_concept_visitor) {}
+
+  static auto visit(
+      void* context,
+      const void* input,
+      const ttx_representation* representation,
+      void* callback_context,
+      void (*callback)(void*, ttx_abstract)) -> ttx_binding_status {
+    auto& subject = *static_cast<ByteImport*>(context);
+    if (subject.status != Binding::Status::Satisfied) {
+      return static_cast<ttx_binding_status>(subject.status);
+    }
+
+    if (!representation->compatible(
             Data::Form::Compiled<
                 Data::Form::Native<U8>::reference>::get_representation())) {
-      return Binding::Status::Rejected;
+      return TTX_BINDING_REJECTED;
     }
-    ++reads;
-    ImportedByte result =
-        ImportedByte(*static_cast<const U8*>(input), report, at_root);
-    observing = true;
-    receive(Abstract::provide(result));
-    observing = false;
-    return Binding::Status::Satisfied;
+
+    ++subject.reads;
+
+    ImportedByte result(
+        *static_cast<const U8*>(input), subject.report, subject.at_root);
+    subject.observing = true;
+    callback(callback_context, ImportedByte::resolve(&result));
+    subject.observing = false;
+    return TTX_BINDING_SATISFIED;
   }
+
+  static constexpr ttx_import_ops operations = {
+    {supports, bind, data, resolve, lookup, visit_concepts},
+    visit};
 };
 
 class ByteExport {
  public:
-  auto get_data() const -> Core::View::Bytes { return Core::View::Bytes(); }
-  conversion_output output =
-      conversion_output(0, 0, 0, TTX_BINDING_SATISFIED);
-  auto expose(Abstract subject) -> Binding::Status {
-    return static_cast<Binding::Status>(
-        conversion_expose(&output, subject.get_abi()));
-  }
-};
+  conversion_output output = {0, 0, 0, TTX_BINDING_SATISFIED};
 
-VALIDATION_TEST(Conversion, default_import) {
-  DefaultImport provider;
-  Abstract::provide(provider).bind<Capabilities::Import>().visit(
-      [&](Capabilities::Import importer) {
-        EXPECT(importer.supports<Abstract>() == Binding::Status::Satisfied);
-        EXPECT(
-            importer.supports<Capabilities::Borrow>() ==
-            Binding::Status::Unknown);
-        Count calls = 0, routes = 0;
-        auto receive = [&](Abstract graph) {
-          ++calls;
-          EXPECT(
-              graph.supports<Policies::None>() == Binding::Status::Satisfied);
-          EXPECT(
-              graph.supports<Policies::Constant>() == Binding::Status::Unknown);
-          EXPECT(
-              graph.supports<Capabilities::Borrow>() ==
-              Binding::Status::Unknown);
-          auto route = [&](Core::View::Bytes, Abstract) { ++routes; };
-          graph.visit_concepts(Abstract::Visitor(route));
-          EXPECT(graph.resolve_concept("anything"_view) == graph);
-        };
-        const U64 input = 42;
-        EXPECT(
-            importer.visit(
-                &input,
-                Data::Form::Compiled<
-                    Data::Form::Native<U64>::reference>::get_representation(),
-                receive) == Binding::Status::Satisfied);
-        EXPECT_EQ(calls, Count(1));
-        EXPECT_EQ(routes, Count(0));
-      },
-      [&](Binding::Failure) { EXPECT(False); });
-}
+  static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
+    const System::Uuid contract(id);
+    return contract == Abstract::contract_id ||
+                   contract == Capabilities::Export::contract_id
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_UNKNOWN;
+  }
+
+  static auto bind(void* context, perimortem_uuid id, ttx_storage output)
+      -> ttx_binding_status {
+    if (System::Uuid(id) == Abstract::contract_id) {
+      return static_cast<ttx_binding_status>(Binding::provide<Abstract>(
+          resolve(context), Data::Form::Storage(output)));
+    }
+
+    if (System::Uuid(id) == Capabilities::Export::contract_id) {
+      return static_cast<ttx_binding_status>(
+          Binding::provide<Capabilities::Export>(
+              {context, &operations}, Data::Form::Storage(output)));
+    }
+
+    return TTX_BINDING_UNKNOWN;
+  }
+
+  static auto resolve(void* context) -> ttx_abstract {
+    return {context, &operations.abstract};
+  }
+
+  static auto expose(void* context, ttx_abstract subject)
+      -> ttx_binding_status {
+    return conversion_expose(
+        &static_cast<ByteExport*>(context)->output, subject);
+  }
+
+  static constexpr ttx_export_ops operations = {
+    {supports, bind, ByteImport::data, resolve, ByteImport::lookup,
+     ByteImport::visit_concepts},
+    expose};
+};
 
 VALIDATION_TEST(Conversion, scoped_input) {
   ByteImport provider;
-  const auto importer = Capabilities::Import::provide(provider);
+  const auto importer =
+      Capabilities::Import({&provider, &ByteImport::operations});
   const U8 input = 37;
   const U64 incompatible = 37;
   Count calls = 0;
   U8 copied = 0;
-  auto receive = [&](Abstract graph) {
+  auto callback = [&](Abstract graph) {
     EXPECT(provider.observing);
     EXPECT(graph.supports<Capabilities::Borrow>() == Binding::Status::Unknown);
     copied = graph.get_data()[0];
@@ -204,7 +275,7 @@ VALIDATION_TEST(Conversion, scoped_input) {
           &incompatible,
           Data::Form::Compiled<
               Data::Form::Native<U64>::reference>::get_representation(),
-          receive) == Binding::Status::Rejected);
+          callback) == Binding::Status::Rejected);
   EXPECT_EQ(provider.reads, Count(0));
   EXPECT_EQ(calls, Count(0));
   EXPECT(
@@ -212,7 +283,7 @@ VALIDATION_TEST(Conversion, scoped_input) {
           &input,
           Data::Form::Compiled<
               Data::Form::Native<U8>::reference>::get_representation(),
-          receive) == Binding::Status::Satisfied);
+          callback) == Binding::Status::Satisfied);
   EXPECT_NOT(provider.observing);
   EXPECT_EQ(copied, input);
   EXPECT_EQ(calls, Count(1));
@@ -225,8 +296,9 @@ VALIDATION_TEST(Conversion, scoped_input) {
             &input,
             Data::Form::Compiled<
                 Data::Form::Native<U8>::reference>::get_representation(),
-            receive) == status);
+            callback) == status);
   }
+
   EXPECT_EQ(calls, Count(1));
   EXPECT_EQ(provider.reads, Count(1));
 }
@@ -235,8 +307,10 @@ VALIDATION_TEST(Conversion, foreign_pipeline) {
   Report report;
   ByteImport provider;
   ByteExport terminal;
-  const auto importer = Capabilities::Import::provide(provider);
-  const auto exporter = Capabilities::Export::provide(terminal);
+  const auto importer =
+      Capabilities::Import({&provider, &ByteImport::operations});
+  const auto exporter =
+      Capabilities::Export({&terminal, &ByteExport::operations});
   const U8 input = 81;
   auto run = [&] {
     return conversion_run(
@@ -270,6 +344,7 @@ VALIDATION_TEST(Conversion, foreign_pipeline) {
     terminal.output.report_route = 1;
     EXPECT_EQ(run(), TTX_BINDING_SATISFIED);
   }
+
   EXPECT_EQ(terminal.output.artifacts, Count(7));
   EXPECT_EQ(report.calls, Count(2));
   const ttx_binding_status statuses[] = {
@@ -278,6 +353,7 @@ VALIDATION_TEST(Conversion, foreign_pipeline) {
     terminal.output.status = status;
     EXPECT_EQ(run(), status);
   }
+
   EXPECT_EQ(terminal.output.artifacts, Count(7));
   EXPECT_EQ(report.calls, Count(2));
 }

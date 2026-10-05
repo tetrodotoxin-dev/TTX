@@ -10,6 +10,9 @@ typedef struct observation_subject {
   const ttx_representation* abstract_form;
   const ttx_representation* marker_form;
   U8 value;
+  ttx_abstract selected;
+  ttx_binding_status answer;
+  Count binds;
 } observation_subject;
 
 C_LINKAGE ttx_abstract observation_abstract(observation_subject* subject);

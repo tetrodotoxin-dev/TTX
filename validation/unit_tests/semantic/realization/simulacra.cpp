@@ -1,28 +1,27 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/semantic/realization/simulacra.hpp"
+#include "validation/support/library.hpp"
+#include "validation/support/measurement.hpp"
 
 #include <string.h>
 
 #include "perimortem/core/static/vector.hpp"
 #include "perimortem/core/null_terminated.hpp"
 
-#include "validation/unit_tests/library.hpp"
-#include "validation/unit_tests/semantic/fixtures/interface_provider.h"
-#include "validation/unit_tests/semantic/measurement.hpp"
 #include "toolchain/validation/unit_test.hpp"
+#include "ttx/semantic/negotiation/query.hpp"
+#include "validation/providers/interface/provider.h"
 
 using namespace Perimortem;
 using namespace Ttx::Semantic::Negotiation;
-using namespace Ttx::Semantic::Realization;
 using Ttx::Data::Form::Compiled;
 using Ttx::Data::Form::Native;
 using Ttx::Data::Form::Storage;
 
 TTX_DATA_RECORD(
     counter_api,
-    TTX_DATA_MEMBER(counter_api, receiver),
+    TTX_DATA_MEMBER(counter_api, context),
     TTX_DATA_MEMBER(counter_api, add),
     TTX_DATA_MEMBER(counter_api, read));
 
@@ -31,17 +30,22 @@ static Toolchain::Validation::Harness TtxSimulacra = {
 };
 
 // This API is three words, with the functions themselves in the transferred
-// record. Its facade owns those words while borrowing the foreign receiver.
+// record. The C++ interface stores those words while borrowing the context.
 class Counter {
  public:
   static constexpr auto contract_id =
       System::Uuid(COUNTER_ID_HIGH, COUNTER_ID_LOW);
   using Api = counter_api;
+
   static auto accept(Api api) -> Bool { return api.add && api.read; }
 
   explicit Counter(Api api) : api(api) {}
-  auto add(U64 value) const -> U64 { return api.add(api.receiver, value); }
-  auto read() const -> U64 { return api.read(api.receiver); }
+
+  auto get_abi() const -> Api { return api; }
+
+  auto add(U64 value) const -> U64 { return api.add(api.context, value); }
+
+  auto read() const -> U64 { return api.read(api.context); }
 
  private:
   Api api;
@@ -78,6 +82,7 @@ VALIDATION_TEST(TtxSimulacra, support_without_abi) {
   if (const auto copies = measurement.get_copies()) {
     EXPECT_EQ(*copies, Count(0));
   }
+
   EXPECT_EQ(foreign.api.statistics().queries, U64(0));
 
   U64 output = 0x1234;
@@ -92,7 +97,7 @@ VALIDATION_TEST(TtxSimulacra, support_without_abi) {
   // The C entry answers the same question without any C++ descriptor machinery.
   EXPECT_EQ(
       foreign.api.query.supports(
-          foreign.api.query.source, Counter::contract_id),
+          foreign.api.query.context, Counter::contract_id),
       TTX_BINDING_SATISFIED);
 }
 
@@ -122,6 +127,7 @@ VALIDATION_TEST(TtxSimulacra, support_outcomes) {
     foreign.api.reset(invalid, 0, 0);
     EXPECT(query.supports<Counter>() == Binding::Status::Rejected);
   }
+
   EXPECT(Query().supports<Counter>() == Binding::Status::Rejected);
 }
 
@@ -131,7 +137,8 @@ VALIDATION_TEST(TtxSimulacra, support_outcomes) {
 VALIDATION_TEST(TtxSimulacra, retained_c_calls) {
   Foreign foreign;
   ASSERT(foreign.api.query.bind);
-  Simulacra::fulfill<Counter>(Query(foreign.api.query))
+  Query(foreign.api.query)
+      .bind<Counter>()
       .visit(
           [&](const Counter& counter) {
             Validation::FlowTests::Measurement measurement;
@@ -139,6 +146,7 @@ VALIDATION_TEST(TtxSimulacra, retained_c_calls) {
             for (U64 i = 0; i < 2; ++i) {
               answer = counter.add(1);
             }
+
             measurement.stop();
 
             EXPECT_EQ(answer, U64(2));
@@ -182,7 +190,7 @@ VALIDATION_TEST(TtxSimulacra, refusal_boundaries) {
 
   // The generic exchange accepts values according to their contract. Counter
   // requires both functions, so a provider that leaves the output empty cannot
-  // produce its typed view. A null opaque receiver remains valid.
+  // produce its typed view. A null opaque context remains valid.
   foreign.api.reset(TTX_BINDING_SATISFIED, 1, 0);
   Query(foreign.api.query)
       .bind<Counter>()
@@ -200,43 +208,43 @@ VALIDATION_TEST(TtxSimulacra, refusal_boundaries) {
 }
 
 struct WrongResult {
-  void* receiver;
+  void* context;
   R64 (*add)(void*, U64);
   U64 (*read)(void*);
 };
 struct WrongArguments {
-  void* receiver;
+  void* context;
   U64 (*add)(U64);
   U64 (*read)(void*);
 };
 struct WrongAbi {
-  void* receiver;
+  void* context;
   U64 (*add)(void*, U64, ...);
   U64 (*read)(void*);
 };
 struct WrongOrder {
-  void* receiver;
+  void* context;
   U64 (*read)(void*);
   U64 (*add)(void*, U64);
 };
 TTX_DATA_RECORD(
     WrongResult,
-    TTX_DATA_MEMBER(WrongResult, receiver),
+    TTX_DATA_MEMBER(WrongResult, context),
     TTX_DATA_MEMBER(WrongResult, add),
     TTX_DATA_MEMBER(WrongResult, read));
 TTX_DATA_RECORD(
     WrongArguments,
-    TTX_DATA_MEMBER(WrongArguments, receiver),
+    TTX_DATA_MEMBER(WrongArguments, context),
     TTX_DATA_MEMBER(WrongArguments, add),
     TTX_DATA_MEMBER(WrongArguments, read));
 TTX_DATA_RECORD(
     WrongAbi,
-    TTX_DATA_MEMBER(WrongAbi, receiver),
+    TTX_DATA_MEMBER(WrongAbi, context),
     TTX_DATA_MEMBER(WrongAbi, add),
     TTX_DATA_MEMBER(WrongAbi, read));
 TTX_DATA_RECORD(
     WrongOrder,
-    TTX_DATA_MEMBER(WrongOrder, receiver),
+    TTX_DATA_MEMBER(WrongOrder, context),
     TTX_DATA_MEMBER(WrongOrder, read),
     TTX_DATA_MEMBER(WrongOrder, add));
 
@@ -273,55 +281,50 @@ VALIDATION_TEST(TtxSimulacra, mismatched_callables) {
   EXPECT_EQ(foreign.api.statistics().calls, U64(0));
 }
 
-class Local {
- public:
-  Local(Query fallback, Binding::Status status)
-      : fallback(fallback), status(status) {}
-  template <typename Contract>
-  auto fulfill_native() const -> Utility::Result<Contract, Binding::Failure> {
-    if (status != Binding::Status::Satisfied) {
-      return static_cast<Binding::Failure>(status);
-    }
-    if constexpr (__is_same(Contract, Counter)) {
-      const counter_api api = counter_api(
-          nullptr, [](void*, U64 amount) -> U64 { return amount; },
-          [](void*) -> U64 { return 0; });
-      return Counter(api);
-    }
-    return Binding::Failure::Unknown;
-  }
-  auto get_query() const -> Query { return fallback; }
-
- private:
-  Query fallback;
-  Binding::Status status;
-};
-
-VALIDATION_TEST(TtxSimulacra, native_policy) {
+// One contract can use a direct word, an enclosing private C structure, or a
+// synchronous temporary. Every returned record remains callable after another
+// binding selects a different context and pair of functions.
+VALIDATION_TEST(TtxSimulacra, composed_contexts) {
   Foreign foreign;
-  ASSERT(foreign.api.query.bind);
-  const Perimortem::Core::Static::Vector<Binding::Status, 3> statuses = {
-    {
-      Binding::Status::Satisfied,
-      Binding::Status::Unknown,
-      Binding::Status::Rejected,
-    },
+  const Query query(foreign.api.query);
+  Core::Option<Counter> direct, independent, embedded, temporary;
+  const auto acquire = [&](counter_composition mode,
+                           Core::Option<Counter>& output) {
+    foreign.api.compose(mode);
+    query.bind<Counter>().visit(
+        [&](Counter counter) { output = counter; },
+        [&](Binding::Failure) { EXPECT(False); });
   };
-  for (auto status : statuses.get_view()) {
-    foreign.api.reset(TTX_BINDING_SATISFIED, 0, 0);
-    Local native(Query(foreign.api.query), status);
-    Simulacra::fulfill<Counter>(native).visit(
-        [&](const Counter& counter) {
-          EXPECT(
-              status == Binding::Status::Satisfied ||
-              status == Binding::Status::Unknown);
-          EXPECT_EQ(counter.add(9), U64(9));
-        },
-        [&](Binding::Failure failure) {
-          EXPECT_EQ(static_cast<U8>(failure), static_cast<U8>(status));
-        });
-    EXPECT_EQ(
-        foreign.api.statistics().queries,
-        status == Binding::Status::Unknown ? U64(1) : U64(0));
-  }
+  acquire(COUNTER_DIRECT, direct);
+  acquire(COUNTER_SECOND, independent);
+  acquire(COUNTER_EMBEDDED, embedded);
+  acquire(COUNTER_TEMPORARY, temporary);
+  ASSERT(direct && independent && embedded && temporary);
+  EXPECT(direct->get_abi().read == independent->get_abi().read);
+  EXPECT(direct->get_abi().context != independent->get_abi().context);
+  EXPECT_EQ(counter_consume(independent->get_abi(), 2), U64(22));
+  EXPECT(direct->get_abi().context != embedded->get_abi().context);
+  EXPECT(embedded->get_abi().context == temporary->get_abi().context);
+  EXPECT(embedded->get_abi().read != temporary->get_abi().read);
+  EXPECT_EQ(direct->add(3), U64(3));
+  EXPECT_EQ(embedded->read(), U64(3));
+  EXPECT_EQ(temporary->read(), U64(103));
+  EXPECT_EQ(counter_consume(temporary->get_abi(), 4), U64(107));
+  EXPECT_EQ(counter_consume(embedded->get_abi(), 5), U64(12));
+  EXPECT_EQ(direct->read(), U64(12));
+
+  // Copies retain the supplied functions and context, regardless of the next
+  // selection. Query's context never determines the returned interface type.
+  Core::Option<Counter> first, second;
+  foreign.api.compose(COUNTER_ALTERNATING);
+  query.bind<Counter>().visit(
+      [&](Counter value) { first = value; },
+      [&](Binding::Failure) { EXPECT(False); });
+  query.bind<Counter>().visit(
+      [&](Counter value) { second = value; },
+      [&](Binding::Failure) { EXPECT(False); });
+  ASSERT(first && second);
+  EXPECT(first->get_abi().context != second->get_abi().context);
+  EXPECT_EQ(first->read(), U64(12));
+  EXPECT_EQ(second->read(), U64(112));
 }

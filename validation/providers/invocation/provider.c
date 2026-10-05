@@ -1,7 +1,7 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "validation/unit_tests/semantic/fixtures/invocation_provider.h"
+#include "validation/providers/invocation/provider.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -25,36 +25,37 @@ static struct {
   R64 bias;
 } state;
 
-static ttx_data_status
-    invoke(void* self, const void* input, void* output) {
+static ttx_data_status invoke(void* context, const void* input, void* output) {
+  R64* source = context;
   const invocation_input* values = input;
-  const R64 bias = *(const R64*)self;
+  const R64 bias = *source;
   ++state.statistics.calls;
   R64 result = (values->value + bias) * values->scale;
   *(R64*)output = values->negate ? -result : result;
   return TTX_DATA_SUCCESS;
 }
 
-static const ttx_representation* representation(void* self) {
-  (void)self;
+static const ttx_representation* representation(void* context) {
+  (void)context;
   return &state.record;
 }
 
-static const void* pointer(void* self) {
-  (void)self;
+static const void* pointer(void* context) {
+  (void)context;
   return &state.invocation;
 }
 
-static ttx_data_status commit(void* self, ttx_storage target) {
+static ttx_data_status commit(void* context, ttx_storage target) {
+  R64* source = context;
   ++state.statistics.transfers;
   if (state.fail_transfer) {
     return TTX_DATA_IO_ERROR;
   }
 
   // Block creates the bridge in the caller's record. It does not need an
-  // independently allocated table for this projected interior receiver.
+  // independently allocated table for this interior context.
   const ttx_invocation value = {
-    self,
+    source,
     &state.inputs,
     &state.outputs,
     invoke,
@@ -64,10 +65,11 @@ static ttx_data_status commit(void* self, ttx_storage target) {
 }
 
 static ttx_data_status
-    get_pointer(void* self, Count position, void** output) {
+    get_pointer(void* context, Count position, void** output) {
+  R64* source = context;
   ++state.statistics.transfers;
   if (position == 0) {
-    *output = (void*)self;
+    *output = source;
     return TTX_DATA_SUCCESS;
   }
 
@@ -79,6 +81,7 @@ static ttx_data_status
     *output = &state.inputs;
     return TTX_DATA_SUCCESS;
   }
+
   if (position == offsetof(ttx_invocation, outputs)) {
     *output = &state.outputs;
     return TTX_DATA_SUCCESS;
@@ -91,13 +94,13 @@ static ttx_data_status
   return TTX_DATA_SUCCESS;
 }
 
-static void release(void* self) {
-  (void)self;
+static void release(void* context) {
+  (void)context;
   ++state.statistics.releases;
 }
 
-static ttx_data_status acquire(void* self, ttx_shared_lifetime* output) {
-  (void)self;
+static ttx_data_status acquire(void* context, ttx_shared_lifetime* output) {
+  (void)context;
   ++state.statistics.acquisitions;
   *output = (ttx_shared_lifetime){
     &state.invocation,
@@ -108,7 +111,8 @@ static ttx_data_status acquire(void* self, ttx_shared_lifetime* output) {
 }
 
 static ttx_binding_status
-    writer(void* self, perimortem_uuid id, ttx_storage requested) {
+    provider(void* context, perimortem_uuid id, ttx_storage requested) {
+  R64* source = context;
   ++state.statistics.binds;
   if (state.status != TTX_BINDING_SATISFIED) {
     return state.status;
@@ -121,7 +125,7 @@ static ttx_binding_status
       pointer,
     };
     const ttx_direct_provider api = {
-      self,
+      source,
       &operations,
     };
     return ttx_binding_provide(
@@ -135,7 +139,7 @@ static ttx_binding_status
       acquire,
     };
     const ttx_shared_provider api = {
-      self,
+      source,
       &operations,
     };
     return ttx_binding_provide(
@@ -149,7 +153,7 @@ static ttx_binding_status
       commit,
     };
     const ttx_block_provider api = {
-      self,
+      source,
       &operations,
     };
     return ttx_binding_provide(
@@ -163,7 +167,7 @@ static ttx_binding_status
       .get_pointer = get_pointer,
     };
     const ttx_fragment_provider api = {
-      self,
+      source,
       &operations,
     };
     return ttx_binding_provide(
@@ -177,8 +181,8 @@ static invocation_statistics statistics(void) {
   return state.statistics;
 }
 
-static ttx_binding_status supports(void* self, perimortem_uuid id) {
-  (void)self;
+static ttx_binding_status supports(void* context, perimortem_uuid id) {
+  (void)context;
   if (state.status != TTX_BINDING_SATISFIED) {
     return state.status;
   }
@@ -256,7 +260,7 @@ invocation_fixture invocation_provider_open(
   return (invocation_fixture){
     {
       &state.bias,
-      writer,
+      provider,
       supports,
     },
     statistics,

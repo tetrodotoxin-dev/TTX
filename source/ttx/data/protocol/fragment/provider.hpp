@@ -20,16 +20,16 @@ class Provider {
     return api.operations && api.operations->representation;
   }
 
-  constexpr Provider(void* source, const Operations& operations)
-      : value(source, &operations) {}
+  constexpr Provider(void* context, const Operations& operations)
+      : api(context, &operations) {}
 
-  constexpr explicit Provider(ttx_fragment_provider value) : value(value) {}
+  constexpr explicit Provider(ttx_fragment_provider api) : api(api) {}
 
   auto get_representation() const -> const Form::Representation& {
-    return *value.operations->representation(value.source);
+    return *api.operations->representation(api.context);
   }
 
-  constexpr auto get_abi() const -> ttx_fragment_provider { return value; }
+  constexpr auto get_abi() const -> ttx_fragment_provider { return api; }
 
   auto get_u8(Count position) const -> Perimortem::Utility::Result<U8, Status>;
 
@@ -72,7 +72,7 @@ class Provider {
       -> Perimortem::Utility::Result<Form::Schema::V512, Status>;
 
  private:
-  ttx_fragment_provider value;
+  ttx_fragment_provider api;
 };
 
 }  // namespace Ttx::Data::Protocol::Fragment
@@ -108,5 +108,5 @@ TTX_DATA_RECORD(
 
 TTX_DATA_RECORD(
     ttx_fragment_provider,
-    TTX_DATA_MEMBER(ttx_fragment_provider, source),
+    TTX_DATA_MEMBER(ttx_fragment_provider, context),
     TTX_DATA_MEMBER(ttx_fragment_provider, operations));

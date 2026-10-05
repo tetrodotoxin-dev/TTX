@@ -35,6 +35,7 @@ struct Element {
         attributes(attributes) {}
 
   constexpr auto operator==(const Element&) const -> bool = default;
+
   constexpr auto references() const -> Bool {
     return attributes & (Struct | Callable);
   }
@@ -44,6 +45,7 @@ struct Element {
   }
 
   constexpr auto is_pointer() const -> Bool { return attributes & Pointer; }
+
   constexpr auto get_value() const -> Form::Schema::Value {
     return is_pointer() ? Form::Schema::Value::Pointer
                         : Form::Schema::Value(type & 63);

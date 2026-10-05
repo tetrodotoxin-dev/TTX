@@ -5,7 +5,6 @@
 
 #include "perimortem/memory/dynamic/vector.hpp"
 
-#include "ttx/abi/receiver.hpp"
 #include "ttx/semantic/flows/swizzle.h"
 #include "ttx/semantic/transport/flow.hpp"
 
@@ -14,7 +13,8 @@ namespace Ttx::Semantic::Flows {
 // A swizzle selects observations from an established Flow. Repeated selections
 // share one observed value, even if a Fragment provider would generate a new
 // answer for another read. Mapping owns that correspondence so execution can
-// use it repeatedly without names, schema searches or temporary allocations.
+// use it repeatedly without names, representation searches or temporary
+// allocations.
 class Swizzle {
  public:
   // Preparation groups destinations by their selected source coordinate and
@@ -37,16 +37,14 @@ class Swizzle {
         const Data::Form::Representation& output,
         Resolver& resolver)
         -> Perimortem::Utility::Result<Mapping, Data::Status> {
-      return create(ttx_swizzle_selection(
-          &input, &output, &resolver,
-          [](void* source, Count position) -> Count {
-            return Abi::Receiver::get<Resolver>(source)(position);
-          }));
+      return create(
+          ttx_swizzle_selection(&input, &output, &resolver, select<Resolver>));
     }
 
     auto get_input() const -> const Data::Form::Representation& {
       return input;
     }
+
     auto get_output() const -> const Data::Form::Representation& {
       return output;
     }
@@ -57,6 +55,11 @@ class Swizzle {
     }
 
    private:
+    template <typename Resolver>
+    static auto select(void* context, Count position) -> Count {
+      return (*static_cast<Resolver*>(context))(position);
+    }
+
     Mapping(
         const Data::Form::Representation& input,
         const Data::Form::Representation& output,
@@ -75,7 +78,7 @@ class Swizzle {
   };
 
   // The result concerns the whole observation. On failure some destinations
-  // may have changed, but exposing progress would promise a partial projection.
+  // may have changed. The returned status establishes no valid output prefix.
   //
   // Mapping's output specifies the target form, including padding locations
   // whose byte values remain unspecified. Block needs explicit materialization

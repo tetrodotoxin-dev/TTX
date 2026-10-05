@@ -8,13 +8,13 @@
 
 // A Shared lifetime separates the borrowed payload from the provider state
 // used for release. The `data` pointer follows the agreed representation.
-// `release` receives the opaque `source` pointer, so the provider can retain
+// `release` receives the opaque `context` pointer, so the provider can retain
 // an allocation while lending a pointer to data within it.
 
 typedef struct ttx_shared_lifetime {
   const void* data;
-  void* source;
-  void (*release)(void* source);
+  void* context;
+  void (*release)(void* context);
 } ttx_shared_lifetime;
 
 // Clear the obligation before calling `release` so reentry cannot release

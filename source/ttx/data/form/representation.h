@@ -44,10 +44,13 @@ typedef struct ttx_representation_position {
         extent(extent ? extent : U32(ttx_schema::get_width(type))) {}
 
   constexpr auto get_value() const -> Value { return static_cast<Value>(type); }
+
   constexpr auto get_byte_order() const -> ByteOrder {
     return static_cast<ByteOrder>(byte_order);
   }
+
   constexpr auto get_extent() const -> Count;
+
   constexpr auto compatible(const ttx_representation_position& other) const
       -> Bool {
     return type == other.type && byte_order == other.byte_order &&
@@ -58,12 +61,14 @@ typedef struct ttx_representation_position {
 
 // Composition places complete admitted forms inside a new struct. Each child
 // retains its extent, padding and struct boundary. The source buffers need
-// survive only composition because the new publication contains its own copies.
+// survive only composition because the new canonical form contains its own
+// copies.
 typedef struct ttx_representation_member {
   const struct ttx_representation* representation;
   Count offset;
 #ifdef __cplusplus
   constexpr ttx_representation_member() : representation(nullptr), offset(0) {}
+
   constexpr ttx_representation_member(
       const ttx_representation& representation,
       Count offset)
@@ -71,8 +76,9 @@ typedef struct ttx_representation_member {
 #endif
 } ttx_representation_member;
 
-// A Representation borrows a canonical descriptor buffer. Compilation has
-// already established its geometry, normalization and reference invariants.
+// A canonical form is the compiled description of data and callable layout.
+// Representation borrows the buffer containing that form. Compilation has
+// established its geometry, normalization and reference invariants.
 // Its complete byte size is a multiple of eight, with zero padding after the
 // last descriptor when necessary. Readers can therefore load whole U64 chunks
 // relative to the buffer start without requiring padding at each block.
@@ -96,23 +102,31 @@ typedef struct ttx_representation {
 
   constexpr ttx_representation(const U8* data = nullptr, Count size = 0)
       : data(data), size(size) {}
+
   constexpr auto get_bytes() const -> Perimortem::Core::View::Bytes {
     return Perimortem::Core::View::Bytes(data, size);
   }
+
   constexpr auto get_blocks() const -> Perimortem::Core::View::Bytes {
     const Count prefix = (data[0] & 15) ? 0 : 8;
     return Perimortem::Core::View::Bytes(data + prefix, size - prefix);
   }
+
   constexpr auto get_pointer_size() const -> Count {
     return (data[0] & 15) ? 8 : 4;
   }
+
   // Admission already established a complete root after any pointer prefix.
   constexpr auto get_depth() const -> U8 {
     return get_blocks().get_data()[0] & 15;
   }
+
   constexpr auto get_extent() const -> Count;
+
   constexpr auto get_alignment() const -> Count;
+
   constexpr auto get_abi() const -> const ttx_representation& { return *this; }
+
   constexpr auto compatible(const ttx_representation& other) const -> Bool;
 
   static auto compile(
@@ -160,8 +174,8 @@ typedef struct ttx_representation {
 // succeeds, it requests one final allocation from the caller's allocator. The
 // caller retains that allocation, including the view and its encoded bytes.
 typedef struct ttx_representation_allocator {
-  void* source;
-  void* (*allocate)(void* source, Count bytes, Count alignment);
+  void* context;
+  void* (*allocate)(void* context, Count bytes, Count alignment);
 } ttx_representation_allocator;
 
 // Select pointer storage in bytes, independently of the compiler's host.
@@ -194,8 +208,8 @@ C_LINKAGE ttx_data_status ttx_representation_next(
 // next occurrence. No callback state or position pointer survives the call, so
 // consuming a record needs neither an allocated iterator nor repeated searches.
 typedef struct ttx_representation_visitor {
-  void* source;
-  ttx_data_status (*visit)(void* source, ttx_representation_position position);
+  void* context;
+  ttx_data_status (*visit)(void* context, ttx_representation_position position);
 } ttx_representation_visitor;
 
 C_LINKAGE ttx_data_status ttx_representation_visit(

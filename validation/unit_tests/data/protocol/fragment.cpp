@@ -2,8 +2,8 @@
 // Copyright (c) 2023-present Matt Kaes and contributors
 
 #include "validation/unit_tests/data/form/preparation.hpp"
+
 #include "toolchain/validation/unit_test.hpp"
-#include "ttx/abi/receiver.hpp"
 #include "ttx/data/protocol/fragment/provider.hpp"
 
 using namespace Perimortem::Core;
@@ -17,27 +17,44 @@ static constexpr auto u32 = Schema::primitive(Schema::Value::U32);
 
 struct Source {
   const Representation& representation;
+
+  static auto describe(void* context) -> const Representation* {
+    return &static_cast<Source*>(context)->representation;
+  }
+
+  static auto read_integer(void*, Count coordinate, U32* result)
+      -> ttx_data_status {
+    if (coordinate) {
+      return TTX_DATA_BOUNDS;
+    }
+
+    *result = 42;
+    return TTX_DATA_SUCCESS;
+  }
+
+  static auto read_wide(void*, Count offset, ttx_vector512* value)
+      -> ttx_data_status {
+    if (offset) {
+      return TTX_DATA_BOUNDS;
+    }
+
+    for (Count i = 0; i < 64; ++i) {
+      value->bytes[i] = U8(i);
+    }
+
+    return TTX_DATA_SUCCESS;
+  }
 };
 
 // The C getter fills its output during the call. Native users receive a typed
-// Result and need no reply receiver, pending state or provider buffer lifetime.
+// Result and need no callback, pending state or provider buffer lifetime.
 VALIDATION_TEST(TtxFragment, typed_fragment_read) {
   Validation::DataTests::Preparation prepare;
   const auto& representation = prepare(u32);
   Source source{representation};
   const Ttx::Data::Protocol::Fragment::Provider::Operations operations = {
-    .representation = [](void* state) -> const Representation* {
-      return &Ttx::Abi::Receiver::get<Source>(state).representation;
-    },
-    .get_u32 = [](void*, Count coordinate,
-                  U32* result) -> ttx_data_status {
-      if (coordinate) {
-        return TTX_DATA_BOUNDS;
-      }
-
-      *result = 42;
-      return TTX_DATA_SUCCESS;
-    },
+    .representation = Source::describe,
+    .get_u32 = Source::read_integer,
   };
 
   Ttx::Data::Protocol::Fragment::Provider access(&source, operations);
@@ -61,21 +78,8 @@ VALIDATION_TEST(TtxFragment, vector_observation) {
   EXPECT_EQ(representation.get_alignment(), Count(64));
   EXPECT_EQ(representation.get_depth(), U8(2));
   const Ttx::Data::Protocol::Fragment::Provider::Operations operations = {
-    .representation = [](void* state) -> const Representation* {
-      return &Ttx::Abi::Receiver::get<Source>(state).representation;
-    },
-    .get_v512 = [](void*, Count offset,
-                   ttx_vector512* value) -> ttx_data_status {
-      if (offset) {
-        return TTX_DATA_BOUNDS;
-      }
-
-      for (Count i = 0; i < 64; ++i) {
-        value->bytes[i] = U8(i);
-      }
-
-      return TTX_DATA_SUCCESS;
-    },
+    .representation = Source::describe,
+    .get_v512 = Source::read_wide,
   };
   Ttx::Data::Protocol::Fragment::Provider access(&source, operations);
   access.get_v512(0).visit(
@@ -90,25 +94,26 @@ VALIDATION_TEST(TtxFragment, vector_observation) {
       [&](Status status) { EXPECT(status == Status::Bounds); });
 }
 
+template <typename Vector>
+static auto read_vector(void*, Count, Vector* result) -> ttx_data_status {
+  for (Count i = 0; i < sizeof(*result); ++i) {
+    result->bytes[i] = U8(i + 1);
+  }
+
+  return TTX_DATA_SUCCESS;
+}
+
 // Each SIMD width has its own typed C getter. The shared fixture fills a
 // complete carrier without using SIMD instructions. The caller checks each
 // byte and the representation's width instead of inspecting provider state.
 VALIDATION_TEST(TtxFragment, vector_widths) {
   Validation::DataTests::Preparation prepare;
-  const auto read = [](void*, Count, auto* result) -> ttx_data_status {
-    for (Count i = 0; i < sizeof(*result); ++i) {
-      result->bytes[i] = U8(i + 1);
-    }
-    return TTX_DATA_SUCCESS;
-  };
   const Ttx::Data::Protocol::Fragment::Provider::Operations operations = {
-    .representation = [](void* state) -> const Representation* {
-      return &Ttx::Abi::Receiver::get<Source>(state).representation;
-    },
-    .get_v64 = read,
-    .get_v128 = read,
-    .get_v256 = read,
-    .get_v512 = read,
+    .representation = Source::describe,
+    .get_v64 = read_vector<ttx_vector64>,
+    .get_v128 = read_vector<ttx_vector128>,
+    .get_v256 = read_vector<ttx_vector256>,
+    .get_v512 = read_vector<ttx_vector512>,
   };
   const auto check = [&](Schema::Value type, auto observe) {
     const auto& representation = prepare(Schema::primitive(type));

@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "ttx/abi/operations.hpp"
 #include "ttx/concept/abstract.hpp"
 #include "ttx/concept/policies/borrowed.h"
 
@@ -16,7 +15,7 @@ namespace Ttx::Concept::Policies {
 //
 // Binding or copying a view of the answer shares the existing access and
 // release obligation. Borrow requests another acquired answer, with its own
-// release, even when the provider returns the same receiver again. The C++
+// release, even when the provider returns the same context again. The C++
 // view leaves release explicit. The consumer of each acquired answer calls
 // `release` once after using the retained answer.
 //
@@ -24,38 +23,34 @@ namespace Ttx::Concept::Policies {
 // Borrowed or a stronger contract that requires it. Returning that result only
 // as Abstract hides the release obligation and can leak the retained
 // resources.
-class Borrowed : public Abstract {
+class Borrowed {
  public:
   static constexpr auto contract_id =
       Perimortem::System::Uuid(TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW);
   using Api = ttx_borrowed;
   using Operations = ttx_borrowed_ops;
-  static auto accept(Api value) -> Bool {
-    return value.operations && value.operations->release &&
+
+  static auto accept(Api api) -> Bool {
+    return api.operations && api.operations->release &&
            Abstract::accept(
-               ttx_abstract(value.source, &value.operations->abstract));
+               ttx_abstract(api.context, &api.operations->abstract));
   }
-  explicit constexpr Borrowed(Api value)
-      : Abstract(value.source, value.operations->abstract) {}
-  constexpr auto get_abi() const -> Api {
-    const auto value = Abstract::get_abi();
-    return Api(
-        value.source, &Abi::Operations::from_abstract<Operations>(*value.operations));
+
+  explicit constexpr Borrowed(Api api) : api(api) {}
+
+  constexpr auto get_abi() const -> Api { return api; }
+
+  constexpr auto get_abstract() const -> Abstract {
+    return Abstract(api.context, api.operations->abstract);
   }
+
   auto release() const -> void {
-    const auto value = get_abi();
-    value.operations->release(value.source);
+    const auto api = get_abi();
+    api.operations->release(api.context);
   }
-  template <typename Provider>
-    requires(!__is_base_of(Abstract, Provider) && !__is_const(Provider))
-  static auto provide(Provider& provider) -> Borrowed {
-    static const Operations operations = Operations(
-        *Abstract::provide(provider).get_abi().operations,
-        [](void* source) {
-          Abi::Receiver::get<Provider>(source).release();
-        });
-    return Borrowed(Api(&provider, &operations));
-  }
+
+ private:
+  Api api;
 };
 
 }  // namespace Ttx::Concept::Policies
@@ -66,5 +61,5 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(ttx_borrowed_ops, release));
 TTX_DATA_RECORD(
     ttx_borrowed,
-    TTX_DATA_MEMBER(ttx_borrowed, source),
+    TTX_DATA_MEMBER(ttx_borrowed, context),
     TTX_DATA_MEMBER(ttx_borrowed, operations));

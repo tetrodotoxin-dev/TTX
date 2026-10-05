@@ -20,13 +20,13 @@
 // refuses it. The provider defines its artifacts and effects, including any
 // observations it reports through the supplied graph.
 typedef struct ttx_export {
-  void* source;
+  void* context;
   const struct ttx_export_ops* operations;
 } ttx_export;
 
 typedef struct ttx_export_ops {
   ttx_abstract_ops abstract;
-  ttx_binding_status (*expose)(void* source, ttx_abstract subject);
+  ttx_binding_status (*expose)(void* context, ttx_abstract abstract);
 } ttx_export_ops;
 
 C_LINKAGE const ttx_representation* ttx_export_representation(void);

@@ -21,24 +21,24 @@ class Provider {
            api.operations->commit;
   }
 
-  constexpr Provider(void* source, const Operations& operations)
-      : value(source, &operations) {}
+  constexpr Provider(void* context, const Operations& operations)
+      : api(context, &operations) {}
 
-  constexpr explicit Provider(ttx_block_provider value) : value(value) {}
+  constexpr explicit Provider(ttx_block_provider api) : api(api) {}
 
   auto get_representation() const -> const Form::Representation& {
-    return *value.operations->representation(value.source);
+    return *api.operations->representation(api.context);
   }
 
-  constexpr auto get_abi() const -> ttx_block_provider { return value; }
+  constexpr auto get_abi() const -> ttx_block_provider { return api; }
 
   auto commit(Form::Storage target) const -> Status {
     return static_cast<Status>(
-        value.operations->commit(value.source, target.get_abi()));
+        api.operations->commit(api.context, target.get_abi()));
   }
 
  private:
-  ttx_block_provider value;
+  ttx_block_provider api;
 };
 
 }  // namespace Ttx::Data::Protocol::Block
@@ -50,5 +50,5 @@ TTX_DATA_RECORD(
 
 TTX_DATA_RECORD(
     ttx_block_provider,
-    TTX_DATA_MEMBER(ttx_block_provider, source),
+    TTX_DATA_MEMBER(ttx_block_provider, context),
     TTX_DATA_MEMBER(ttx_block_provider, operations));

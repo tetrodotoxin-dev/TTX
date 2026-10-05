@@ -30,8 +30,8 @@ auto Library::open(Core::View::Bytes path, Memory::Allocator::Arena& errors)
           [](Core::View::Bytes error) -> Result { return error; });
 }
 
-auto Library::visit(Query host, Receiver receive) const -> Binding::Status {
-  const auto status = entry(host, receive.get_abi());
+auto Library::visit(Query host, Callback callback) const -> Binding::Status {
+  const auto status = entry(host, callback.get_abi());
   return status == TTX_BINDING_SATISFIED || status == TTX_BINDING_UNKNOWN
              ? static_cast<Binding::Status>(status)
              : Binding::Status::Rejected;

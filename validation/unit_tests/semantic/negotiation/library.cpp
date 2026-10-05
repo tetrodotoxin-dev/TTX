@@ -1,8 +1,7 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/abi/receiver.hpp"
-#include "validation/unit_tests/library.hpp"
+#include "validation/support/library.hpp"
 
 #include "perimortem/core/null_terminated.hpp"
 
@@ -22,17 +21,21 @@ VALIDATION_TEST(NativeEntry, scoped_negotiation) {
           library, Core::NullTerminated::to_view(
                        TTX_LIBRARY_ENTRY, sizeof(TTX_LIBRARY_ENTRY) - 1)));
   ttx_binding_status admission = TTX_BINDING_UNKNOWN;
-  const ttx_semantic_query host = ttx_semantic_query(
-      &admission,
-      [](void*, perimortem_uuid, ttx_storage) -> ttx_binding_status {
-        return TTX_BINDING_UNKNOWN;
-      },
-      [](void* source, perimortem_uuid) {
-        return Ttx::Abi::Receiver::get<ttx_binding_status>(source);
-      });
-  Count received = 0;
-  auto receive = [&](Query query) {
-    ++received;
+  struct Admission {
+    static auto bind(void*, perimortem_uuid, ttx_storage)
+        -> ttx_binding_status {
+      return TTX_BINDING_UNKNOWN;
+    }
+
+    static auto supports(void* context, perimortem_uuid) -> ttx_binding_status {
+      return *static_cast<ttx_binding_status*>(context);
+    }
+  };
+  const ttx_semantic_query host = {
+    &admission, Admission::bind, Admission::supports};
+  Count calls = 0;
+  auto function = [&](Query query) {
+    ++calls;
     query.bind<Ttx::Concept::Abstract>().visit(
         [&](Ttx::Concept::Abstract subject) {
           EXPECT(subject.get_data() == "subject"_view);
@@ -40,12 +43,12 @@ VALIDATION_TEST(NativeEntry, scoped_negotiation) {
         [&](Binding::Failure) { EXPECT(False); });
     return Binding::Status::Rejected;
   };
-  const Receiver receiver(receive);
-  EXPECT_EQ(entry(host, receiver.get_abi()), TTX_BINDING_UNKNOWN);
+  const Callback callback(function);
+  EXPECT_EQ(entry(host, callback.get_abi()), TTX_BINDING_UNKNOWN);
   admission = TTX_BINDING_REJECTED;
-  EXPECT_EQ(entry(host, receiver.get_abi()), TTX_BINDING_REJECTED);
-  EXPECT_EQ(received, Count(0));
+  EXPECT_EQ(entry(host, callback.get_abi()), TTX_BINDING_REJECTED);
+  EXPECT_EQ(calls, Count(0));
   admission = TTX_BINDING_SATISFIED;
-  EXPECT_EQ(entry(host, receiver.get_abi()), TTX_BINDING_REJECTED);
-  EXPECT_EQ(received, Count(1));
+  EXPECT_EQ(entry(host, callback.get_abi()), TTX_BINDING_REJECTED);
+  EXPECT_EQ(calls, Count(1));
 }

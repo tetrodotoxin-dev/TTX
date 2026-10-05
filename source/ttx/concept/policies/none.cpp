@@ -9,29 +9,54 @@ using namespace Ttx::Concept;
 using namespace Ttx::Semantic::Negotiation;
 using namespace Perimortem;
 
+namespace {
+
+// This shared answer has its own context. Its stability does not establish a
+// Constant promise for the question that selected it.
 class NoneProvider {
  public:
-  auto get_data() const -> Core::View::Bytes { return "None"_view; }
-  auto supports(System::Uuid id) const -> Binding::Status {
-    return id == Policies::None::contract_id ? Binding::Status::Satisfied
-                                             : Binding::Status::Unknown;
+  static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
+    const System::Uuid contract(id);
+    return contract == Abstract::contract_id ||
+                   contract == Policies::None::contract_id
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_UNKNOWN;
   }
-  auto bind_interface(System::Uuid id, Ttx::Data::Form::Storage target)
-      -> Binding::Status {
-    if (id == Policies::None::contract_id) {
-      return Binding::provide<Policies::None>(
-          Abstract::provide(*this).get_abi(), target);
+
+  static auto bind(void* context, perimortem_uuid id, ttx_storage target)
+      -> ttx_binding_status {
+    if (supports(context, id) != TTX_BINDING_SATISFIED) {
+      return TTX_BINDING_UNKNOWN;
     }
-    return Binding::Status::Unknown;
+
+    return static_cast<ttx_binding_status>(Binding::provide<Abstract>(
+        resolve(context), Ttx::Data::Form::Storage(target)));
   }
-  auto resolve_concept(Core::View::Bytes) const -> Abstract {
-    return Policies::None::get_none();
+
+  static auto data(void*) -> perimortem_view_bytes {
+    const auto bytes = "None"_view;
+    return perimortem_view_bytes(bytes.get_data(), bytes.get_size());
   }
+
+  static auto resolve(void* context) -> ttx_abstract {
+    return ttx_abstract(context, &operations);
+  }
+
+  static auto route(void* context, perimortem_view_bytes) -> ttx_abstract {
+    return resolve(context);
+  }
+
+  static void visit(void*, ttx_concept_visitor) {}
+
+  static constexpr ttx_abstract_ops operations = {supports, bind,  data,
+                                                  resolve,  route, visit};
 };
 
+}  // namespace
+
 auto Policies::None::get_none() -> None {
-  static NoneProvider subject;
-  return None(Abstract::provide(subject).get_abi());
+  static NoneProvider provider;
+  return None(NoneProvider::resolve(&provider));
 }
 
 C_LINKAGE ttx_abstract ttx_none(void) {

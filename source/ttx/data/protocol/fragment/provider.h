@@ -17,30 +17,30 @@
 // promising that a foreign pointer can be used as a native address.
 
 typedef struct ttx_fragment_provider_operations {
-  const ttx_representation* (*representation)(void* source);
-  ttx_data_status (*get_u8)(void* source, Count position, U8* result);
-  ttx_data_status (*get_u16)(void* source, Count position, U16* result);
-  ttx_data_status (*get_u32)(void* source, Count position, U32* result);
-  ttx_data_status (*get_u64)(void* source, Count position, U64* result);
-  ttx_data_status (*get_s8)(void* source, Count position, S8* result);
-  ttx_data_status (*get_s16)(void* source, Count position, S16* result);
-  ttx_data_status (*get_s32)(void* source, Count position, S32* result);
-  ttx_data_status (*get_s64)(void* source, Count position, S64* result);
-  ttx_data_status (*get_r32)(void* source, Count position, R32* result);
-  ttx_data_status (*get_r64)(void* source, Count position, R64* result);
-  ttx_data_status (*get_pointer)(void* source, Count position, void** result);
+  const ttx_representation* (*representation)(void* context);
+  ttx_data_status (*get_u8)(void* context, Count position, U8* result);
+  ttx_data_status (*get_u16)(void* context, Count position, U16* result);
+  ttx_data_status (*get_u32)(void* context, Count position, U32* result);
+  ttx_data_status (*get_u64)(void* context, Count position, U64* result);
+  ttx_data_status (*get_s8)(void* context, Count position, S8* result);
+  ttx_data_status (*get_s16)(void* context, Count position, S16* result);
+  ttx_data_status (*get_s32)(void* context, Count position, S32* result);
+  ttx_data_status (*get_s64)(void* context, Count position, S64* result);
+  ttx_data_status (*get_r32)(void* context, Count position, R32* result);
+  ttx_data_status (*get_r64)(void* context, Count position, R64* result);
+  ttx_data_status (*get_pointer)(void* context, Count position, void** result);
   ttx_data_status (
-      *get_v64)(void* source, Count position, ttx_vector64* result);
+      *get_v64)(void* context, Count position, ttx_vector64* result);
   ttx_data_status (
-      *get_v128)(void* source, Count position, ttx_vector128* result);
+      *get_v128)(void* context, Count position, ttx_vector128* result);
   ttx_data_status (
-      *get_v256)(void* source, Count position, ttx_vector256* result);
+      *get_v256)(void* context, Count position, ttx_vector256* result);
   ttx_data_status (
-      *get_v512)(void* source, Count position, ttx_vector512* result);
+      *get_v512)(void* context, Count position, ttx_vector512* result);
 } ttx_fragment_provider_operations;
 
 typedef struct ttx_fragment_provider {
-  void* source;
+  void* context;
   const ttx_fragment_provider_operations* operations;
 } ttx_fragment_provider;
 

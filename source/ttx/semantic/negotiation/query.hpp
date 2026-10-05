@@ -17,16 +17,16 @@ namespace Ttx::Semantic::Negotiation {
 //
 // Since negotiating semantic contracts _requires_ negotiation of semantic
 // contracts there is a level of bootstrapping that is required to get the first
-// source interface. A loaded module can return it from an agreed entry point,
-// while a native provider can lend its `bind` thunk directly. That initial
+// Query interface. A loaded module can return it from an agreed entry point,
+// while a native provider can lend its `bind` function directly. That initial
 // agreement makes UUID and representation negotiation possible without
-// requiring either participant to construct an Abstract graph. The `bind` thunk
-// is directly accessible under that prearranged lifetime, which gives later
-// contracts a starting point for negotiating their own Data access.
+// requiring either participant to construct an Abstract graph. The `bind`
+// function is directly accessible under that prearranged lifetime, which gives
+// later contracts a starting point for negotiating their own Data access.
 //
 // Once acquired, Query separates a semantic promise from its usable interface.
-// `supports` asks whether the subject accepts a UUID without requesting data or
-// inspecting an API Representation. `bind` also establishes the complete API
+// `supports` asks whether the provider accepts a UUID without requesting data
+// or inspecting an API Representation. `bind` also establishes the complete API
 // format and supplies the operations. This lets a consumer reason about a
 // property even when it cannot consume any of that provider's API formats.
 // Success from `supports` never grants permission to invoke an interface.
@@ -43,12 +43,12 @@ class Query {
  public:
   constexpr Query() = default;
 
-  constexpr explicit Query(ttx_semantic_query value) : value(value) {}
+  constexpr explicit Query(ttx_semantic_query api) : api(api) {}
 
-  constexpr operator ttx_semantic_query() const { return value; }
+  constexpr operator ttx_semantic_query() const { return api; }
 
   constexpr auto is_set() const -> Bool {
-    return value.bind != nullptr && value.supports != nullptr;
+    return api.bind != nullptr && api.supports != nullptr;
   }
 
   auto supports(Perimortem::System::Uuid contract) const -> Binding::Status;
@@ -68,7 +68,8 @@ class Query {
 
   // A Data API describes the requested callable record independently of the
   // semantic promise identified by its UUID. Keeping both inputs explicit
-  // lets that API perform admission without inheriting a semantic facade.
+  // lets that API perform admission while preserving the requested semantic
+  // contract.
   template <typename Interface>
   auto bind(Perimortem::System::Uuid contract) const
       -> Perimortem::Utility::Result<Interface, Binding::Failure> {
@@ -107,7 +108,7 @@ class Query {
   }
 
  private:
-  ttx_semantic_query value = ttx_semantic_query();
+  ttx_semantic_query api = ttx_semantic_query();
 };
 
 }  // namespace Ttx::Semantic::Negotiation
@@ -118,6 +119,6 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(perimortem_uuid, low));
 TTX_DATA_RECORD(
     ttx_semantic_query,
-    TTX_DATA_MEMBER(ttx_semantic_query, source),
+    TTX_DATA_MEMBER(ttx_semantic_query, context),
     TTX_DATA_MEMBER(ttx_semantic_query, bind),
     TTX_DATA_MEMBER(ttx_semantic_query, supports));

@@ -13,18 +13,18 @@
 // establish which payloads invoke can consume and produce.
 //
 // The record may be populated through Block without a persistent backing
-// table. Receiver, frame descriptions and executable code borrow the enclosing
-// publication. Copying the record acquires no additional ownership. An
-// operation requiring independent release exposes that obligation in its own
-// contract. Inputs and outputs are borrowed until the synchronous call returns,
-// after which only success provides usable output. A policy offering
-// asynchronous execution must establish its own lifetime for the operation's
-// data.
+// table. Context, frame descriptions and executable code remain borrowed for
+// the lifetime supplied by the provider. Copying the record acquires no
+// additional ownership. An operation requiring independent release exposes that
+// obligation in its own contract. Inputs and outputs are borrowed until the
+// synchronous call returns, after which only success provides usable output. A
+// policy offering asynchronous execution must establish its own lifetime for
+// the operation's data.
 typedef struct ttx_invocation {
-  void* receiver;
+  void* context;
   const ttx_representation* inputs;
   const ttx_representation* outputs;
-  ttx_data_status (*invoke)(void* receiver, const void* inputs, void* outputs);
+  ttx_data_status (*invoke)(void* context, const void* inputs, void* outputs);
 } ttx_invocation;
 
 C_LINKAGE const ttx_representation* ttx_invocation_representation(void);

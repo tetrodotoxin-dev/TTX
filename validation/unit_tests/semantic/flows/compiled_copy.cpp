@@ -1,16 +1,17 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "validation/support/measurement.hpp"
+#include "validation/unit_tests/semantic/fixtures.hpp"
+
 #include "perimortem/core/static/vector.hpp"
 
-#include "validation/unit_tests/semantic/fixtures.hpp"
-#include "validation/unit_tests/semantic/measurement.hpp"
 #include "ttx/data/form/compiled.hpp"
 
 using namespace Validation::FlowTests;
 using Ttx::Data::Form::Compiled;
 
-// The reader publishes metadata prepared during C++ translation. The loaded
+// The consumer publishes metadata prepared during C++ translation. The loaded
 // C provider prepared its own metadata at module opening. Their agreement
 // therefore crosses both a language boundary and a preparation strategy.
 VALIDATION_TEST(TtxFlow, static_form_flow) {
@@ -19,7 +20,7 @@ VALIDATION_TEST(TtxFlow, static_form_flow) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {
+  Module::State provider = {
     .provides = PROVIDES_DIRECT,
     .values =
         {
@@ -35,7 +36,7 @@ VALIDATION_TEST(TtxFlow, static_form_flow) {
 
   Measurement measurement;
   const auto agreement =
-      flow.connect(Flow::consumer(representation), module.writer(writer));
+      flow.connect(Flow::consumer(representation), module.provider(provider));
   ASSERT(agreement == Flow::Status::Success);
   const auto status = Copy::flow(flow, target);
   measurement.stop();

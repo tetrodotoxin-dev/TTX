@@ -25,7 +25,7 @@ auto Swizzle::Mapping::create(ttx_swizzle_selection selection)
   }
 
   // Output traversal discovers groups in first selection order. Temporary
-  // vectors collect repeated destinations before publication packs them into
+  // vectors collect repeated destinations before constructing the mapping in
   // one position array. The lookup table exists only during this preparation.
   struct Selection {
     Representation::Position input;
@@ -42,7 +42,7 @@ auto Swizzle::Mapping::create(ttx_swizzle_selection selection)
   const auto collected =
       selection.output->visit([&](Representation::Position output) {
         const Count coordinate =
-            selection.position(selection.source, output.offset);
+            selection.position(selection.context, output.offset);
         const Count index =
             indices.find(coordinate)
                 .visit(

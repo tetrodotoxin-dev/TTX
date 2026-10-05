@@ -7,8 +7,9 @@
 
 namespace Validation {
 
-// Fixtures are built beside the runner. Keep the Library alive
-// through every borrowed thunk, and report fixture failures at their source.
+// Provider libraries live in validation/providers relative to the runner.
+// Keep each Library alive through every borrowed operation and report fixture
+// failures at their source.
 auto open_library(Perimortem::Core::View::Bytes name)
     -> Perimortem::System::Library;
 auto find_symbol(

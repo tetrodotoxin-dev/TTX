@@ -12,11 +12,13 @@ ttx_binding_status conversion_expose(
   if (output->status != TTX_BINDING_SATISFIED) {
     return output->status;
   }
+
   const perimortem_view_bytes value =
-      subject.operations->get_data(subject.source);
+      subject.operations->get_data(subject.context);
   if (value.size != 1) {
     return TTX_BINDING_REJECTED;
   }
+
   output->value = value.data[0];
   ++output->artifacts;
 
@@ -24,18 +26,20 @@ ttx_binding_status conversion_expose(
   if (output->report_route) {
     const U8 route[] = {'r', 'e', 'p', 'o', 'r', 't'};
     service = subject.operations->resolve_concept(
-        subject.source, (perimortem_view_bytes){route, sizeof(route)});
+        subject.context, (perimortem_view_bytes){route, sizeof(route)});
   }
+
   ttx_export report = {0};
   const ttx_storage destination = {
     ttx_export_representation(), (U8*)&report, sizeof(report)};
   const perimortem_uuid id = {TTX_EXPORT_ID_HIGH, TTX_EXPORT_ID_LOW};
-  if (service.operations->bind(service.source, id, destination) ==
+  if (service.operations->bind(service.context, id, destination) ==
       TTX_BINDING_SATISFIED) {
     // The reporting service is optional. Its refusal does not discard the
     // artifact already produced by this terminal.
-    report.operations->expose(report.source, subject);
+    report.operations->expose(report.context, subject);
   }
+
   return TTX_BINDING_SATISFIED;
 }
 
@@ -44,10 +48,10 @@ typedef struct conversion_visit {
   ttx_binding_status status;
 } conversion_visit;
 
-static void receive(void* receiver, ttx_abstract subject) {
-  conversion_visit* visit = receiver;
+static void callback(void* context, ttx_abstract subject) {
+  conversion_visit* visit = context;
   visit->status =
-      visit->exporter.operations->expose(visit->exporter.source, subject);
+      visit->exporter.operations->expose(visit->exporter.context, subject);
 }
 
 ttx_binding_status conversion_run(
@@ -57,6 +61,6 @@ ttx_binding_status conversion_run(
     ttx_export exporter) {
   conversion_visit visit = {exporter, TTX_BINDING_UNKNOWN};
   const ttx_binding_status status = importer.operations->visit(
-      importer.source, input, representation, &visit, receive);
+      importer.context, input, representation, &visit, callback);
   return status == TTX_BINDING_SATISFIED ? visit.status : status;
 }

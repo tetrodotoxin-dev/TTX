@@ -14,13 +14,24 @@ namespace Ttx::Concept::Policies {
 // used to assume the resolution would never produce a valid answer.
 //
 // For explicit rejection None should be used instead.
-class Unknown : public Abstract {
+class Unknown {
  public:
   static constexpr auto contract_id =
       Perimortem::System::Uuid(TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW);
   using Api = ttx_abstract;
-  using Abstract::Abstract;
+
+  explicit constexpr Unknown(Api api) : api(api) {}
+
+  static auto accept(Api api) -> Bool { return Abstract::accept(api); }
+
+  constexpr auto get_abi() const -> Api { return api; }
+
+  constexpr auto get_abstract() const -> Abstract { return Abstract(api); }
+
   static auto get_unknown() -> Unknown;
+
+ private:
+  Api api;
 };
 
 }  // namespace Ttx::Concept::Policies

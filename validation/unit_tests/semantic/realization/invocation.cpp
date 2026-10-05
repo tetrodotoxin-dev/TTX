@@ -1,19 +1,19 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/abi/receiver.hpp"
 #include "ttx/semantic/realization/invocation.hpp"
+
+#include "validation/support/library.hpp"
+#include "validation/support/measurement.hpp"
 
 #include "perimortem/core/static/vector.hpp"
 #include "perimortem/core/null_terminated.hpp"
 
-#include "validation/unit_tests/library.hpp"
-#include "validation/unit_tests/semantic/fixtures/invocation_provider.h"
-#include "validation/unit_tests/semantic/measurement.hpp"
 #include "toolchain/validation/unit_test.hpp"
 #include "ttx/data/form/compiled.hpp"
 #include "ttx/semantic/flows/copy.hpp"
 #include "ttx/semantic/transport/flow.hpp"
+#include "validation/providers/invocation/provider.h"
 
 using namespace Perimortem;
 using namespace Ttx::Semantic::Negotiation;
@@ -54,42 +54,46 @@ class ForeignInvocation {
   static auto input_form() -> const Ttx::Data::Form::Representation& {
     return Ttx::Data::Form::Compiled<inputs>::get_representation();
   }
+
   static auto output_form() -> const Ttx::Data::Form::Representation& {
     return Ttx::Data::Form::Compiled<real>::get_representation();
   }
-  auto query() -> Query {
-    return Query(ttx_semantic_query(
-        this,
-        [](void* source, perimortem_uuid id,
-           ttx_storage requested) -> ttx_binding_status {
-          const auto& self = Ttx::Abi::Receiver::get<ForeignInvocation>(source);
-          if (System::Uuid(id) != operation) {
-            return TTX_BINDING_UNKNOWN;
-          }
 
-          // This provider policy composes ordinary Flow and Copy. The C module
-          // chooses its transport. Binding transfers an ordinary API record.
-          // The copied receiver belongs to the module, so releasing a Shared
-          // acquisition of the API record does not invalidate that receiver.
-          Flow flow;
-          const auto status = flow.connect(
-              Flow::consumer(*requested.representation), Query(self.api.query));
-          if (status == Flow::Status::Unknown) {
-            return TTX_BINDING_UNKNOWN;
-          }
-          if (status != Flow::Status::Success) {
-            return TTX_BINDING_REJECTED;
-          }
-          const auto copied = Ttx::Semantic::Flows::Copy::flow(
-              flow, Ttx::Data::Form::Storage(requested));
-          return copied == Ttx::Data::Status::Success ? TTX_BINDING_SATISFIED
-                                                      : TTX_BINDING_REJECTED;
-        },
-        [](void*, perimortem_uuid id) -> ttx_binding_status {
-          return System::Uuid(id) == operation ? TTX_BINDING_SATISFIED
-                                               : TTX_BINDING_UNKNOWN;
-        }));
+  static auto bind(void* context, perimortem_uuid id, ttx_storage requested)
+      -> ttx_binding_status {
+    const auto& self = *static_cast<ForeignInvocation*>(context);
+    if (System::Uuid(id) != operation) {
+      return TTX_BINDING_UNKNOWN;
+    }
+
+    // This provider policy composes ordinary Flow and Copy. The C
+    // module chooses its transport. Binding transfers an ordinary API
+    // record. The copied context belongs to the module, so releasing
+    // a Shared acquisition of the API record does not invalidate that
+    // context.
+    Flow flow;
+    const auto status = flow.connect(
+        Flow::consumer(*requested.representation), Query(self.api.query));
+    if (status == Flow::Status::Unknown) {
+      return TTX_BINDING_UNKNOWN;
+    }
+
+    if (status != Flow::Status::Success) {
+      return TTX_BINDING_REJECTED;
+    }
+
+    const auto copied = Ttx::Semantic::Flows::Copy::flow(
+        flow, Ttx::Data::Form::Storage(requested));
+    return copied == Ttx::Data::Status::Success ? TTX_BINDING_SATISFIED
+                                                : TTX_BINDING_REJECTED;
   }
+
+  static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
+    return System::Uuid(id) == operation ? TTX_BINDING_SATISFIED
+                                         : TTX_BINDING_UNKNOWN;
+  }
+
+  auto query() -> Query { return Query({this, bind, supports}); }
 
   auto connect(Invocation& call) -> Binding::Status {
     return call.connect(query(), operation, input_form(), output_form());
@@ -111,14 +115,15 @@ VALIDATION_TEST(InvocationTests, foreign_transports) {
     const auto established = foreign.api.statistics();
 
     // Preparation and Data transfer are deliberately outside measurement.
-    // A private C receiver adds two before scaling. The independent arithmetic
-    // answer catches lost fields, wrong offsets and incorrect receiver use.
+    // The C operation adds two before scaling. The independent arithmetic
+    // answer catches lost fields, wrong offsets and incorrect context use.
     const invocation_input arguments = invocation_input(5, 1.5, 1);
     R64 answer = 0;
     Validation::FlowTests::Measurement measurement;
     for (Count i = 0; i != 2; ++i) {
       ASSERT(call.invoke(&arguments, &answer) == Ttx::Data::Status::Success);
     }
+
     measurement.stop();
     EXPECT_EQ(answer, R64(-10.5));
     EXPECT_EQ(measurement.get_allocations(), Count(0));

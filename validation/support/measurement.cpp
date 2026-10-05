@@ -1,7 +1,7 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "validation/unit_tests/semantic/measurement.hpp"
+#include "validation/support/measurement.hpp"
 
 #include <new>
 #include <stddef.h>
@@ -16,20 +16,24 @@ Measurement::Measurement()
     : previous(active), checkouts(Bibliotheca::check_out_requests()) {
   active = this;
 }
+
 Measurement::~Measurement() {
   stop();
 }
+
 auto Measurement::stop() -> void {
   if (active == this) {
     allocations += Bibliotheca::check_out_requests() - checkouts;
     active = previous;
   }
 }
+
 auto Measurement::allocation() -> void {
   for (auto* interval = active; interval; interval = interval->previous) {
     ++interval->allocations;
   }
 }
+
 auto Measurement::copy() -> void {
   for (auto* interval = active; interval; interval = interval->previous) {
     ++interval->copies;
@@ -64,6 +68,7 @@ void* __wrap_memmove(void* destination, const void* source, size_t size) {
   Measurement::copy();
   return __real_memmove(destination, source, size);
 }
+
 #if __has_feature(address_sanitizer)
 // ASan rewrites memory intrinsics before ordinary wrapping. Observe that entry
 // too so a sanitizer run checks the same copy count instead of skipping it.
@@ -85,18 +90,22 @@ void* __wrap_malloc(size_t size) {
   Measurement::allocation();
   return __real_malloc(size);
 }
+
 void* __wrap_calloc(size_t count, size_t size) {
   Measurement::allocation();
   return __real_calloc(count, size);
 }
+
 void* __wrap_realloc(void* pointer, size_t size) {
   Measurement::allocation();
   return __real_realloc(pointer, size);
 }
+
 void* __wrap_aligned_alloc(size_t alignment, size_t size) {
   Measurement::allocation();
   return __real_aligned_alloc(alignment, size);
 }
+
 int __wrap_posix_memalign(void** pointer, size_t alignment, size_t size) {
   Measurement::allocation();
   return __real_posix_memalign(pointer, alignment, size);
@@ -107,16 +116,19 @@ void* __wrap__Znwm(size_t size) {
   Measurement::allocation();
   return __real__Znwm(size);
 }
+
 void* __real__Znam(size_t);
 void* __wrap__Znam(size_t size) {
   Measurement::allocation();
   return __real__Znam(size);
 }
+
 void* __real__ZnwmSt11align_val_t(size_t, std::align_val_t);
 void* __wrap__ZnwmSt11align_val_t(size_t size, std::align_val_t alignment) {
   Measurement::allocation();
   return __real__ZnwmSt11align_val_t(size, alignment);
 }
+
 void* __real__ZnamSt11align_val_t(size_t, std::align_val_t);
 void* __wrap__ZnamSt11align_val_t(size_t size, std::align_val_t alignment) {
   Measurement::allocation();

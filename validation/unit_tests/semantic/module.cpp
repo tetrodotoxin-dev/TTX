@@ -1,10 +1,11 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "validation/unit_tests/semantic/fixtures.hpp"
+
 #include "perimortem/core/diagnostics/log.hpp"
 #include "perimortem/core/null_terminated.hpp"
 
-#include "validation/unit_tests/semantic/fixtures.hpp"
 using namespace Validation::FlowTests;
 
 Module::Module(
@@ -23,13 +24,14 @@ Module::Module(
   }
 }
 
-auto Module::writer(State& state) const -> Query {
-  return Query(api->writer(&state));
+auto Module::provider(State& state) const -> Query {
+  return Query(api->provider(&state));
 }
 
-auto Module::bootstrap_writer() const -> Query {
-  return Query(api->bootstrap_writer());
+auto Module::bootstrap_provider() const -> Query {
+  return Query(api->bootstrap_provider());
 }
+
 // This is the explicit Direct/Shared cast permission, not a cast of opaque
 // binding source state. The host checked the C Query schema before this call.
 auto Module::import_query(const Flow& flow) const -> Query {
@@ -45,6 +47,7 @@ auto Module::import_query(const Flow& flow) const -> Query {
         Diagnostics::Log::fatal("Bootstrap requires a castable protocol."_view);
       });
 }
+
 auto Module::selection() const -> Swizzle::Mapping {
   return Swizzle::Mapping::create(*api->selection())
       .visit(
@@ -53,6 +56,7 @@ auto Module::selection() const -> Swizzle::Mapping {
             Diagnostics::Log::fatal("Invalid C selection policy."_view);
           });
 }
+
 auto Module::select(const Flow& flow, Storage target) const -> Status {
   const provider_operations operations = provider_operations(ttx_swizzle);
   const auto result =
@@ -60,13 +64,14 @@ auto Module::select(const Flow& flow, Storage target) const -> Status {
   return static_cast<Status>(result);
 }
 
-auto Module::writer(Heterogeneous& state) const -> Query {
-  return Query(heterogeneous->writer(&state));
+auto Module::provider(Heterogeneous& state) const -> Query {
+  return Query(heterogeneous->provider(&state));
 }
 
 auto Module::primitives() const -> Query {
   return Query(api->primitives());
 }
-auto Module::primitive_schema() const -> const Representation& {
-  return *api->primitive_schema();
+
+auto Module::primitive_representation() const -> const Representation& {
+  return *api->primitive_representation();
 }

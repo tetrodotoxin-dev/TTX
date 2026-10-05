@@ -15,20 +15,20 @@
 //
 // Binding or copying a view of the answer shares the existing access and
 // release obligation. Borrow requests another acquired answer, with its own
-// release, even when the provider returns the same receiver again.
+// release, even when the provider returns the same context again.
 //
 // Operations that require the caller to release their result must return
 // Borrowed or a stronger contract that requires it. Returning that result only
 // as Abstract hides the release obligation and can leak the retained
 // resources.
 typedef struct ttx_borrowed {
-  void* source;
+  void* context;
   const struct ttx_borrowed_ops* operations;
 } ttx_borrowed;
 
 typedef struct ttx_borrowed_ops {
   ttx_abstract_ops abstract;
-  void (*release)(void* source);
+  void (*release)(void* context);
 } ttx_borrowed_ops;
 
 C_LINKAGE const ttx_representation* ttx_borrowed_representation(void);

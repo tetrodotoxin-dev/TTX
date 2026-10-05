@@ -1,8 +1,8 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "validation/support/measurement.hpp"
 #include "validation/unit_tests/semantic/fixtures.hpp"
-#include "validation/unit_tests/semantic/measurement.hpp"
 
 #include "perimortem/core/static/vector.hpp"
 #include "perimortem/core/diagnostics/log.hpp"
@@ -14,7 +14,7 @@ using namespace Validation::FlowTests;
 
 // C supplies a position policy, not a result buffer. The same admitted policy
 // reads four values in the Flow's schema and fills two target values. Direct
-// reads public bytes, while Fragment asks the C writer for two typed values.
+// reads public bytes, while Fragment asks the C provider for two typed values.
 VALIDATION_TEST(TtxFlow, swizzle_protocols) {
   Preparation prepare;
   const auto& four = prepare(four_schema);
@@ -32,7 +32,7 @@ VALIDATION_TEST(TtxFlow, swizzle_protocols) {
     },
   };
   for (U8 protocol : protocols.get_view()) {
-    Module::State writer = {
+    Module::State provider = {
       .provides = protocol,
       .values =
           {
@@ -42,11 +42,12 @@ VALIDATION_TEST(TtxFlow, swizzle_protocols) {
             40,
           },
     };
-    Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
+    Validation::FlowTests::Consumer consumer =
+        Validation::FlowTests::Consumer(four);
 
     Flow flow;
     ASSERT(
-        flow.connect(reader.query(), module.writer(writer)) ==
+        flow.connect(consumer.query(), module.provider(provider)) ==
         Flow::Status::Success);
 
     Static::Vector<U32, 2> a, b;
@@ -59,7 +60,7 @@ VALIDATION_TEST(TtxFlow, swizzle_protocols) {
     EXPECT_EQ(b[1], U32(10));
 
     EXPECT_EQ(
-        writer.reads, protocol == PROVIDES_FRAGMENT ? Count(4) : Count(0));
+        provider.reads, protocol == PROVIDES_FRAGMENT ? Count(4) : Count(0));
   }
 }
 
@@ -71,21 +72,18 @@ VALIDATION_TEST(TtxFlow, mapping_admission) {
   const auto& four = prepare(four_schema);
 
   const auto pair = prepare(Schema::range(integer, 2, 4, 8, 4));
-  const auto repeated = [](void*, Count) -> Count { return 0; };
-  Swizzle::Mapping::create(
-      ttx_swizzle_selection(&four, &pair, nullptr, repeated))
+  auto repeated = [](Count) -> Count { return 0; };
+  Swizzle::Mapping::create(four, pair, repeated)
       .visit([&](auto&) {}, [&](Status) { EXPECT(false); });
 
-  Swizzle::Mapping::create(
-      ttx_swizzle_selection(
-          &four, &pair, nullptr, [](void*, Count) -> Count { return 16; }))
+  auto missing = [](Count) -> Count { return 16; };
+  Swizzle::Mapping::create(four, pair, missing)
       .visit(
           [&](auto&) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Bounds); });
 
   const auto wrong = prepare(Schema::range(real, 2, 4, 8, 4));
-  Swizzle::Mapping::create(
-      ttx_swizzle_selection(&four, &wrong, nullptr, repeated))
+  Swizzle::Mapping::create(four, wrong, repeated)
       .visit(
           [&](auto&) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Incompatible); });
@@ -93,7 +91,7 @@ VALIDATION_TEST(TtxFlow, mapping_admission) {
 
 // The mapping can be reused with another target Storage, but not with a target
 // whose schema differs from its declared output. Failure happens before the
-// first Fragment observation, preserving both the writer and the destination.
+// first Fragment observation, preserving both the provider and the destination.
 VALIDATION_TEST(TtxFlow, swizzle_wrong_target) {
   Preparation prepare;
   const auto& four = prepare(four_schema);
@@ -101,7 +99,7 @@ VALIDATION_TEST(TtxFlow, swizzle_wrong_target) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {
+  Module::State provider = {
     .provides = PROVIDES_FRAGMENT,
     .values =
         {
@@ -111,11 +109,12 @@ VALIDATION_TEST(TtxFlow, swizzle_wrong_target) {
           4,
         },
   };
-  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
+  Validation::FlowTests::Consumer consumer =
+      Validation::FlowTests::Consumer(four);
 
   Flow flow;
   ASSERT(
-      flow.connect(reader.query(), module.writer(writer)) ==
+      flow.connect(consumer.query(), module.provider(provider)) ==
       Flow::Status::Success);
 
   Static::Vector<R32, 2> output = {
@@ -130,7 +129,7 @@ VALIDATION_TEST(TtxFlow, swizzle_wrong_target) {
       Status::Incompatible);
   EXPECT(module.select(flow, storage(wrong, output)) == Status::Incompatible);
 
-  EXPECT_EQ(writer.reads, Count(0));
+  EXPECT_EQ(provider.reads, Count(0));
   EXPECT_EQ(output[0], R32(-1));
 }
 
@@ -144,7 +143,7 @@ VALIDATION_TEST(TtxFlow, swizzle_overlap) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {
+  Module::State provider = {
     .provides = PROVIDES_DIRECT,
     .values =
         {
@@ -154,22 +153,23 @@ VALIDATION_TEST(TtxFlow, swizzle_overlap) {
           40,
         },
   };
-  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
+  Validation::FlowTests::Consumer consumer =
+      Validation::FlowTests::Consumer(four);
 
   Flow flow;
   ASSERT(
-      flow.connect(reader.query(), module.writer(writer)) ==
+      flow.connect(consumer.query(), module.provider(provider)) ==
       Flow::Status::Success);
 
   const auto mapping = module.selection();
   EXPECT(
       Swizzle::flow(
-          flow, mapping, storage(mapping.get_output(), writer.values)) ==
+          flow, mapping, storage(mapping.get_output(), provider.values)) ==
       Status::Unsupported);
-  EXPECT_EQ(writer.values[0], U32(10));
-  EXPECT_EQ(writer.values[1], U32(20));
+  EXPECT_EQ(provider.values[0], U32(10));
+  EXPECT_EQ(provider.values[1], U32(20));
 
-  EXPECT_EQ(writer.binds[3], Count(0));
+  EXPECT_EQ(provider.binds[3], Count(0));
 }
 
 // Repetition and slicing are position policies over the same input. Neither
@@ -203,7 +203,7 @@ VALIDATION_TEST(TtxFlow, swizzle_and_slice) {
     },
   };
   for (U8 protocol : protocols.get_view()) {
-    Module::State writer = {
+    Module::State provider = {
       .provides = protocol,
       .values =
           {
@@ -213,11 +213,12 @@ VALIDATION_TEST(TtxFlow, swizzle_and_slice) {
             40,
           },
     };
-    Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
+    Validation::FlowTests::Consumer consumer =
+        Validation::FlowTests::Consumer(four);
 
     Flow flow;
     ASSERT(
-        flow.connect(reader.query(), module.writer(writer)) ==
+        flow.connect(consumer.query(), module.provider(provider)) ==
         Flow::Status::Success);
 
     Static::Vector<U32, 2> output;
@@ -232,7 +233,7 @@ VALIDATION_TEST(TtxFlow, swizzle_and_slice) {
   }
 }
 
-// A projection reports its failure cause without certifying an output prefix.
+// Swizzle reports its failure cause without certifying an output prefix.
 // This provider fails its second observation, so the first write remains in
 // the target. Keeping that evidence separate from the status shows why a
 // consumer needing rollback must supply that policy explicitly.
@@ -243,7 +244,7 @@ VALIDATION_TEST(TtxFlow, swizzle_failure) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {
+  Module::State provider = {
     .provides = PROVIDES_FRAGMENT,
     .failure = 1,
     .fail_at = 2,
@@ -255,11 +256,12 @@ VALIDATION_TEST(TtxFlow, swizzle_failure) {
           40,
         },
   };
-  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
+  Validation::FlowTests::Consumer consumer =
+      Validation::FlowTests::Consumer(four);
 
   Flow flow;
   ASSERT(
-      flow.connect(reader.query(), module.writer(writer)) ==
+      flow.connect(consumer.query(), module.provider(provider)) ==
       Flow::Status::Success);
 
   const auto mapping = module.selection();
@@ -299,19 +301,19 @@ VALIDATION_TEST(TtxFlow, swizzle_byte_order) {
               },
             };
             for (U8 protocol : protocols.get_view()) {
-              Module::State writer = {
+              Module::State provider = {
                 .provides = protocol,
                 .values =
                     {
                       0x12345678,
                     },
               };
-              Validation::FlowTests::Reader reader =
-                  Validation::FlowTests::Reader(four);
+              Validation::FlowTests::Consumer consumer =
+                  Validation::FlowTests::Consumer(four);
 
               Flow flow;
               ASSERT(
-                  flow.connect(reader.query(), module.writer(writer)) ==
+                  flow.connect(consumer.query(), module.provider(provider)) ==
                   Flow::Status::Success);
 
               alignas(U32) Static::Vector<U8, 4> output;
@@ -339,6 +341,7 @@ VALIDATION_TEST(TtxFlow, repeated_named_value) {
   struct Names {
     Perimortem::Memory::Dynamic::Map<View::Bytes, Count> cache;
     Count lookups = 0;
+
     auto operator()(Count) -> Count {
       return cache.find("r"_view).visit(
           [&] {
@@ -359,7 +362,7 @@ VALIDATION_TEST(TtxFlow, repeated_named_value) {
 
             Module module;
             ASSERT(module.is_set());
-            Module::State writer = {
+            Module::State provider = {
               .provides = PROVIDES_FRAGMENT,
               .generating = 1,
               .values =
@@ -369,7 +372,7 @@ VALIDATION_TEST(TtxFlow, repeated_named_value) {
             };
             Flow flow;
             ASSERT(
-                flow.connect(Flow::consumer(four), module.writer(writer)) ==
+                flow.connect(Flow::consumer(four), module.provider(provider)) ==
                 Flow::Status::Success);
             Static::Vector<U32, 5> output;
             const auto target = storage(five, output);
@@ -379,7 +382,7 @@ VALIDATION_TEST(TtxFlow, repeated_named_value) {
             EXPECT(Swizzle::flow(flow, mapping, target) == Status::Success);
             measurement.stop();
 
-            EXPECT_EQ(writer.reads, Count(2));
+            EXPECT_EQ(provider.reads, Count(2));
             for (U32 value : output.get_view()) {
               EXPECT_EQ(value, U32(43));
             }
@@ -404,11 +407,11 @@ VALIDATION_TEST(TtxFlow, sparse_range_mapping) {
   Swizzle::Mapping::create(input, output, resolve)
       .visit(
           [&](auto& mapping) {
-            const auto publication = mapping.get_abi();
-            EXPECT_EQ(publication.count, Count(2));
-            EXPECT_EQ(publication.groups[0].input.offset, Count(3999999996));
-            EXPECT_EQ(publication.groups[0].count, Count(2));
-            EXPECT_EQ(publication.groups[1].input.offset, Count(0));
+            const auto api = mapping.get_abi();
+            EXPECT_EQ(api.count, Count(2));
+            EXPECT_EQ(api.groups[0].input.offset, Count(3999999996));
+            EXPECT_EQ(api.groups[0].count, Count(2));
+            EXPECT_EQ(api.groups[1].input.offset, Count(0));
           },
           [&](Status) { EXPECT(false); });
 }
@@ -447,7 +450,7 @@ VALIDATION_TEST(TtxFlow, repeated_byte_orders) {
               },
             };
             for (U8 protocol : protocols.get_view()) {
-              Module::State writer = {
+              Module::State provider = {
                 .provides = protocol,
                 .values =
                     {
@@ -456,7 +459,8 @@ VALIDATION_TEST(TtxFlow, repeated_byte_orders) {
               };
               Flow flow;
               ASSERT(
-                  flow.connect(Flow::consumer(four), module.writer(writer)) ==
+                  flow.connect(
+                      Flow::consumer(four), module.provider(provider)) ==
                   Flow::Status::Success);
               alignas(U32) Static::Vector<U8, 8> bytes;
               ASSERT(
@@ -467,7 +471,7 @@ VALIDATION_TEST(TtxFlow, repeated_byte_orders) {
               EXPECT_EQ(bytes[4], U8(0x12));
               EXPECT_EQ(bytes[7], U8(0x78));
               EXPECT_EQ(
-                  writer.reads,
+                  provider.reads,
                   protocol == PROVIDES_FRAGMENT ? Count(1) : Count(0));
             }
           },
@@ -497,10 +501,10 @@ VALIDATION_TEST(TtxFlow, mapping_move) {
       .visit(
           [&](auto& mapping) {
             auto moved = Perimortem::Core::Data::take(mapping);
-            const auto publication = moved.get_abi();
-            EXPECT_EQ(publication.count, Count(64));
+            const auto api = moved.get_abi();
+            EXPECT_EQ(api.count, Count(64));
             for (Count i = 0; i < 64; ++i) {
-              const auto& group = publication.groups[i];
+              const auto& group = api.groups[i];
               EXPECT_EQ(group.input.offset, 252 - i * 4);
               EXPECT_EQ(group.count, Count(1));
               EXPECT_EQ(group.outputs[0].offset, i * 4);

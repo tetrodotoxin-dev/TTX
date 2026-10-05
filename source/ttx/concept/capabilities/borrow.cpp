@@ -14,16 +14,19 @@ auto Capabilities::Borrow::borrow() const
     -> Perimortem::Utility::Result<Policies::Borrowed, Binding::Failure> {
   const auto api = get_abi();
   ttx_borrowed output = ttx_borrowed();
-  const auto status = api.operations->borrow(api.source, &output);
+  const auto status = api.operations->borrow(api.context, &output);
   if (status == TTX_BINDING_SATISFIED) {
     if (Policies::Borrowed::accept(output)) {
       return Policies::Borrowed(output);
     }
-    if (output.source && output.operations && output.operations->release) {
-      output.operations->release(output.source);
+
+    if (output.context && output.operations && output.operations->release) {
+      output.operations->release(output.context);
     }
+
     return Binding::Failure::Rejected;
   }
+
   return status == TTX_BINDING_UNKNOWN ? Binding::Failure::Unknown
                                        : Binding::Failure::Rejected;
 }

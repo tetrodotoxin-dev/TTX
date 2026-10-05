@@ -22,13 +22,17 @@ class Measurement {
   auto operator=(const Measurement&) -> Measurement& = delete;
 
   auto stop() -> void;
+
   auto get_allocations() const -> Count { return allocations; }
+
   auto get_copies() const -> Perimortem::Core::Option<Count>;
+
   static auto wraps_runtime() -> Bool;
 
   // Linker wrappers call these hooks. The examples observe counts rather than
   // replacing an allocator or a copy implementation with test behavior.
   static auto allocation() -> void;
+
   static auto copy() -> void;
 
  private:

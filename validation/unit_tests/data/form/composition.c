@@ -4,7 +4,8 @@
 #include "validation/unit_tests/data/form/composition.h"
 
 // This C fixture composes the same admitted child through
-// the C entry and asks the caller for publication storage only after admission.
+// the C entry and asks the caller for canonical form storage only after
+// admission.
 ttx_data_status compose_pair(
     const ttx_representation* child,
     Count width,

@@ -3,45 +3,45 @@
 
 #pragma once
 
-#include "ttx/abi/receiver.hpp"
-
 #include "perimortem/core/view/bytes.hpp"
 
 namespace Ttx::Concept {
 
-// Discovery lends the caller's receiver to the provider for one enumeration.
+// Discovery lends the caller's callback to the provider for one enumeration.
 // The provider chooses which named values to expose and can produce each one
 // directly from its own storage. Native references and bound views use the
-// same receiver shape without forcing either representation onto the other.
+// same callback shape without forcing either representation onto the other.
 //
-// The receiver is borrowed, so the provider must finish calling it before
+// The callback is borrowed, so the provider must finish calling it before
 // enumeration returns. It cannot retain the Visitor for deferred work. Each
 // discovery contract supplies the lifetime of the names and values it emits.
 template <typename Value>
 class Visitor {
  public:
   constexpr Visitor(
-      void* source,
-      void (*receive)(void*, Perimortem::Core::View::Bytes, Value))
-      : source(source), receive(receive) {}
+      void* context,
+      void (*callback)(void*, Perimortem::Core::View::Bytes, Value))
+      : context(context), callback(callback) {}
 
-  template <typename Receiver>
-    requires(!__is_same(__remove_cvref(Receiver), Visitor))
-  constexpr explicit Visitor(Receiver& receiver)
-      : Visitor(
-            &receiver,
-            [](void* source, Perimortem::Core::View::Bytes name, Value value) {
-              Abi::Receiver::get<Receiver>(source)(name, value);
-            }) {}
+  template <typename Function>
+    requires(!__is_same(__remove_cvref(Function), Visitor))
+  constexpr explicit Visitor(Function& callback)
+      : Visitor(&callback, invoke<Function>) {}
 
   auto operator()(Perimortem::Core::View::Bytes name, Value value) const
       -> void {
-    receive(source, name, value);
+    callback(context, name, value);
   }
 
  private:
-  void* source;
-  void (*receive)(void*, Perimortem::Core::View::Bytes, Value);
+  template <typename Function>
+  static void
+      invoke(void* context, Perimortem::Core::View::Bytes name, Value value) {
+    (*static_cast<Function*>(context))(name, value);
+  }
+
+  void* context;
+  void (*callback)(void*, Perimortem::Core::View::Bytes, Value);
 };
 
 }  // namespace Ttx::Concept

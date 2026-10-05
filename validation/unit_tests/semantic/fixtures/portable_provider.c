@@ -2,14 +2,18 @@
 // Copyright (c) 2023-present Matt Kaes and contributors
 
 #include "validation/unit_tests/semantic/fixtures/portable_provider.h"
+
 static U32 value = 40;
 static U32 calls;
-static U32 add(void* receiver, U32 amount) {
+
+static U32 add(void* context, U32 amount) {
+  U32* source = context;
   ++calls;
-  return *(const U32*)receiver + amount;
+  return *source + amount;
 }
-// Root fields are the opaque receiver and a pointer to add. The callable
-// takes that receiver and one U32, and returns U32. Wasm uses four byte slots
+
+// Root fields are the opaque context and a pointer to add. The callable
+// takes that context and one U32, and returns U32. Wasm uses four byte slots
 // and convention three. Native64 uses eight byte slots and convention one.
 #if defined(__EMSCRIPTEN__)
 static const U8 bytes[] = {
@@ -27,21 +31,25 @@ static const ttx_representation form = {
   sizeof(bytes),
 };
 static ttx_binding_status
-    bind(void* source, perimortem_uuid id, ttx_storage output) {
+    bind(void* context, perimortem_uuid id, ttx_storage output) {
+  U32* source = context;
   if (id.high != 17 || id.low != 23) {
     return TTX_BINDING_UNKNOWN;
   }
+
   const portable_counter api = {
     source,
     add,
   };
   return ttx_binding_provide(&form, &api, output);
 }
-static ttx_binding_status supports(void* source, perimortem_uuid id) {
-  (void)source;
+
+static ttx_binding_status supports(void* context, perimortem_uuid id) {
+  (void)context;
   return id.high == 17 && id.low == 23 ? TTX_BINDING_SATISFIED
                                        : TTX_BINDING_UNKNOWN;
 }
+
 ttx_semantic_query portable_counter_open(void) {
   return (ttx_semantic_query){
     &value,
@@ -49,6 +57,7 @@ ttx_semantic_query portable_counter_open(void) {
     supports,
   };
 }
+
 U32 portable_counter_calls(void) {
   return calls;
 }

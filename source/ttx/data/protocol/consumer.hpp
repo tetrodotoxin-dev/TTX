@@ -8,7 +8,7 @@
 
 namespace Ttx::Data::Protocol {
 
-// This value retains the admitted C carrier while borrowing its requirement.
+// This C++ interface stores the API record and borrows its representation.
 // Copies ask the same consumer policy without acquiring another lifetime.
 class Consumer {
  public:
@@ -19,19 +19,19 @@ class Consumer {
     return api.operations && api.operations->representation;
   }
 
-  constexpr Consumer(void* source, const Operations& operations)
-      : value(source, &operations) {}
+  constexpr Consumer(void* context, const Operations& operations)
+      : api(context, &operations) {}
 
-  constexpr explicit Consumer(ttx_consumer value) : value(value) {}
+  constexpr explicit Consumer(ttx_consumer api) : api(api) {}
 
   auto get_representation() const -> const Form::Representation& {
-    return *value.operations->representation(value.source);
+    return *api.operations->representation(api.context);
   }
 
-  constexpr auto get_abi() const -> ttx_consumer { return value; }
+  constexpr auto get_abi() const -> ttx_consumer { return api; }
 
  private:
-  ttx_consumer value;
+  ttx_consumer api;
 };
 
 }  // namespace Ttx::Data::Protocol
@@ -42,5 +42,5 @@ TTX_DATA_RECORD(
 
 TTX_DATA_RECORD(
     ttx_consumer,
-    TTX_DATA_MEMBER(ttx_consumer, source),
+    TTX_DATA_MEMBER(ttx_consumer, context),
     TTX_DATA_MEMBER(ttx_consumer, operations));

@@ -4,7 +4,7 @@
 #ifndef TTX_SEMANTIC_NEGOTIATION_LIBRARY_H
 #define TTX_SEMANTIC_NEGOTIATION_LIBRARY_H
 
-#include "ttx/semantic/negotiation/receiver.h"
+#include "ttx/semantic/negotiation/callback.h"
 
 // Entry point for a dynamically loaded TTX provider. The loader calls
 // `ttx_query` with the host's services and a callback. The provider passes its
@@ -15,6 +15,6 @@
 // or Unknown or Rejected if it declines to supply a Query.
 #define TTX_LIBRARY_ENTRY "ttx_query"
 typedef ttx_binding_status (
-    *ttx_library_entry)(ttx_semantic_query host, ttx_query_receiver receive);
+    *ttx_library_entry)(ttx_semantic_query host, ttx_query_callback callback);
 
 #endif

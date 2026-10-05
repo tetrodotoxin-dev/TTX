@@ -38,7 +38,8 @@ class Compiled {
     consteval Storage() : representation(bytes.get_data(), size) {
       // Measurement admitted this exact immutable source and established the
       // output extent. The repeated preparation follows the same algorithm,
-      // so publication needs no second failure state or allocation policy.
+      // so writing the canonical form needs no second failure state or
+      // allocation policy.
       Compiler compiler;
       compiler.compile(source, pointer_size);
       compiler.write(Perimortem::Core::Access::Bytes(bytes.get_data(), size));

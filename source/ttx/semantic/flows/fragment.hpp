@@ -29,8 +29,9 @@ class Fragment {
       Count position,
       Consumer consume) -> Data::Status {
     using Value = Data::Form::Schema::Value;
-    // This thunk returns a native pointer value. A foreign pointer carrier can
-    // still move as a block, but cannot be materialized through this getter.
+    // This operation returns a native pointer value. A foreign pointer carrier
+    // can still move as a block, but cannot be materialized through this
+    // getter.
     if (type.get_value() == Value::Pointer &&
         type.get_extent() != sizeof(void*)) {
       return Data::Status::Unsupported;

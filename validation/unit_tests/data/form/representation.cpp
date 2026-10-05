@@ -6,7 +6,6 @@
 #include "perimortem/core/static/vector.hpp"
 
 #include "toolchain/validation/unit_test.hpp"
-#include "ttx/abi/receiver.hpp"
 #include "ttx/data/form/schema.hpp"
 
 using namespace Perimortem::Core;
@@ -21,7 +20,12 @@ static constexpr auto u32 = Schema::primitive(Schema::Value::U32);
 
 // Both the source tree and its placement array disappear before lookup. The
 // prepared result must carry its own facts, including indices derived from the
-// source structure. Mutating the original leaf cannot change that publication.
+// source structure. Mutating the original leaf cannot change that canonical
+// form.
+static auto allocate_representation(void* context, Count size, Count) -> void* {
+  return static_cast<Arena*>(context)->allocate(size).get_data();
+}
+
 VALIDATION_TEST(TtxRepresentation, independent_lifetime) {
   Arena arena;
   const Representation* prepared = nullptr;
@@ -102,7 +106,7 @@ VALIDATION_TEST(TtxRepresentation, heterogeneous_index) {
           [&](Status) { EXPECT(false); });
 }
 
-// Failure leaves the publication slot untouched. A caller can discard its
+// Failure leaves the canonical form slot untouched. A caller can discard its
 // preparation arena without having lent an incomplete result to consumers.
 VALIDATION_TEST(TtxRepresentation, invalid_publication) {
   Arena arena;
@@ -166,19 +170,16 @@ VALIDATION_TEST(TtxRepresentation, singleton_range) {
 }
 
 // The C entry publishes only after the whole compilation succeeds. Its caller
-// may already have a usable publication in the slot, which failure must retain.
+// may already have a usable canonical form in the slot, which failure must
+// retain.
 VALIDATION_TEST(TtxRepresentation, publication_on_error) {
   Arena arena;
   const Representation sentinel = Representation();
   const Representation* output = &sentinel;
   auto source = u32;
   source.extent = 1;
-  const ttx_representation_allocator allocator = ttx_representation_allocator(
-      &arena, [](void* source, Count size, Count) -> void* {
-        return Ttx::Abi::Receiver::get<Arena>(source)
-            .allocate(size)
-            .get_data();
-      });
+  const ttx_representation_allocator allocator =
+      ttx_representation_allocator(&arena, allocate_representation);
   EXPECT(
       ttx_representation_compile(&source, sizeof(void*), allocator, &output) ==
       TTX_DATA_INVALID);

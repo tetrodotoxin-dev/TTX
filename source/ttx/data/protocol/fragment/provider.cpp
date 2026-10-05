@@ -14,10 +14,10 @@ using namespace Ttx::Data::Protocol;
 template <typename Value>
 static auto read(
     ttx_data_status (*operation)(void*, Count, Value*),
-    void* source,
+    void* context,
     Count position) -> Perimortem::Utility::Result<Value, Status> {
   Value result;
-  const auto status = operation(source, position, &result);
+  const auto status = operation(context, position, &result);
   if (status != TTX_DATA_SUCCESS) {
     return static_cast<Status>(status);
   }
@@ -27,77 +27,77 @@ static auto read(
 
 auto Fragment::Provider::get_u8(Count position) const
     -> Perimortem::Utility::Result<U8, Status> {
-  return read(value.operations->get_u8, value.source, position);
+  return read(api.operations->get_u8, api.context, position);
 }
 
 auto Fragment::Provider::get_u16(Count position) const
     -> Perimortem::Utility::Result<U16, Status> {
-  return read(value.operations->get_u16, value.source, position);
+  return read(api.operations->get_u16, api.context, position);
 }
 
 auto Fragment::Provider::get_u32(Count position) const
     -> Perimortem::Utility::Result<U32, Status> {
-  return read(value.operations->get_u32, value.source, position);
+  return read(api.operations->get_u32, api.context, position);
 }
 
 auto Fragment::Provider::get_u64(Count position) const
     -> Perimortem::Utility::Result<U64, Status> {
-  return read(value.operations->get_u64, value.source, position);
+  return read(api.operations->get_u64, api.context, position);
 }
 
 auto Fragment::Provider::get_s8(Count position) const
     -> Perimortem::Utility::Result<S8, Status> {
-  return read(value.operations->get_s8, value.source, position);
+  return read(api.operations->get_s8, api.context, position);
 }
 
 auto Fragment::Provider::get_s16(Count position) const
     -> Perimortem::Utility::Result<S16, Status> {
-  return read(value.operations->get_s16, value.source, position);
+  return read(api.operations->get_s16, api.context, position);
 }
 
 auto Fragment::Provider::get_s32(Count position) const
     -> Perimortem::Utility::Result<S32, Status> {
-  return read(value.operations->get_s32, value.source, position);
+  return read(api.operations->get_s32, api.context, position);
 }
 
 auto Fragment::Provider::get_s64(Count position) const
     -> Perimortem::Utility::Result<S64, Status> {
-  return read(value.operations->get_s64, value.source, position);
+  return read(api.operations->get_s64, api.context, position);
 }
 
 auto Fragment::Provider::get_r32(Count position) const
     -> Perimortem::Utility::Result<R32, Status> {
-  return read(value.operations->get_r32, value.source, position);
+  return read(api.operations->get_r32, api.context, position);
 }
 
 auto Fragment::Provider::get_r64(Count position) const
     -> Perimortem::Utility::Result<R64, Status> {
-  return read(value.operations->get_r64, value.source, position);
+  return read(api.operations->get_r64, api.context, position);
 }
 
 auto Fragment::Provider::get_pointer(Count position) const
     -> Perimortem::Utility::Result<void*, Status> {
-  return read(value.operations->get_pointer, value.source, position);
+  return read(api.operations->get_pointer, api.context, position);
 }
 
 auto Fragment::Provider::get_v64(Count position) const
     -> Perimortem::Utility::Result<Form::Schema::V64, Status> {
-  return read(value.operations->get_v64, value.source, position);
+  return read(api.operations->get_v64, api.context, position);
 }
 
 auto Fragment::Provider::get_v128(Count position) const
     -> Perimortem::Utility::Result<Form::Schema::V128, Status> {
-  return read(value.operations->get_v128, value.source, position);
+  return read(api.operations->get_v128, api.context, position);
 }
 
 auto Fragment::Provider::get_v256(Count position) const
     -> Perimortem::Utility::Result<Form::Schema::V256, Status> {
-  return read(value.operations->get_v256, value.source, position);
+  return read(api.operations->get_v256, api.context, position);
 }
 
 auto Fragment::Provider::get_v512(Count position) const
     -> Perimortem::Utility::Result<Form::Schema::V512, Status> {
-  return read(value.operations->get_v512, value.source, position);
+  return read(api.operations->get_v512, api.context, position);
 }
 
 auto ttx_fragment_provider_representation() -> const ttx_representation* {

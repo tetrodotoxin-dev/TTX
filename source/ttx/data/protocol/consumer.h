@@ -13,11 +13,11 @@
 // own destination Storage after agreement and keep it alive through the call.
 
 typedef struct ttx_consumer_operations {
-  const ttx_representation* (*representation)(void* source);
+  const ttx_representation* (*representation)(void* context);
 } ttx_consumer_operations;
 
 typedef struct ttx_consumer {
-  void* source;
+  void* context;
   const ttx_consumer_operations* operations;
 } ttx_consumer;
 

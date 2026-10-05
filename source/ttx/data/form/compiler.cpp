@@ -141,7 +141,8 @@ static auto publish(
   }
 
   auto* allocation = allocator.allocate(
-      allocator.source, sizeof(Representation) + size, alignof(Representation));
+      allocator.context, sizeof(Representation) + size,
+      alignof(Representation));
   if (!allocation) {
     return TTX_DATA_BOUNDS;
   }

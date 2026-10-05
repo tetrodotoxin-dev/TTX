@@ -9,29 +9,54 @@ using namespace Ttx::Concept;
 using namespace Ttx::Semantic::Negotiation;
 using namespace Perimortem;
 
+namespace {
+
+// This shared answer has its own context. Its stability does not establish a
+// Constant promise for the question that selected it.
 class UnknownProvider {
  public:
-  auto get_data() const -> Core::View::Bytes { return "Unknown"_view; }
-  auto supports(System::Uuid id) const -> Binding::Status {
-    return id == Policies::Unknown::contract_id ? Binding::Status::Satisfied
-                                                : Binding::Status::Unknown;
+  static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
+    const System::Uuid contract(id);
+    return contract == Abstract::contract_id ||
+                   contract == Policies::Unknown::contract_id
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_UNKNOWN;
   }
-  auto bind_interface(System::Uuid id, Ttx::Data::Form::Storage target)
-      -> Binding::Status {
-    if (id == Policies::Unknown::contract_id) {
-      return Binding::provide<Policies::Unknown>(
-          Abstract::provide(*this).get_abi(), target);
+
+  static auto bind(void* context, perimortem_uuid id, ttx_storage target)
+      -> ttx_binding_status {
+    if (supports(context, id) != TTX_BINDING_SATISFIED) {
+      return TTX_BINDING_UNKNOWN;
     }
-    return Binding::Status::Unknown;
+
+    return static_cast<ttx_binding_status>(Binding::provide<Abstract>(
+        resolve(context), Ttx::Data::Form::Storage(target)));
   }
-  auto resolve_concept(Core::View::Bytes) const -> Abstract {
-    return Policies::Unknown::get_unknown();
+
+  static auto data(void*) -> perimortem_view_bytes {
+    const auto bytes = "Unknown"_view;
+    return perimortem_view_bytes(bytes.get_data(), bytes.get_size());
   }
+
+  static auto resolve(void* context) -> ttx_abstract {
+    return ttx_abstract(context, &operations);
+  }
+
+  static auto route(void* context, perimortem_view_bytes) -> ttx_abstract {
+    return resolve(context);
+  }
+
+  static void visit(void*, ttx_concept_visitor) {}
+
+  static constexpr ttx_abstract_ops operations = {supports, bind,  data,
+                                                  resolve,  route, visit};
 };
 
+}  // namespace
+
 auto Policies::Unknown::get_unknown() -> Unknown {
-  static UnknownProvider subject;
-  return Unknown(Abstract::provide(subject).get_abi());
+  static UnknownProvider provider;
+  return Unknown(UnknownProvider::resolve(&provider));
 }
 
 C_LINKAGE ttx_abstract ttx_unknown(void) {

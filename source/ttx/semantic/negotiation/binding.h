@@ -14,13 +14,20 @@
 // Query's separate `supports` operation establishes only the semantic promise.
 // Even a positive support answer leaves this representation check necessary.
 //
-// The record may contain an opaque receiver and any number of operations.
-// Copying those values grants no access to the receiver's private layout:
-// each provider's functions still interpret their own state. Keeping that
-// state opaque lets substitutes change storage without changing their answers.
+// The record may contain an opaque context and any number of operations.
+// Copying those values grants no access to the context's private layout:
+// each supplied function interprets its context. A provider can reuse a
+// function with a compatible context, or supply a wrapper that delegates to
+// another implementation. The bound context may differ from the discovery
+// context. Its relationship to provider storage remains private.
+//
+// Consumers retain the complete admitted record. An embedded interface is
+// obtained through its declared member. It does not establish the layout of
+// an enclosing record. These choices let providers compose implementations
+// while the consumer depends only on the negotiated contract.
 //
 // This synchronous exchange borrows the destination only until return. The
-// enclosing publication retains the supplied receivers and executable code
+// supplying provider keeps the context and executable code available
 // through every use of its interfaces. An interface with independent ownership
 // describes those obligations in its own contract because copying pointers
 // cannot acquire a lifetime. Ordinary Flow can materialize a record when
@@ -30,10 +37,10 @@
 // answer, whether the contract is unfamiliar or the provider lacks evidence.
 // Rejected is an explicit refusal of this request, not the inverse of success.
 // A provider may delegate an Unknown question as permitted by its policy.
-// Consumers cannot bypass that policy by inspecting its underlying receiver.
+// Consumers cannot bypass that policy by inspecting its opaque context.
 //
 // Every answer is synchronous. Unknown schedules no work and promises no later
-// answer. A subsequent observation asks again under the publication's policy.
+// answer. A subsequent observation asks again under the provider's policy.
 // Neither Unknown nor Rejected supplies a usable API, even if a materializing
 // provider touched the destination. Callers publish the record only on success.
 //
@@ -46,7 +53,7 @@ typedef U8 ttx_binding_status;
 #define TTX_BINDING_UNKNOWN ((ttx_binding_status)1)
 #define TTX_BINDING_REJECTED ((ttx_binding_status)3)
 
-// Ready records use the same byte agreement as any other data publication.
+// Ready records use the same byte agreement as any other data transfer.
 // The supplying record and the admitted destination both have the geometry
 // their descriptors promise otherwise the binding is rejected. Mismatched
 // descriptors leave the destination untouched.

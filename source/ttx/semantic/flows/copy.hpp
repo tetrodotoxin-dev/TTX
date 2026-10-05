@@ -12,7 +12,7 @@ namespace Ttx::Semantic::Flows {
 // both agree on an exact Representation that represents the `source`.
 //
 // Flowing a copy allows making an observation of that representation and
-// storing it in a format provided by the destination receiver. This is often
+// storing it in a format provided by the consumer. This is often
 // modeled as a `memmove` but the semantics are defined by the TTX transport
 // used to perform the flow.
 class Copy {

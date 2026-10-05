@@ -13,15 +13,17 @@ VALIDATION_TEST(TtxFlow, primitive_abi) {
   Module module;
   ASSERT(module.is_set());
 
-  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(
-      module.primitive_schema(), PROVIDES_FRAGMENT);
+  Validation::FlowTests::Consumer consumer = Validation::FlowTests::Consumer(
+      module.primitive_representation(), PROVIDES_FRAGMENT);
   Flow flow;
   ASSERT(
-      flow.connect(reader.query(), module.primitives()) ==
+      flow.connect(consumer.query(), module.primitives()) ==
       Flow::Status::Success);
 
   Module::Primitives output = Module::Primitives();
-  ASSERT(Copy::flow(flow, storage(reader.schema, output)) == Status::Success);
+  ASSERT(
+      Copy::flow(flow, storage(consumer.representation, output)) ==
+      Status::Success);
 
   EXPECT_EQ(output.u8, U8(251));
   EXPECT_EQ(output.u16, U16(513));

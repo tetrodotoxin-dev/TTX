@@ -1,6 +1,9 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "validation/support/measurement.hpp"
+#include "validation/unit_tests/semantic/fixtures.hpp"
+
 #include <new>
 #include <stdlib.h>
 
@@ -9,15 +12,13 @@
 #include "perimortem/memory/dynamic/vector.hpp"
 
 #include "toolchain/validation/benchmark.hpp"
-#include "validation/unit_tests/semantic/fixtures.hpp"
-#include "validation/unit_tests/semantic/measurement.hpp"
 #include "ttx/semantic/transport/flow.hpp"
 
 using namespace Validation::FlowTests;
 
-// Establishment needs only a reader schema. Each synchronous Copy then takes
-// its own Storage and returns a finished result without a retained request
-// object.
+// Establishment needs only a consumer representation. Each synchronous Copy
+// then takes its own Storage and returns a finished result without a retained
+// request object.
 VALIDATION_TEST(TtxFlow, copy_multiple_targets) {
   Preparation prepare;
   const auto& four = prepare(four_schema);
@@ -25,7 +26,7 @@ VALIDATION_TEST(TtxFlow, copy_multiple_targets) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {
+  Module::State provider = {
     .provides = PROVIDES_DIRECT,
     .values =
         {
@@ -35,11 +36,12 @@ VALIDATION_TEST(TtxFlow, copy_multiple_targets) {
           40,
         },
   };
-  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
+  Validation::FlowTests::Consumer consumer =
+      Validation::FlowTests::Consumer(four);
 
   Flow flow;
   ASSERT(
-      flow.connect(reader.query(), module.writer(writer)) ==
+      flow.connect(consumer.query(), module.provider(provider)) ==
       Flow::Status::Success);
 
   Static::Vector<U32, 4> a, b;
@@ -53,9 +55,9 @@ VALIDATION_TEST(TtxFlow, copy_multiple_targets) {
   EXPECT_EQ(a[3], U32(40));
   EXPECT_EQ(b[0], U32(10));
 
-  EXPECT_EQ(reader.descriptions, Count(1));
-  EXPECT_EQ(writer.descriptions, Count(1));
-  EXPECT_EQ(writer.binds[0], Count(1));
+  EXPECT_EQ(consumer.descriptions, Count(1));
+  EXPECT_EQ(provider.descriptions, Count(1));
+  EXPECT_EQ(provider.binds[0], Count(1));
 
   EXPECT_EQ(measurement.get_allocations(), Count(0));
   if (const auto copies = measurement.get_copies()) {
@@ -73,14 +75,15 @@ VALIDATION_TEST(TtxFlow, copy_target_mismatch) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {
+  Module::State provider = {
     .provides = PROVIDES_BLOCK,
   };
-  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
+  Validation::FlowTests::Consumer consumer =
+      Validation::FlowTests::Consumer(four);
 
   Flow flow;
   ASSERT(
-      flow.connect(reader.query(), module.writer(writer)) ==
+      flow.connect(consumer.query(), module.provider(provider)) ==
       Flow::Status::Success);
 
   U32 small = 99;
@@ -98,20 +101,20 @@ VALIDATION_TEST(TtxFlow, copy_target_mismatch) {
       Copy::flow(flow, storage(prepare(integer), small)) ==
       Status::Incompatible);
   EXPECT_EQ(small, U32(99));
-  EXPECT_EQ(writer.commits, Count(0));
+  EXPECT_EQ(provider.commits, Count(0));
 }
 
-// A Storage can lend its reader without becoming the permanent destination. The
-// agreement borrows only the schema, so another Storage receives this call's
-// result.
-VALIDATION_TEST(TtxFlow, reusable_reader) {
+// A Storage can lend its consumer without becoming the permanent destination.
+// The agreement borrows only the schema, so another Storage receives this
+// call's result.
+VALIDATION_TEST(TtxFlow, reusable_consumer) {
   Preparation prepare;
   const auto& four = prepare(four_schema);
 
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {
+  Module::State provider = {
     .provides = PROVIDES_DIRECT,
     .values =
         {
@@ -135,7 +138,7 @@ VALIDATION_TEST(TtxFlow, reusable_reader) {
   Flow flow;
   ASSERT(
       flow.connect(
-          Flow::consumer(storage(four, original)), module.writer(writer)) ==
+          Flow::consumer(storage(four, original)), module.provider(provider)) ==
       Flow::Status::Success);
 
   EXPECT(Copy::flow(flow, storage(four, output)) == Status::Success);
@@ -143,7 +146,7 @@ VALIDATION_TEST(TtxFlow, reusable_reader) {
   EXPECT_EQ(output[3], U32(4));
 }
 
-// The C entry reports the same outcome as the native facade. The partial write
+// The C entry reports the same outcome as the C++ interface. The partial write
 // below is observable because this test owns the failing provider, but Copy
 // does not certify that prefix as a second kind of successful observation.
 VALIDATION_TEST(TtxFlow, c_copy_result) {
@@ -153,7 +156,7 @@ VALIDATION_TEST(TtxFlow, c_copy_result) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {
+  Module::State provider = {
     .provides = PROVIDES_FRAGMENT,
     .values =
         {
@@ -163,11 +166,12 @@ VALIDATION_TEST(TtxFlow, c_copy_result) {
           4,
         },
   };
-  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
+  Validation::FlowTests::Consumer consumer =
+      Validation::FlowTests::Consumer(four);
 
   Flow flow;
   ASSERT(
-      flow.connect(reader.query(), module.writer(writer)) ==
+      flow.connect(consumer.query(), module.provider(provider)) ==
       Flow::Status::Success);
 
   Static::Vector<U32, 4> output;
@@ -176,9 +180,9 @@ VALIDATION_TEST(TtxFlow, c_copy_result) {
   EXPECT_EQ(outcome, TTX_DATA_SUCCESS);
   EXPECT_EQ(output[3], U32(4));
 
-  writer.failure = 1;
-  writer.fail_at = 3;
-  writer.reads = 0;
+  provider.failure = 1;
+  provider.fail_at = 3;
+  provider.reads = 0;
   output[2] = 99;
   const auto failure =
       ttx_copy(flow.get_abi(), storage(four, output).get_abi());
@@ -188,7 +192,8 @@ VALIDATION_TEST(TtxFlow, c_copy_result) {
 
 // A zero count is useful only when the observer can see real work. Exercise
 // the C, C++ and Bibliotheca routes, including nesting and an explicitly
-// stopped scope. Optimization barriers keep the allocations observable to Clang.
+// stopped scope. Optimization barriers keep the allocations observable to
+// Clang.
 VALIDATION_TEST(TtxFlow, measurement_routes) {
   Measurement outer;
   void* c = malloc(64);

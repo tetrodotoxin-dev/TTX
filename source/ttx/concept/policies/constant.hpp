@@ -14,12 +14,22 @@ namespace Ttx::Concept::Policies {
 //
 // Borrowing keeps the data available. When an acquired answer also provides
 // Constant, its release obligation remains until that borrow is returned.
-class Constant : public Abstract {
+class Constant {
  public:
   static constexpr auto contract_id =
       Perimortem::System::Uuid(TTX_CONSTANT_ID_HIGH, TTX_CONSTANT_ID_LOW);
   using Api = ttx_abstract;
-  using Abstract::Abstract;
+
+  explicit constexpr Constant(Api api) : api(api) {}
+
+  static auto accept(Api api) -> Bool { return Abstract::accept(api); }
+
+  constexpr auto get_abi() const -> Api { return api; }
+
+  constexpr auto get_abstract() const -> Abstract { return Abstract(api); }
+
+ private:
+  Api api;
 };
 
 }  // namespace Ttx::Concept::Policies

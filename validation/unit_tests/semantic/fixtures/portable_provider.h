@@ -10,8 +10,8 @@
 // and in WebAssembly. The C provider publishes literal descriptor bytes so the
 // check can catch a disagreement with the C++ compiler's canonical encoding.
 typedef struct portable_counter {
-  void* receiver;
-  U32 (*add)(void* receiver, U32 amount);
+  void* context;
+  U32 (*add)(void* context, U32 amount);
 } portable_counter;
 
 C_LINKAGE ttx_semantic_query portable_counter_open(void);

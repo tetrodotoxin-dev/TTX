@@ -1,59 +1,68 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "validation/unit_tests/semantic/fixtures.hpp"
+
 #include "perimortem/core/static/vector.hpp"
 
-#include "validation/unit_tests/semantic/fixtures.hpp"
 #include "ttx/data/protocol/direct/provider.hpp"
 
 using namespace Validation::FlowTests;
 
 // Two semantic promises can share one Data API. Supplying the requested UUID
 // explicitly must preserve the provider's policy instead of deriving identity
-// from the C++ facade or accepting another promise with the same byte shape.
+// from the C++ interface or accepting another promise with the same byte shape.
 VALIDATION_TEST(TtxFlow, explicit_contract) {
-  using Ttx::Data::Protocol::Direct::Provider;
-  static constexpr Perimortem::System::Uuid selected =
-      Perimortem::System::Uuid(41, 73);
-  static const auto& form = Ttx::Data::Form::Compiled<
-      Ttx::Data::Form::Native<U32>::reference>::get_representation();
+  using Interface = Ttx::Data::Protocol::Direct::Provider;
+  struct Provider {
+    static auto selected() -> Perimortem::System::Uuid {
+      return Perimortem::System::Uuid(41, 73);
+    }
+
+    static auto representation(void*) -> const Representation* {
+      return &Ttx::Data::Form::Compiled<
+          Ttx::Data::Form::Native<U32>::reference>::get_representation();
+    }
+
+    static auto read(void* context) -> const void* { return context; }
+
+    static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
+      return Perimortem::System::Uuid(id) == selected() ? TTX_BINDING_SATISFIED
+                                                        : TTX_BINDING_REJECTED;
+    }
+
+    static auto bind(void* context, perimortem_uuid id, ttx_storage output)
+        -> ttx_binding_status {
+      const auto status = supports(context, id);
+      if (status != TTX_BINDING_SATISFIED) {
+        return status;
+      }
+
+      static const Interface::Operations operations = {representation, read};
+      return static_cast<ttx_binding_status>(
+          Binding::provide<Interface>({context, &operations}, Storage(output)));
+    }
+  };
+  const auto selected = Provider::selected();
   U32 payload = 42;
-  const Query query(ttx_semantic_query(
-      &payload,
-      [](void* source, perimortem_uuid contract,
-         ttx_storage requested) -> ttx_binding_status {
-        if (Perimortem::System::Uuid(contract) != selected) {
-          return TTX_BINDING_REJECTED;
-        }
+  const Query query({&payload, Provider::bind, Provider::supports});
 
-        static const Provider::Operations operations = Provider::Operations(
-            [](void*) -> const Representation* { return &form; },
-            [](void* source) -> const void* { return source; });
-        return static_cast<ttx_binding_status>(Binding::provide<Provider>(
-            Provider::Api(source, &operations), Storage(requested)));
-      },
-      [](void*, perimortem_uuid contract) -> ttx_binding_status {
-        return Perimortem::System::Uuid(contract) == selected
-                   ? TTX_BINDING_SATISFIED
-                   : TTX_BINDING_REJECTED;
-      }));
-
-  query.bind<Provider>(selected).visit(
-      [&](Provider provider) {
+  query.bind<Interface>(selected).visit(
+      [&](Interface provider) {
         EXPECT_EQ(*static_cast<const U32*>(provider.read_ptr()), U32(42));
       },
       [&](Binding::Failure) { EXPECT(false); });
-  query.bind<Provider>(Ttx::Semantic::Transport::Flow::direct.provider)
+  query.bind<Interface>(Ttx::Semantic::Transport::Flow::direct.provider)
       .visit(
-          [&](Provider) { EXPECT(false); },
+          [&](Interface) { EXPECT(false); },
           [&](Binding::Failure failure) {
             EXPECT(failure == Binding::Failure::Rejected);
           });
 }
 
-// The module entry is the prearranged C bootstrap. It supplies a writer for
-// the Query record, while the host's reader permits only Direct or Shared.
-// The agreed C representation grants the cast that imports its bind thunk.
+// The module entry is the prearranged C bootstrap. It supplies a provider for
+// the Query record, while the host's consumer permits only Direct or Shared.
+// The agreed C representation grants the cast that imports its bind function.
 // That imported Query then participates in ordinary protocol negotiation.
 VALIDATION_TEST(TtxFlow, bootstrap_bind) {
   Preparation prepare;
@@ -64,14 +73,15 @@ VALIDATION_TEST(TtxFlow, bootstrap_bind) {
 
   // Derive the expected callable form from the actual C declaration. The C
   // provider authors the same form independently, including bind's signature.
-  const auto& query_schema = Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-      ttx_semantic_query>::reference>::get_representation();
-  Validation::FlowTests::Reader receiver = Validation::FlowTests::Reader(
-      query_schema, PROVIDES_DIRECT | PROVIDES_SHARED);
+  const auto& query_representation =
+      Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
+          ttx_semantic_query>::reference>::get_representation();
+  Validation::FlowTests::Consumer consumer = Validation::FlowTests::Consumer(
+      query_representation, PROVIDES_DIRECT | PROVIDES_SHARED);
 
   Flow bootstrap;
   ASSERT(
-      bootstrap.connect(receiver.query(), module.bootstrap_writer()) ==
+      bootstrap.connect(consumer.query(), module.bootstrap_provider()) ==
       Flow::Status::Success);
   EXPECT(bootstrap.get_protocol() == Protocol::Direct);
 
@@ -83,7 +93,7 @@ VALIDATION_TEST(TtxFlow, bootstrap_bind) {
   EXPECT(
       imported.supports(Ttx::Semantic::Transport::Flow::block.provider) ==
       Ttx::Semantic::Negotiation::Binding::Status::Unknown);
-  Validation::FlowTests::Reader data = Validation::FlowTests::Reader(four);
+  Validation::FlowTests::Consumer data = Validation::FlowTests::Consumer(four);
   Flow flow;
   ASSERT(flow.connect(data.query(), imported) == Flow::Status::Success);
 

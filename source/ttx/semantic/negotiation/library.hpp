@@ -7,8 +7,8 @@
 
 #include "perimortem/system/library.hpp"
 
+#include "ttx/semantic/negotiation/callback.hpp"
 #include "ttx/semantic/negotiation/library.h"
-#include "ttx/semantic/negotiation/receiver.hpp"
 
 namespace Ttx::Semantic::Negotiation {
 
@@ -25,11 +25,13 @@ class Library {
   Library(const Library&) = default;
   auto operator=(const Library&) -> Library& = default;
   Library(Library&&) = default;
-  auto visit(Query host, Receiver receive) const -> Binding::Status;
+
+  auto visit(Query host, Callback callback) const -> Binding::Status;
 
  private:
   Library(Perimortem::System::Library library, ttx_library_entry entry)
       : library(Perimortem::Core::Data::take(library)), entry(entry) {}
+
   Perimortem::Memory::Dynamic::Record<Perimortem::System::Library> library;
   ttx_library_entry entry;
 };

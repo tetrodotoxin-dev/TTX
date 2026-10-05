@@ -3,10 +3,10 @@
 
 #include "ttx/data/form/compiled.hpp"
 
+#include "validation/unit_tests/data/form/preparation.hpp"
+
 #include "perimortem/core/static/vector.hpp"
 #include "perimortem/core/null_terminated.hpp"
-
-#include "validation/unit_tests/data/form/preparation.hpp"
 
 using namespace Perimortem::Core;
 using namespace Ttx::Data;
@@ -77,7 +77,7 @@ VALIDATION_TEST(TtxCompiled, primitive_bytes) {
       Data::compare(
           representation.data, expected.get_data(), sizeof(expected)));
 
-  // A borrowed publication must also be usable for observation. This checks
+  // A borrowed canonical form must also be usable for observation. This checks
   // the literal distance against the current format rather than merely
   // comparing two copies of the same byte array.
   Representation(expected.get_data(), sizeof(expected))
@@ -116,7 +116,7 @@ VALIDATION_TEST(TtxCompiled, repeated_publication) {
   EXPECT(Data::compare(first.get_data(), second.get_data(), sizeof(first)));
 }
 
-// Padding belongs to the complete publication, not each descriptor. F1 and
+// Padding belongs to the complete canonical form, not each descriptor. F1 and
 // F3 both leave four tail bytes after these three blocks. Empty has only
 // its root block. Dirty destination bytes make an unwritten tail observable.
 VALIDATION_TEST(TtxCompiled, canonical_padding) {

@@ -3,89 +3,68 @@
 
 #pragma once
 
-#include "ttx/abi/operations.hpp"
 #include "ttx/concept/abstract.hpp"
 #include "ttx/concept/capabilities/import.h"
-#include "ttx/concept/policies/none.h"
 
 namespace Ttx::Concept::Capabilities {
 
 // Exposes the capability to interpret data described by the supplied
-// Representation and produce an Abstract projection. The provider checks the
-// representation before interpreting the input. If it can produce a valid
-// projection, `visit` invokes the receiver once with the Abstract representing
-// the imported graph and returns Satisfied after the callback finishes.
+// Representation and supply an Abstract for the imported graph. The provider
+// checks the representation before interpreting the input. On success, `visit`
+// invokes the callback once with that Abstract and returns Satisfied after the
+// callback finishes.
 //
-// The receiver is a callable passed by reference and invoked with an Abstract.
+// The callback is a callable passed by reference and invoked with an Abstract.
 // Its captured state carries the consumer's observations. `visit` returns the
-// provider's status and discards any value returned by the receiver. The
-// input, Representation and receiver remain available until `visit` returns.
+// provider's status and discards any value returned by the callback. The
+// input, Representation and callback remain available until `visit` returns.
 // The imported graph is available during the callback, where the consumer can
 // inspect it, copy data or negotiate retained access through the graph's
 // capabilities.
 //
-// A `visit` returning Unknown or Rejected guarantees that the receiver was
+// A `visit` returning Unknown or Rejected guarantees that the callback was
 // never invoked. Unknown leaves the import request undetermined. Rejected
-// explicitly refuses it. `provide` adapts the native provider's `visit`
-// operation. A provider that omits `visit` supplies the default import, which
-// passes None to the receiver and returns Satisfied.
-class Import : public Abstract {
+// explicitly refuses it.
+class Import {
  public:
   static constexpr auto contract_id =
       Perimortem::System::Uuid(TTX_IMPORT_ID_HIGH, TTX_IMPORT_ID_LOW);
   using Api = ttx_import;
   using Operations = ttx_import_ops;
-  static auto accept(Api value) -> Bool {
-    return value.operations && value.operations->visit &&
+
+  static auto accept(Api api) -> Bool {
+    return api.operations && api.operations->visit &&
            Abstract::accept(
-               ttx_abstract(value.source, &value.operations->abstract));
-  }
-  explicit constexpr Import(Api value)
-      : Abstract(value.source, value.operations->abstract) {}
-  constexpr auto get_abi() const -> Api {
-    const auto value = Abstract::get_abi();
-    return Api(
-        value.source, &Abi::Operations::from_abstract<Operations>(*value.operations));
+               ttx_abstract(api.context, &api.operations->abstract));
   }
 
-  template <typename Receiver>
+  explicit constexpr Import(Api api) : api(api) {}
+
+  constexpr auto get_abi() const -> Api { return api; }
+
+  constexpr auto get_abstract() const -> Abstract {
+    return Abstract(api.context, api.operations->abstract);
+  }
+
+  template <typename Function>
   auto visit(
       const void* input,
       const Data::Form::Representation& representation,
-      Receiver& receiver) const -> Semantic::Negotiation::Binding::Status {
+      Function& callback) const -> Semantic::Negotiation::Binding::Status {
     const auto api = get_abi();
     return static_cast<Semantic::Negotiation::Binding::Status>(
         api.operations->visit(
-            api.source, input, &representation, &receiver,
-            [](void* state, ttx_abstract subject) {
-              Abi::Receiver::get<Receiver>(state)(Abstract(subject));
-            }));
+            api.context, input, &representation, &callback,
+            Import::callback<Function>));
   }
 
-  template <typename Provider>
-    requires(!__is_base_of(Abstract, Provider) && !__is_const(Provider))
-  static auto provide(Provider& provider) -> Import {
-    static const Operations operations = Operations(
-        *Abstract::provide(provider).get_abi().operations,
-        [](void* source, const void* input,
-           const ttx_representation* representation, void* receiver,
-           void (*receive)(void*, ttx_abstract)) -> ttx_binding_status {
-          auto observe = [&](Abstract subject) {
-            receive(receiver, subject.get_abi());
-          };
-          if constexpr (requires(Provider& provider) {
-                          provider.visit(input, *representation, observe);
-                        }) {
-            return static_cast<ttx_binding_status>(
-                Abi::Receiver::get<Provider>(source).visit(
-                    input, *representation, observe));
-          } else {
-            receive(receiver, ttx_none());
-            return TTX_BINDING_SATISFIED;
-          }
-        });
-    return Import(Api(&provider, &operations));
+ private:
+  template <typename Function>
+  static void callback(void* context, ttx_abstract abstract) {
+    (*static_cast<Function*>(context))(Abstract(abstract));
   }
+
+  Api api;
 };
 
 }  // namespace Ttx::Concept::Capabilities
@@ -96,5 +75,5 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(ttx_import_ops, visit));
 TTX_DATA_RECORD(
     ttx_import,
-    TTX_DATA_MEMBER(ttx_import, source),
+    TTX_DATA_MEMBER(ttx_import, context),
     TTX_DATA_MEMBER(ttx_import, operations));

@@ -27,7 +27,7 @@ typedef struct provider_state {
   Count releases;
   Count fail_at;
   U32 values[4];
-  void* observer;
+  void* context;
   void (*released)(void*);
   const ttx_representation* destination_representation;
   Count destination_capacity;
@@ -52,11 +52,11 @@ typedef struct provider_operations {
 } provider_operations;
 
 typedef struct provider_api {
-  ttx_semantic_query (*writer)(provider_state*);
-  ttx_semantic_query (*bootstrap_writer)(void);
+  ttx_semantic_query (*provider)(provider_state*);
+  ttx_semantic_query (*bootstrap_provider)(void);
   const ttx_swizzle_selection* (*selection)(void);
   ttx_semantic_query (*primitives)(void);
-  const ttx_representation* (*primitive_schema)(void);
+  const ttx_representation* (*primitive_representation)(void);
   ttx_data_status (
       *select)(const provider_operations*, const ttx_flow*, ttx_storage);
 } provider_api;

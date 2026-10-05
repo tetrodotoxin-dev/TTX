@@ -4,9 +4,9 @@
 #include "validation/unit_tests/data/form/visitation.h"
 
 static ttx_data_status observe(
-    void* source,
+    void* context,
     ttx_representation_position position) {
-  visitation_probe* probe = source;
+  visitation_probe* probe = context;
   probe->offsets[probe->count++] = position.offset;
   return probe->count == probe->stop ? TTX_DATA_DENIED : TTX_DATA_SUCCESS;
 }

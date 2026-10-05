@@ -40,6 +40,7 @@ static auto compile(Count count) -> void {
   if (compiler.compile(schema) != Status::Success) {
     Diagnostics::Log::fatal("Benchmark schema failed to compile."_view);
   }
+
   auto bytes = compiler.get_size();
   Toolchain::Validation::Benchmark::prevent_optimization(bytes);
 }
@@ -47,9 +48,11 @@ static auto compile(Count count) -> void {
 VALIDATION_BENCHMARK(Forms, compile_512) {
   compile(512);
 }
+
 VALIDATION_BENCHMARK(Forms, compile_4096) {
   compile(4096);
 }
+
 VALIDATION_BENCHMARK(Forms, compile_16384) {
   compile(16384);
 }
@@ -81,6 +84,7 @@ static Toolchain::Validation::Harness Agreement = {
           Diagnostics::Log::fatal(
               "Benchmark representation failed to compile."_view);
         }
+
         first = Representation(publications[0].get_data(), compiler.get_size());
         second =
             Representation(publications[1].get_data(), compiler.get_size());

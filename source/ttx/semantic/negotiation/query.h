@@ -11,19 +11,20 @@
 // Two systems need an agreed entry point before either can ask the other for
 // an interface. A module can return this Query from its entry function, or a
 // native provider can lend it directly. That enclosing agreement supplies the
-// `bind` thunk and its lifetime, so calling `bind` does not first require a
+// `bind` function and its lifetime, so calling `bind` does not first require a
 // Flow. Systems can therefore begin cooperating without constructing a TTX
 // graph. Once that first Query is available, `bind` can acquire interfaces that
 // support further negotiation, such as an Abstract exposed by a plugin.
 //
-// A caller sometimes needs to know what a subject promises without acquiring
-// any operations. `supports` answers that semantic question using only the
-// UUID. For example, an unsigned policy can exclude negative values without
-// exposing a callable interface. The answer transfers no bytes and requires no
-// agreed Representation. Satisfied establishes that promise, Unknown leaves the
-// question unsettled, and Rejected records an explicit refusal. An unfamiliar
-// UUID therefore need not be rejected. These answers are observations, with
-// no implied background work or obligation to become determined later.
+// A caller sometimes needs to know which contracts a provider supports without
+// acquiring any operations. `supports` answers that semantic question using
+// only the UUID. For example, an unsigned policy can exclude negative values
+// without exposing a callable interface. The answer transfers no bytes and
+// requires no agreed Representation. Satisfied establishes that promise,
+// Unknown leaves the question unsettled, and Rejected records an explicit
+// refusal. An unfamiliar UUID therefore need not be rejected. These answers are
+// observations, with no implied background work or obligation to become
+// determined later.
 //
 // `bind` asks the stronger question: can this provider supply the promised API
 // in the concrete form the caller can consume? Success populates that admitted
@@ -43,22 +44,20 @@
 // status and borrowing rules are described in
 // ttx/semantic/negotiation/binding.h.
 //
-// `source` refers to private provider state. A consumer accessing that state
-// through Query is undefined behavior under TTX. The provider may substitute
-// a different implementation with the same semantic answers, so the consumer
-// uses the supplied operations and lifetime agreement rather than assuming a
-// native object layout.
+// `context` is opaque and each supplied function interprets it. A consumer
+// accessing that state through Query is undefined behavior under TTX. The
+// provider may substitute a different implementation satisfying the same
+// contracts. The consumer uses the supplied functions and lifetime agreement
+// independently of the provider's storage or implementation language.
 //
 // The supplying protocol keeps the provider state and implementation code
 // alive through negotiation and every use of the returned bindings. Copying
 // this Query borrows that agreement without acquiring another lifetime.
 typedef struct ttx_semantic_query {
-  void* source;
-  ttx_binding_status (*bind)(
-      void* source,
-      perimortem_uuid contract,
-      ttx_storage requested);
-  ttx_binding_status (*supports)(void* source, perimortem_uuid contract);
+  void* context;
+  ttx_binding_status (
+      *bind)(void* context, perimortem_uuid contract, ttx_storage requested);
+  ttx_binding_status (*supports)(void* context, perimortem_uuid contract);
 } ttx_semantic_query;
 
 #endif

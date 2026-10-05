@@ -21,20 +21,20 @@ class Provider {
            api.operations->acquire;
   }
 
-  constexpr Provider(void* source, const Operations& operations)
-      : value(source, &operations) {}
+  constexpr Provider(void* context, const Operations& operations)
+      : api(context, &operations) {}
 
-  constexpr explicit Provider(ttx_shared_provider value) : value(value) {}
+  constexpr explicit Provider(ttx_shared_provider api) : api(api) {}
 
   auto get_representation() const -> const Form::Representation& {
-    return *value.operations->representation(value.source);
+    return *api.operations->representation(api.context);
   }
 
-  constexpr auto get_abi() const -> ttx_shared_provider { return value; }
+  constexpr auto get_abi() const -> ttx_shared_provider { return api; }
 
   auto acquire() const -> Perimortem::Utility::Result<Lifetime, Status> {
     ttx_shared_lifetime result;
-    const auto status = value.operations->acquire(value.source, &result);
+    const auto status = api.operations->acquire(api.context, &result);
     if (status != TTX_DATA_SUCCESS) {
       return static_cast<Status>(status);
     }
@@ -43,7 +43,7 @@ class Provider {
   }
 
  private:
-  ttx_shared_provider value;
+  ttx_shared_provider api;
 };
 
 }  // namespace Ttx::Data::Protocol::Shared
@@ -55,5 +55,5 @@ TTX_DATA_RECORD(
 
 TTX_DATA_RECORD(
     ttx_shared_provider,
-    TTX_DATA_MEMBER(ttx_shared_provider, source),
+    TTX_DATA_MEMBER(ttx_shared_provider, context),
     TTX_DATA_MEMBER(ttx_shared_provider, operations));

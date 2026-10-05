@@ -3,11 +3,11 @@
 
 #include "validation/unit_tests/data/form/composition.h"
 
+#include "validation/unit_tests/data/form/preparation.hpp"
+
 #include "perimortem/core/static/vector.hpp"
 
-#include "validation/unit_tests/data/form/preparation.hpp"
 #include "toolchain/validation/unit_test.hpp"
-#include "ttx/abi/receiver.hpp"
 
 using namespace Perimortem;
 using namespace Ttx::Data;
@@ -20,6 +20,12 @@ static Toolchain::Validation::Harness Composition = {
 // Composition gives each imported root a real member boundary. Compare with
 // source compilation to catch lost padding, reference remapping and duplicate
 // bodies. Reversed placement order must produce the same canonical bytes.
+static auto allocate_representation(void* context, Count size, Count) -> void* {
+  return static_cast<Memory::Allocator::Arena*>(context)
+      ->allocate(size)
+      .get_data();
+}
+
 static auto check_pair(
     const Schema& child,
     Toolchain::Validation::Test::TestResult& result) -> void {
@@ -64,12 +70,8 @@ static auto check_pair(
           },
           [&](Status) { EXPECT(False); });
 
-  const ttx_representation_allocator allocator = ttx_representation_allocator(
-      &arena, [](void* source, Count size, Count) -> void* {
-        return Ttx::Abi::Receiver::get<Memory::Allocator::Arena>(source)
-            .allocate(size)
-            .get_data();
-      });
+  const ttx_representation_allocator allocator =
+      ttx_representation_allocator(&arena, allocate_representation);
   const Representation* output = nullptr;
   ASSERT(
       compose_pair(&form, width, child.get_alignment(), allocator, &output) ==

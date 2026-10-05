@@ -2,7 +2,6 @@
 // Copyright (c) 2023-present Matt Kaes and contributors
 
 #include "ttx/data/form/representation.hpp"
-#include "ttx/abi/receiver.hpp"
 
 using namespace Ttx::Data;
 using namespace Ttx::Data::Form;
@@ -90,7 +89,7 @@ auto ttx_representation_visit(
 
   return static_cast<ttx_data_status>(
       source->visit([&](Representation::Position position) {
-        return static_cast<Status>(visitor.visit(visitor.source, position));
+        return static_cast<Status>(visitor.visit(visitor.context, position));
       }));
 }
 
@@ -106,8 +105,14 @@ auto ttx_representation_visit_selected(
   return static_cast<ttx_data_status>(source->visit(
       Perimortem::Core::View::Vector<Count>(coordinates, count),
       [&](Representation::Position position) {
-        return static_cast<Status>(visitor.visit(visitor.source, position));
+        return static_cast<Status>(visitor.visit(visitor.context, position));
       }));
+}
+
+static auto allocate_representation(void* context, Count bytes, Count)
+    -> void* {
+  auto& arena = *static_cast<Perimortem::Memory::Allocator::Arena*>(context);
+  return arena.allocate(bytes).get_data();
 }
 
 auto ttx_representation::compile(
@@ -115,13 +120,8 @@ auto ttx_representation::compile(
     Perimortem::Memory::Allocator::Arena& arena,
     Count pointer_size)
     -> Perimortem::Utility::Result<const ttx_representation&, Status> {
-  const ttx_representation_allocator allocator = ttx_representation_allocator(
-      &arena, [](void* source, Count bytes, Count) -> void* {
-        return Ttx::Abi::Receiver::get<Perimortem::Memory::Allocator::Arena>(
-                   source)
-            .allocate(bytes)
-            .get_data();
-      });
+  const ttx_representation_allocator allocator =
+      ttx_representation_allocator(&arena, allocate_representation);
   const ttx_representation* result = nullptr;
   const auto status =
       ttx_representation_compile(schema, pointer_size, allocator, &result);
@@ -138,13 +138,8 @@ auto ttx_representation::compose(
     Count alignment,
     Perimortem::Memory::Allocator::Arena& arena)
     -> Perimortem::Utility::Result<const ttx_representation&, Status> {
-  const ttx_representation_allocator allocator = ttx_representation_allocator(
-      &arena, [](void* source, Count bytes, Count) -> void* {
-        return Ttx::Abi::Receiver::get<Perimortem::Memory::Allocator::Arena>(
-                   source)
-            .allocate(bytes)
-            .get_data();
-      });
+  const ttx_representation_allocator allocator =
+      ttx_representation_allocator(&arena, allocate_representation);
   const ttx_representation* result = nullptr;
   const auto status = ttx_representation_compose(
       members.get_data(), members.get_size(), extent, alignment, allocator,

@@ -101,7 +101,9 @@ typedef struct ttx_schema_reference {
   }
 
   constexpr auto is_set() const -> Bool { return schema || is_pointer(); }
+
   constexpr auto get_extent(Count pointer_size = sizeof(void*)) const -> Count;
+
   constexpr auto get_alignment(Count pointer_size = sizeof(void*)) const
       -> Count;
 #endif
@@ -134,19 +136,22 @@ typedef struct ttx_schema_argument {
   Count count;
 #ifdef __cplusplus
   constexpr ttx_schema_argument() : reference(), count(0) {}
+
   constexpr ttx_schema_argument(ttx_schema_reference reference, Count count = 1)
       : reference(reference), count(count) {}
 
   constexpr auto get_reference() const -> ttx_schema_reference {
     return reference;
   }
+
   constexpr auto get_count() const -> Count { return count; }
 #endif
 } ttx_schema_argument;
 
-// An unset result reference denotes void. The actual receiver is an ordinary
-// explicit argument. These facts describe the realized C call boundary and
-// impose no native ownership or language object model on its provider.
+// An unset result reference denotes void. A context passed to the function is
+// an ordinary explicit argument. These facts describe the realized C call
+// boundary and impose no native ownership or language object model on its
+// provider.
 typedef struct ttx_schema_callable {
   const ttx_schema_argument* arguments;
   Count count;
@@ -158,7 +163,9 @@ typedef struct ttx_schema_callable {
     return Perimortem::Core::View::Vector<ttx_schema_argument>(
         arguments, count);
   }
+
   constexpr auto get_result() const -> ttx_schema_reference { return result; }
+
   constexpr auto get_convention() const;
 #endif
 } ttx_schema_callable;
@@ -179,6 +186,7 @@ typedef struct ttx_schema_position {
   constexpr auto get_reference() const -> ttx_schema_reference {
     return reference;
   }
+
   constexpr auto get_offset() const -> Count { return offset; }
 #endif
 } ttx_schema_position;
@@ -219,7 +227,7 @@ typedef struct ttx_schema_primitive {
 //
 // Names and the choice of which source supplies an output belong to the
 // semantic layer. Source descriptions may be runtime objects or C++ constants.
-// They need only remain stable during compilation. The resulting publication
+// They need only remain stable during compilation. The resulting canonical form
 // has its own lifetime and contains no source identity used to justify
 // compatibility.
 typedef struct ttx_schema {

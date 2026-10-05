@@ -10,13 +10,13 @@
 #define COUNTER_ID_HIGH ((U64)0x2d4fc0031eda431bULL)
 #define COUNTER_ID_LOW ((U64)0xa69d57835fb2fd19ULL)
 
-// The whole API crosses the binding boundary. Its receiver is an interior
+// The whole API crosses the binding boundary. Its context is an interior
 // address of private C state. Negotiation checks the whole record rather than
-// assuming a fixed receiver and table pair.
+// assuming a fixed context and table pair.
 typedef struct counter_api {
-  void* receiver;
-  U64 (*add)(void* receiver, U64 amount);
-  U64 (*read)(void* receiver);
+  void* context;
+  U64 (*add)(void* context, U64 amount);
+  U64 (*read)(void* context);
 } counter_api;
 
 typedef struct counter_statistics {
@@ -24,11 +24,23 @@ typedef struct counter_statistics {
   U64 calls;
 } counter_statistics;
 
+enum counter_composition {
+  COUNTER_DIRECT,
+  COUNTER_SECOND,
+  COUNTER_EMBEDDED,
+  COUNTER_TEMPORARY,
+  COUNTER_ALTERNATING,
+};
+
 typedef struct counter_fixture {
   ttx_semantic_query query;
   void (*reset)(ttx_binding_status status, U8 omit, U8 stateless);
   counter_statistics (*statistics)(void);
+  void (*compose)(enum counter_composition mode);
 } counter_fixture;
+
+// This consumer is compiled separately from the provider's private state.
+C_LINKAGE U64 counter_consume(counter_api api, U64 amount);
 
 typedef ttx_data_status (*interface_compile)(
     ttx_schema_reference,
@@ -36,7 +48,6 @@ typedef ttx_data_status (*interface_compile)(
     ttx_representation_allocator,
     const ttx_representation**);
 C_LINKAGE EXPORTED(TTX_TEST)
-counter_fixture
-    interface_provider_open(interface_compile compiler);
+counter_fixture interface_provider_open(interface_compile compiler);
 
 #endif

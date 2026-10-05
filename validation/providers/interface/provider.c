@@ -1,41 +1,77 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "validation/unit_tests/semantic/fixtures/interface_provider.h"
+#include "validation/providers/interface/provider.h"
 
 #include <stddef.h>
 
-#include "validation/unit_tests/semantic/fixtures/provider_representation.h"
+#include "validation/providers/representation.h"
 
-static struct {
+typedef struct counter_state {
   U64 guard;
   U64 value;
+  U64 second;
   counter_statistics statistics;
   ttx_binding_status status;
   U8 omit;
   U8 stateless;
-} state;
+  enum counter_composition mode;
+  U64 selections;
+} counter_state;
+
+static counter_state state;
 static const ttx_representation* representation;
 
-static U64 add(void* receiver, U64 amount) {
+static U64 add(void* context, U64 amount) {
+  U64* source = context;
   ++state.statistics.calls;
-  if (!receiver) {
+  if (!source) {
     return amount;
   }
 
-  U64* value = (U64*)receiver;
+  U64* value = source;
   *value += amount;
   return *value;
 }
 
-static U64 read(void* receiver) {
+static U64 read(void* context) {
+  U64* source = context;
   ++state.statistics.calls;
-  return receiver ? *(const U64*)receiver : 0;
+  return source ? *source : 0;
+}
+
+// The wrapper owns the relationship between the enclosing state and the
+// counter word. The lower operation only receives its own expected context.
+static U64 embedded_add(void* context, U64 amount) {
+  counter_state* subject = context;
+  return add(&subject->value, amount);
+}
+
+static U64 embedded_read(void* context) {
+  counter_state* subject = context;
+  return read(&subject->value);
+}
+
+// The temporary value is a simulacra for the lower counter operation, with
+// the offset already applied. The operation consumes it during the call, and
+// only the numeric result reaches the consumer.
+static U64 temporary_add(void* context, U64 amount) {
+  counter_state* subject = context;
+  U64 temporary = subject->value + 100;
+  const U64 result = add(&temporary, amount);
+  subject->value = temporary - 100;
+  return result;
+}
+
+static U64 temporary_read(void* context) {
+  counter_state* subject = context;
+  U64 temporary = subject->value + 100;
+  return read(&temporary);
 }
 
 static ttx_binding_status
-    bind(void* source, perimortem_uuid id, ttx_storage requested) {
-  (void)source;
+    bind(void* context, perimortem_uuid id, ttx_storage requested) {
+  (void)context;
   ++state.statistics.queries;
   if (state.status != TTX_BINDING_SATISFIED) {
     return state.status;
@@ -49,11 +85,20 @@ static ttx_binding_status
     return TTX_BINDING_SATISFIED;
   }
 
-  const counter_api api = {
-    state.stateless ? NULL : &state.value,
-    add,
-    read,
-  };
+  counter_api api = {state.stateless ? NULL : &state.value, add, read};
+  enum counter_composition mode = state.mode;
+  if (mode == COUNTER_ALTERNATING) {
+    mode = state.selections++ % 2 ? COUNTER_TEMPORARY : COUNTER_DIRECT;
+  }
+
+  if (mode == COUNTER_SECOND) {
+    api.context = &state.second;
+  } else if (mode == COUNTER_EMBEDDED) {
+    api = (counter_api){&state, embedded_add, embedded_read};
+  } else if (mode == COUNTER_TEMPORARY) {
+    api = (counter_api){&state, temporary_add, temporary_read};
+  }
+
   return ttx_binding_provide(representation, &api, requested);
 }
 
@@ -62,15 +107,18 @@ static void reset(ttx_binding_status status, U8 omit, U8 stateless) {
     0,
   };
   state.value = 0;
+  state.second = 20;
   state.status = status;
   state.omit = omit;
   state.stateless = stateless;
+  state.mode = COUNTER_DIRECT;
+  state.selections = 0;
 }
 
 // Support observes the semantic promise without constructing the counter API.
 // A caller can keep using this fact even if its callable layout has drifted.
-static ttx_binding_status supports(void* source, perimortem_uuid id) {
-  (void)source;
+static ttx_binding_status supports(void* context, perimortem_uuid id) {
+  (void)context;
   if (state.status != TTX_BINDING_SATISFIED) {
     return state.status;
   }
@@ -78,6 +126,11 @@ static ttx_binding_status supports(void* source, perimortem_uuid id) {
   return id.high == COUNTER_ID_HIGH && id.low == COUNTER_ID_LOW
              ? TTX_BINDING_SATISFIED
              : TTX_BINDING_UNKNOWN;
+}
+
+static void compose(enum counter_composition mode) {
+  state.mode = mode;
+  state.selections = 0;
 }
 
 static counter_statistics statistics(void) {
@@ -156,7 +209,7 @@ counter_fixture interface_provider_open(interface_compile compiler) {
         NULL,
         TTX_SCHEMA_REFERENCE_POINTER,
       },
-      offsetof(counter_api, receiver),
+      offsetof(counter_api, context),
     },
     {
       {
@@ -199,5 +252,6 @@ counter_fixture interface_provider_open(interface_compile compiler) {
     },
     reset,
     statistics,
+    compose,
   };
 }

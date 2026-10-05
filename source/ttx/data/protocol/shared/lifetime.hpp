@@ -13,37 +13,37 @@ namespace Ttx::Data::Protocol::Shared {
 // releasing the same acquisition twice.
 class Lifetime {
  public:
-  constexpr Lifetime() : value() {}
+  constexpr Lifetime() : api() {}
 
-  constexpr explicit Lifetime(ttx_shared_lifetime value) : value(value) {}
+  constexpr explicit Lifetime(ttx_shared_lifetime api) : api(api) {}
 
   Lifetime(const Lifetime&) = delete;
 
   auto operator=(const Lifetime&) -> Lifetime& = delete;
 
-  constexpr Lifetime(Lifetime&& other) : value(other.take_abi()) {}
+  constexpr Lifetime(Lifetime&& other) : api(other.take_abi()) {}
 
   auto operator=(Lifetime&& other) -> Lifetime& {
     if (this != &other) {
-      ttx_shared_release(&value);
-      value = other.take_abi();
+      ttx_shared_release(&api);
+      api = other.take_abi();
     }
 
     return *this;
   }
 
-  ~Lifetime() { ttx_shared_release(&value); }
+  ~Lifetime() { ttx_shared_release(&api); }
 
-  auto get_pointer() const -> const void* { return value.data; }
+  auto get_pointer() const -> const void* { return api.data; }
 
   auto take_abi() -> ttx_shared_lifetime {
-    auto result = value;
-    value = ttx_shared_lifetime();
+    auto result = api;
+    api = ttx_shared_lifetime();
     return result;
   }
 
  private:
-  ttx_shared_lifetime value = ttx_shared_lifetime();
+  ttx_shared_lifetime api = ttx_shared_lifetime();
 };
 
 }  // namespace Ttx::Data::Protocol::Shared
@@ -51,5 +51,5 @@ class Lifetime {
 TTX_DATA_RECORD(
     ttx_shared_lifetime,
     TTX_DATA_MEMBER(ttx_shared_lifetime, data),
-    TTX_DATA_MEMBER(ttx_shared_lifetime, source),
+    TTX_DATA_MEMBER(ttx_shared_lifetime, context),
     TTX_DATA_MEMBER(ttx_shared_lifetime, release));

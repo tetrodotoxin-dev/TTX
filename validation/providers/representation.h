@@ -9,11 +9,12 @@
 #include "ttx/data/form/representation.h"
 
 // Each C fixture compiles its descriptions once when the module opens. This
-// bounded output region lives with the loaded module, so every returned thunk
-// and Representation shares that lifetime. Access callbacks perform no further
-// preparation, and unloading the module retires the whole publication.
-// The host supplies the compiler through the entry contract, letting this C
-// module use its own storage without linking a second supporting runtime.
+// bounded output region lives with the loaded module, so every returned
+// function and Representation shares that lifetime. Access callbacks perform no
+// further preparation, and unloading the module ends access to its interfaces
+// and representations. The host supplies the compiler through the entry
+// contract, letting this C module use its own storage without linking a second
+// supporting runtime.
 static _Alignas(8) U8 representation_storage[32768];
 static Count representation_usage;
 
@@ -25,7 +26,8 @@ typedef ttx_data_status (*provider_compile)(
 static provider_compile compile_representation;
 
 static void*
-    representation_allocate(void* source, Count size, Count alignment) {
+    representation_allocate(void* context, Count size, Count alignment) {
+  U8* source = context;
   (void)source;
   const Count start = (representation_usage + alignment - 1) & ~(alignment - 1);
   if (size > sizeof(representation_storage) - start) {

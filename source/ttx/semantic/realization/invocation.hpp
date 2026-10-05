@@ -9,8 +9,9 @@
 namespace Ttx::Semantic::Realization {
 
 // Invocation retains the agreed operation record so repeated calls can use its
-// thunk directly without another UUID lookup, signature walk or table transfer.
-// The publication supplying its receiver and code outlives every invocation.
+// function directly without another UUID lookup, signature walk or table
+// transfer. The provider keeps the context and code available through every
+// invocation.
 class Invocation {
  public:
   auto connect(
@@ -22,7 +23,7 @@ class Invocation {
 
   auto invoke(const void* inputs, void* outputs) const -> Data::Status {
     return static_cast<Data::Status>(
-        call.invoke(call.receiver, inputs, outputs));
+        call.invoke(call.context, inputs, outputs));
   }
 
   auto close() -> void { call = ttx_invocation(); }
@@ -35,7 +36,7 @@ class Invocation {
 
 TTX_DATA_RECORD(
     ttx_invocation,
-    TTX_DATA_MEMBER(ttx_invocation, receiver),
+    TTX_DATA_MEMBER(ttx_invocation, context),
     TTX_DATA_MEMBER(ttx_invocation, inputs),
     TTX_DATA_MEMBER(ttx_invocation, outputs),
     TTX_DATA_MEMBER(ttx_invocation, invoke));

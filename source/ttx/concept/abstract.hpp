@@ -5,31 +5,21 @@
 
 #include "perimortem/core/view/bytes.hpp"
 #include "perimortem/core/static/vector.hpp"
-#include "perimortem/core/option.hpp"
 
 #include "perimortem/system/uuid.hpp"
 
-#include "ttx/abi/receiver.hpp"
 #include "ttx/concept/abstract.h"
-#include "ttx/concept/policies/unknown.h"
 #include "ttx/concept/visitor.hpp"
 #include "ttx/semantic/negotiation/query.hpp"
 
 namespace Ttx::Concept {
 
-// An Abstract is the entry view of a subject that a provider agreed to expose.
-// The C receiver and ops table makes the same view usable across languages and
-// systems, but it can be a bit cumbersome to use. This C++ API provides a more
-// native API layer that also allows for optimizations inside the same module
-// that the C layer can't expose.
-//
-// The table's complete callable form still participates in TTX's semantic
-// binding. Once this record is acquired navigation can use Abstract operations
-// directly, but it should avoid assuming it follows any specific C++ object
-// model.
+// An Abstract carries the context and operations supplied by its provider.
+// Each operation interprets that context according to its own implementation.
+// The C++ view copies this record and forwards calls through its functions.
 //
 // Abstract is a view valid within the observation that supplied it. Copying
-// the view keeps the same receiver and table. The supplying call or retained
+// the view keeps the same context and table. The supplying call or retained
 // provider determines when that access ends, and a later observation asks the
 // provider again. Stronger return contracts state how to retain their answers.
 //
@@ -47,20 +37,22 @@ class Abstract {
   using Visitor = Concept::Visitor<Abstract>;
 
   static auto accept(Api api) -> Bool {
-    return api.source && api.operations && api.operations->supports &&
+    return api.context && api.operations && api.operations->supports &&
            api.operations->bind && api.operations->get_data &&
            api.operations->resolve && api.operations->resolve_concept &&
            api.operations->visit_concepts;
   }
 
-  constexpr Abstract(void* source, const Operations& operations)
-      : value(source, &operations) {}
-  explicit constexpr Abstract(Api value) : value(value) {}
+  constexpr Abstract(void* context, const Operations& operations)
+      : api(context, &operations) {}
 
-  constexpr auto get_abi() const -> Api { return value; }
+  explicit constexpr Abstract(Api api) : api(api) {}
+
+  constexpr auto get_abi() const -> Api { return api; }
+
   constexpr auto get_query() const -> Semantic::Negotiation::Query {
     return Semantic::Negotiation::Query(ttx_semantic_query(
-        value.source, value.operations->bind, value.operations->supports));
+        api.context, api.operations->bind, api.operations->supports));
   }
 
   auto supports(Perimortem::System::Uuid contract) const
@@ -83,11 +75,7 @@ class Abstract {
   template <typename Contract>
   auto bind() const -> Perimortem::Utility::
       Result<Contract, Semantic::Negotiation::Binding::Failure> {
-    if constexpr (__is_same(Contract, Abstract)) {
-      return *this;
-    } else {
-      return get_query().template bind<Contract>();
-    }
+    return get_query().template bind<Contract>();
   }
 
   // Gets this Abstract's byte observation without creating another Abstract to
@@ -96,13 +84,13 @@ class Abstract {
   //
   // The bytes have no Abstract contract to inspect and no implied format or
   // Constant promise. Repeated calls can observe changing data even when a
-  // semantic edge on the same subject is Constant.
+  // semantic edge on the same Abstract is Constant.
   //
-  // The returned view survives until the next observation on this subject or
-  // publication release. Consumers needing longer retention can copy the bytes
-  // or negotiate a contract that provides it.
+  // The returned view survives until the next observation on this Abstract or
+  // the end of the supplying lifetime. Consumers needing longer retention can
+  // copy the bytes or negotiate a contract that provides it.
   auto get_data() const -> Perimortem::Core::View::Bytes {
-    const auto data = value.operations->get_data(value.source);
+    const auto data = api.operations->get_data(api.context);
     return Perimortem::Core::View::Bytes(data.data, data.size);
   }
 
@@ -115,7 +103,7 @@ class Abstract {
   // Equality here identifies the same borrowed view, not equivalent semantic
   // content or an explicit shared C++ value.
   auto resolve() const -> Abstract {
-    return Abstract(value.operations->resolve(value.source));
+    return Abstract(api.operations->resolve(api.context));
   }
 
   // Resolves a binary query through this Abstract's policy. The provider owns
@@ -127,8 +115,8 @@ class Abstract {
   // established by the provider + route pair, allowing the consumer to retain
   // its answer without asking again.
   auto resolve_concept(Perimortem::Core::View::Bytes route) const -> Abstract {
-    return Abstract(value.operations->resolve_concept(
-        value.source,
+    return Abstract(api.operations->resolve_concept(
+        api.context,
         perimortem_view_bytes(route.get_data(), route.get_size())));
   }
 
@@ -146,160 +134,35 @@ class Abstract {
   // if retained. References encoded in those bytes follow the provider's route
   // contract.
   auto visit_concepts(Visitor visitor) const -> void {
-    const ttx_concept_visitor receiver = ttx_concept_visitor(
-        &visitor, [](void* source, perimortem_view_bytes route, Api subject) {
-          Abi::Receiver::get<Visitor>(source)(
-              Perimortem::Core::View::Bytes(route.data, route.size),
-              Abstract(subject));
-        });
-    value.operations->visit_concepts(value.source, receiver);
+    const ttx_concept_visitor callback(&visitor, callback_concept);
+    api.operations->visit_concepts(api.context, callback);
   }
 
-  // This token identifies the provider within its enclosing publication. It
-  // proves neither a C++ type nor identity across independent publications.
-  constexpr auto get_identity() const -> const void* { return value.source; }
+  // This context identifies the Abstract within the supplying lifetime. It
+  // proves neither a C++ type nor identity across independent lifetimes.
+  constexpr auto get_identity() const -> const void* { return api.context; }
 
   constexpr auto operator==(const Abstract& other) const -> Bool {
-    return value.source == other.value.source &&
-           value.operations == other.value.operations;
+    return api.context == other.api.context &&
+           api.operations == other.api.operations;
   }
+
   constexpr auto operator!=(const Abstract& other) const -> Bool {
     return !(*this == other);
   }
 
-  // Attempts to recover the native provider when this module published the
-  // exact C++ provider type. Comparing the private operation tables proves the
-  // relationship without negotiating another interface. A foreign publication
-  // cannot supply that local proof, even when its type has the same name and
-  // layout.
-  //
-  // Code with an independently known native object can use it directly. That
-  // knowledge does not establish the C++ type of later graph observations,
-  // which may return substitutes.
-  //
-  // Only the matching local table grants the native reference. A ReadOnly
-  // projection uses another table and cannot be recovered through this path.
-  template <typename Provider>
-  auto cast() const -> Perimortem::Core::Option<Provider&> {
-    if constexpr (__is_base_of(Abstract, Provider)) {
-      return Perimortem::Core::Option<Provider&>();
-    } else {
-      Bool native = value.operations == &provider_operations<Provider>();
-      if (!native) {
-        return Perimortem::Core::Option<Provider&>();
-      }
-
-      return Abi::Receiver::get<Provider>(value.source);
-    }
-  }
-
-  // Adapts a native provider to the Abstract interface. An object already
-  // carrying an Abstract view supplies that existing view, preserving the
-  // provider and policy it represents. Deriving a C++ facade from Abstract
-  // therefore doesn't publish the facade as a new graph subject.
-  //
-  // Other native providers are published through generated thunks. Those thunks
-  // know the concrete provider type, so its implementation doesn't need to
-  // inherit an Abstract base or expose its private representation.
-  //
-  // Native publication borrows a mutable provider. A const handle does not
-  // narrow its hooks. Policies such as ReadOnly select the access they expose
-  // through their own operation tables.
-  template <typename Provider>
-    requires(!__is_const(Provider))
-  static constexpr auto provide(Provider& provider) -> Abstract {
-    if constexpr (__is_base_of(Abstract, Provider)) {
-      return provider;
-    } else {
-      return Abstract(&provider, provider_operations<Provider>());
-    }
-  }
-
  private:
-  // Hidden linkage keeps table identity local to one linked unit. Otherwise
-  // symbol preemption could accidentally turn a foreign publication into a
-  // native cast proof when two modules instantiate the same C++ provider type.
-  template <typename Provider>
-  __attribute__((visibility("hidden"))) static constexpr auto
-      provider_operations() -> const Operations& {
-    static constexpr Operations operations = Operations(
-        [](void* source, perimortem_uuid id) -> ttx_binding_status {
-          const Perimortem::System::Uuid contract(id);
-          if (contract == contract_id) {
-            return TTX_BINDING_SATISFIED;
-          }
-
-          if constexpr (requires(Provider& provider) {
-                          provider.supports(contract);
-                        }) {
-            return static_cast<ttx_binding_status>(
-                Abi::Receiver::get<Provider>(source).supports(contract));
-          }
-
-          return TTX_BINDING_UNKNOWN;
-        },
-        [](void* source, perimortem_uuid id,
-           ttx_storage requested) -> ttx_binding_status {
-          const Data::Form::Storage target(requested);
-          if (Perimortem::System::Uuid(id) == contract_id) {
-            return static_cast<ttx_binding_status>(
-                Semantic::Negotiation::Binding::provide<Abstract>(
-                    Api(source, &operations), target));
-          }
-
-          if constexpr (requires(Provider& provider) {
-                          provider.bind_interface(
-                              Perimortem::System::Uuid(id), target);
-                        }) {
-            return static_cast<ttx_binding_status>(
-                Abi::Receiver::get<Provider>(source).bind_interface(
-                    Perimortem::System::Uuid(id), target));
-          }
-
-          return TTX_BINDING_UNKNOWN;
-        },
-        [](void* source) -> perimortem_view_bytes {
-          const auto data = Abi::Receiver::get<Provider>(source).get_data();
-          return perimortem_view_bytes(data.get_data(), data.get_size());
-        },
-        [](void* source) -> Api {
-          if constexpr (requires(Provider& provider) { provider.resolve(); }) {
-            return Abi::Receiver::get<Provider>(source).resolve().get_abi();
-          }
-
-          return Api(source, &operations);
-        },
-        [](void* source, perimortem_view_bytes route) -> Api {
-          if constexpr (requires(Provider& provider) {
-                          provider.resolve_concept(
-                              Perimortem::Core::View::Bytes());
-                        }) {
-            return Abi::Receiver::get<Provider>(source)
-                .resolve_concept(
-                    Perimortem::Core::View::Bytes(route.data, route.size))
-                .get_abi();
-          }
-
-          return ttx_unknown();
-        },
-        [](void* source, ttx_concept_visitor visitor) {
-          if constexpr (requires(Provider& provider, Visitor visitor) {
-                          provider.visit_concepts(visitor);
-                        }) {
-            auto receive = [&](Perimortem::Core::View::Bytes route,
-                               Abstract subject) {
-              visitor.receive(
-                  visitor.source,
-                  perimortem_view_bytes(route.get_data(), route.get_size()),
-                  subject.get_abi());
-            };
-            Abi::Receiver::get<Provider>(source).visit_concepts(Visitor(receive));
-          }
-        });
-    return operations;
+  static void callback_concept(
+      void* context,
+      perimortem_view_bytes route,
+      Api abstract) {
+    auto& visitor = *static_cast<Visitor*>(context);
+    visitor(
+        Perimortem::Core::View::Bytes(route.data, route.size),
+        Abstract(abstract));
   }
 
-  Api value;
+  Api api;
 };
 
 static_assert(sizeof(Abstract) == sizeof(ttx_abstract));
@@ -321,11 +184,11 @@ class Ttx::Data::Form::Native<ttx_abstract> {
     Schema root;
     Schema operations;
     Schema visitor;
-    Schema receive;
+    Schema callback;
     Schema resolve;
     Schema lookup;
     Schema visit;
-    Perimortem::Core::Static::Vector<Schema::Argument, 3> receive_arguments;
+    Perimortem::Core::Static::Vector<Schema::Argument, 3> callback_arguments;
     Perimortem::Core::Static::Vector<Schema::Argument, 1> resolve_arguments;
     Perimortem::Core::Static::Vector<Schema::Argument, 2> lookup_arguments;
     Perimortem::Core::Static::Vector<Schema::Argument, 2> visit_arguments;
@@ -337,7 +200,7 @@ class Ttx::Data::Form::Native<ttx_abstract> {
     // Populate each shape after the vectors exist so every view borrows live
     // storage, including the edges that point back to the root.
     constexpr Definition()
-        : receive_arguments({
+        : callback_arguments({
             Schema::pointer(),
             Native<perimortem_view_bytes>::reference,
             Schema::Argument(root),
@@ -354,7 +217,9 @@ class Ttx::Data::Form::Native<ttx_abstract> {
             Schema::Argument(visitor),
           }),
           root_fields({
-            Schema::Position(Schema::pointer(), offsetof(ttx_abstract, source)),
+            Schema::Position(
+                Schema::pointer(),
+                offsetof(ttx_abstract, context)),
             {
               Schema::pointer(&operations),
               offsetof(ttx_abstract, operations),
@@ -380,10 +245,10 @@ class Ttx::Data::Form::Native<ttx_abstract> {
           visitor_fields({
             Schema::Position(
                 Schema::pointer(),
-                offsetof(ttx_concept_visitor, source)),
+                offsetof(ttx_concept_visitor, context)),
             {
-              receive,
-              offsetof(ttx_concept_visitor, receive),
+              callback,
+              offsetof(ttx_concept_visitor, callback),
             },
           }) {
       root = Schema::composite(
@@ -394,8 +259,8 @@ class Ttx::Data::Form::Native<ttx_abstract> {
       visitor = Schema::composite(
           visitor_fields.get_view(), sizeof(ttx_concept_visitor),
           alignof(ttx_concept_visitor));
-      receive = Schema::callable(
-          Schema::Convention::Native, receive_arguments.get_view());
+      callback = Schema::callable(
+          Schema::Convention::Native, callback_arguments.get_view());
       resolve = Schema::callable(
           Schema::Convention::Native, resolve_arguments.get_view(), root);
       lookup = Schema::callable(
@@ -425,5 +290,5 @@ class Ttx::Data::Form::Native<ttx_abstract_ops> {
 
 TTX_DATA_RECORD(
     ttx_concept_visitor,
-    TTX_DATA_MEMBER(ttx_concept_visitor, source),
-    TTX_DATA_MEMBER(ttx_concept_visitor, receive));
+    TTX_DATA_MEMBER(ttx_concept_visitor, context),
+    TTX_DATA_MEMBER(ttx_concept_visitor, callback));

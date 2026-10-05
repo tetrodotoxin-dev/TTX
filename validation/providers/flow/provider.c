@@ -9,8 +9,8 @@
 #include "ttx/data/protocol/block/provider.h"
 #include "ttx/data/protocol/direct/provider.h"
 #include "ttx/data/protocol/fragment/provider.h"
-#include "validation/unit_tests/semantic/fixtures/provider.h"
-#include "validation/unit_tests/semantic/fixtures/provider_representation.h"
+#include "validation/providers/flow/provider.h"
+#include "validation/providers/representation.h"
 
 static const ttx_schema u32 = {
   4,
@@ -48,28 +48,30 @@ static int matches(perimortem_uuid id, U64 high, U64 low) {
   return id.high == high && id.low == low;
 }
 
-static const ttx_representation* schema(void* source) {
-  ++((provider_state*)source)->descriptions;
+static const ttx_representation* schema(void* context) {
+  provider_state* source = context;
+  ++source->descriptions;
   return four_representation;
 }
 
-static const void* direct(void* source) {
-  return ((const provider_state*)source)->values;
+static const void* direct(void* context) {
+  provider_state* source = context;
+  return source->values;
 }
 
-static void release(void* source) {
-  provider_state* state = (provider_state*)source;
+static void release(void* context) {
+  provider_state* state = context;
   state->held = 0;
   ++state->releases;
   if (state->released) {
-    state->released(state->observer);
+    state->released(state->context);
   }
 }
 
 // The synchronous accessors borrow their outputs only for the call. No
 // provider state stores output storage or a completion for later use.
-static ttx_data_status shared(void* source, ttx_shared_lifetime* result) {
-  provider_state* state = (provider_state*)source;
+static ttx_data_status shared(void* context, ttx_shared_lifetime* result) {
+  provider_state* state = context;
   ++state->acquires;
   if (state->held) {
     return TTX_DATA_BUSY;
@@ -88,8 +90,8 @@ static ttx_data_status shared(void* source, ttx_shared_lifetime* result) {
   return TTX_DATA_SUCCESS;
 }
 
-static ttx_data_status block(void* source, ttx_storage destination) {
-  provider_state* state = (provider_state*)source;
+static ttx_data_status block(void* context, ttx_storage destination) {
+  provider_state* state = context;
   ++state->commits;
   state->destination_representation = destination.representation;
   state->destination_capacity = destination.size;
@@ -101,9 +103,8 @@ static ttx_data_status block(void* source, ttx_storage destination) {
   return TTX_DATA_SUCCESS;
 }
 
-static ttx_data_status
-    fragment(void* source, Count position, U32* result) {
-  provider_state* state = (provider_state*)source;
+static ttx_data_status fragment(void* context, Count position, U32* result) {
+  provider_state* state = context;
   ++state->reads;
   if (state->failure && state->reads == state->fail_at) {
     return TTX_DATA_IO_ERROR;
@@ -139,8 +140,8 @@ static const ttx_fragment_provider_operations fragment_ops = {
 };
 
 static ttx_binding_status
-    bind(void* source, perimortem_uuid id, ttx_storage requested) {
-  provider_state* state = (provider_state*)source;
+    bind(void* context, perimortem_uuid id, ttx_storage requested) {
+  provider_state* state = context;
   if (matches(id, TTX_DIRECT_PROVIDER_ID_HIGH, TTX_DIRECT_PROVIDER_ID_LOW)) {
     ++state->binds[0];
     if (!(state->provides & PROVIDES_DIRECT)) {
@@ -148,7 +149,7 @@ static ttx_binding_status
     }
 
     const ttx_direct_provider api = {
-      source,
+      state,
       &direct_ops,
     };
     return ttx_binding_provide(
@@ -161,7 +162,7 @@ static ttx_binding_status
     }
 
     const ttx_shared_provider api = {
-      source,
+      state,
       &shared_ops,
     };
     return ttx_binding_provide(
@@ -174,7 +175,7 @@ static ttx_binding_status
     }
 
     const ttx_block_provider api = {
-      source,
+      state,
       &block_ops,
     };
     return ttx_binding_provide(
@@ -188,7 +189,7 @@ static ttx_binding_status
     }
 
     const ttx_fragment_provider api = {
-      source,
+      state,
       &fragment_ops,
     };
     return ttx_binding_provide(
@@ -200,8 +201,8 @@ static ttx_binding_status
   return TTX_BINDING_SATISFIED;
 }
 
-static ttx_binding_status supports(void* source, perimortem_uuid id) {
-  const provider_state* state = source;
+static ttx_binding_status supports(void* context, perimortem_uuid id) {
+  const provider_state* state = context;
   U8 protocol = 0;
   if (matches(id, TTX_DIRECT_PROVIDER_ID_HIGH, TTX_DIRECT_PROVIDER_ID_LOW)) {
     protocol = PROVIDES_DIRECT;
@@ -221,7 +222,7 @@ static ttx_binding_status supports(void* source, perimortem_uuid id) {
                                     : TTX_BINDING_UNKNOWN;
 }
 
-static ttx_semantic_query writer(provider_state* state) {
+static ttx_semantic_query provider(provider_state* state) {
   return (ttx_semantic_query){
     state,
     bind,
@@ -230,11 +231,11 @@ static ttx_semantic_query writer(provider_state* state) {
 }
 
 // The loader already knows this C entry contract. It can obtain the data
-// pointer for a stable Query publication, check the agreed Query ABI and use
-// that Query's bind thunk. No Fragment or Block implementation is implied.
+// pointer for a stable Query record, check the agreed Query ABI and use
+// that Query's bind function. No Fragment or Block implementation is implied.
 // The returned Query is data too. Its descriptor includes bind's actual
 // arguments and result so a pointer sized but incompatible function cannot
-// pass the agreement that grants access to this publication.
+// pass the agreement that grants access to this Query record.
 static const ttx_schema query_byte = {
   1,
   1,
@@ -413,7 +414,7 @@ static const ttx_schema_position query_fields[] = {
       NULL,
       TTX_SCHEMA_REFERENCE_POINTER,
     },
-    offsetof(ttx_semantic_query, source),
+    offsetof(ttx_semantic_query, context),
   },
   {
     {
@@ -453,35 +454,34 @@ static provider_state static_state = {
         4,
       },
 };
-static const ttx_semantic_query published = {
+static const ttx_semantic_query query_api = {
   &static_state,
   bind,
   supports,
 };
-static const ttx_representation* bootstrap_schema(void* source) {
-  (void)source;
+
+static const ttx_representation* bootstrap_schema(void* context) {
+  (void)context;
   return query_representation;
 }
 
-static const void* bootstrap_pointer(void* source) {
-  (void)source;
-  return &published;
+static const void* bootstrap_pointer(void* context) {
+  (void)context;
+  return &query_api;
 }
 
 static const ttx_direct_provider_operations bootstrap_ops = {
   bootstrap_schema,
   bootstrap_pointer,
 };
-static ttx_binding_status bootstrap_bind(
-    void* source,
-    perimortem_uuid id,
-    ttx_storage requested) {
+static ttx_binding_status
+    bootstrap_bind(void* context, perimortem_uuid id, ttx_storage requested) {
   if (!matches(id, TTX_DIRECT_PROVIDER_ID_HIGH, TTX_DIRECT_PROVIDER_ID_LOW)) {
     return TTX_BINDING_UNKNOWN;
   }
 
   const ttx_direct_provider api = {
-    source,
+    context,
     &bootstrap_ops,
   };
   return ttx_binding_provide(
@@ -489,15 +489,15 @@ static ttx_binding_status bootstrap_bind(
 }
 
 static ttx_binding_status bootstrap_supports(
-    void* source,
+    void* context,
     perimortem_uuid id) {
-  (void)source;
+  (void)context;
   return matches(id, TTX_DIRECT_PROVIDER_ID_HIGH, TTX_DIRECT_PROVIDER_ID_LOW)
              ? TTX_BINDING_SATISFIED
              : TTX_BINDING_UNKNOWN;
 }
 
-static ttx_semantic_query bootstrap_writer(void) {
+static ttx_semantic_query bootstrap_provider(void) {
   return (ttx_semantic_query){
     NULL,
     bootstrap_bind,
@@ -524,8 +524,9 @@ static const ttx_schema two = {
         },
   },
 };
-static Count select_position(void* source, Count output) {
-  (void)source;
+
+static Count select_position(void* context, Count output) {
+  (void)context;
   return output ? 0 : 12;
 }
 
@@ -567,6 +568,7 @@ static const ttx_swizzle_group selection_groups[] = {
     1,
   },
 };
+
 static const ttx_swizzle_selection* selection(void) {
   return &selection_policy;
 }
@@ -593,8 +595,8 @@ static const ttx_schema primitive_u8 = {
   },
 };
 static ttx_data_status
-    primitive_get_u8(void* source, Count position, U8* result) {
-  (void)source;
+    primitive_get_u8(void* context, Count position, U8* result) {
+  (void)context;
   if (position != offsetof(provider_values, u8)) {
     return TTX_DATA_BOUNDS;
   }
@@ -616,8 +618,8 @@ static const ttx_schema primitive_u16 = {
   },
 };
 static ttx_data_status
-    primitive_get_u16(void* source, Count position, U16* result) {
-  (void)source;
+    primitive_get_u16(void* context, Count position, U16* result) {
+  (void)context;
   if (position != offsetof(provider_values, u16)) {
     return TTX_DATA_BOUNDS;
   }
@@ -639,8 +641,8 @@ static const ttx_schema primitive_u32 = {
   },
 };
 static ttx_data_status
-    primitive_get_u32(void* source, Count position, U32* result) {
-  (void)source;
+    primitive_get_u32(void* context, Count position, U32* result) {
+  (void)context;
   if (position != offsetof(provider_values, u32)) {
     return TTX_DATA_BOUNDS;
   }
@@ -662,8 +664,8 @@ static const ttx_schema primitive_u64 = {
   },
 };
 static ttx_data_status
-    primitive_get_u64(void* source, Count position, U64* result) {
-  (void)source;
+    primitive_get_u64(void* context, Count position, U64* result) {
+  (void)context;
   if (position != offsetof(provider_values, u64)) {
     return TTX_DATA_BOUNDS;
   }
@@ -685,8 +687,8 @@ static const ttx_schema primitive_s8 = {
   },
 };
 static ttx_data_status
-    primitive_get_s8(void* source, Count position, S8* result) {
-  (void)source;
+    primitive_get_s8(void* context, Count position, S8* result) {
+  (void)context;
   if (position != offsetof(provider_values, s8)) {
     return TTX_DATA_BOUNDS;
   }
@@ -708,8 +710,8 @@ static const ttx_schema primitive_s16 = {
   },
 };
 static ttx_data_status
-    primitive_get_s16(void* source, Count position, S16* result) {
-  (void)source;
+    primitive_get_s16(void* context, Count position, S16* result) {
+  (void)context;
   if (position != offsetof(provider_values, s16)) {
     return TTX_DATA_BOUNDS;
   }
@@ -731,8 +733,8 @@ static const ttx_schema primitive_s32 = {
   },
 };
 static ttx_data_status
-    primitive_get_s32(void* source, Count position, S32* result) {
-  (void)source;
+    primitive_get_s32(void* context, Count position, S32* result) {
+  (void)context;
   if (position != offsetof(provider_values, s32)) {
     return TTX_DATA_BOUNDS;
   }
@@ -754,8 +756,8 @@ static const ttx_schema primitive_s64 = {
   },
 };
 static ttx_data_status
-    primitive_get_s64(void* source, Count position, S64* result) {
-  (void)source;
+    primitive_get_s64(void* context, Count position, S64* result) {
+  (void)context;
   if (position != offsetof(provider_values, s64)) {
     return TTX_DATA_BOUNDS;
   }
@@ -777,8 +779,8 @@ static const ttx_schema primitive_r32 = {
   },
 };
 static ttx_data_status
-    primitive_get_r32(void* source, Count position, R32* result) {
-  (void)source;
+    primitive_get_r32(void* context, Count position, R32* result) {
+  (void)context;
   if (position != offsetof(provider_values, r32)) {
     return TTX_DATA_BOUNDS;
   }
@@ -800,8 +802,8 @@ static const ttx_schema primitive_r64 = {
   },
 };
 static ttx_data_status
-    primitive_get_r64(void* source, Count position, R64* result) {
-  (void)source;
+    primitive_get_r64(void* context, Count position, R64* result) {
+  (void)context;
   if (position != offsetof(provider_values, r64)) {
     return TTX_DATA_BOUNDS;
   }
@@ -823,8 +825,8 @@ static const ttx_schema primitive_pointer = {
   },
 };
 static ttx_data_status
-    primitive_get_pointer(void* source, Count position, void** result) {
-  (void)source;
+    primitive_get_pointer(void* context, Count position, void** result) {
+  (void)context;
   if (position != offsetof(provider_values, pointer)) {
     return TTX_DATA_BOUNDS;
   }
@@ -926,12 +928,13 @@ static const ttx_schema primitive_record = {
         },
   },
 };
-static const ttx_representation* primitive_schema(void) {
+
+static const ttx_representation* get_primitive_representation(void) {
   return primitive_representation;
 }
 
-static const ttx_representation* primitive_describe(void* source) {
-  (void)source;
+static const ttx_representation* primitive_describe(void* context) {
+  (void)context;
   return primitive_representation;
 }
 
@@ -950,10 +953,9 @@ static const ttx_fragment_provider_operations primitive_access = {
   .get_pointer = primitive_get_pointer,
 };
 
-static ttx_binding_status primitive_bind(
-    void* source,
-    perimortem_uuid id,
-    ttx_storage requested) {
+static ttx_binding_status
+    primitive_bind(void* context, perimortem_uuid id, ttx_storage requested) {
+  provider_values* source = context;
   if (!matches(
           id, TTX_FRAGMENT_PROVIDER_ID_HIGH, TTX_FRAGMENT_PROVIDER_ID_LOW)) {
     return TTX_BINDING_UNKNOWN;
@@ -968,9 +970,9 @@ static ttx_binding_status primitive_bind(
 }
 
 static ttx_binding_status primitive_supports(
-    void* source,
+    void* context,
     perimortem_uuid id) {
-  (void)source;
+  (void)context;
   return matches(
              id, TTX_FRAGMENT_PROVIDER_ID_HIGH, TTX_FRAGMENT_PROVIDER_ID_LOW)
              ? TTX_BINDING_SATISFIED
@@ -1008,8 +1010,8 @@ C_LINKAGE EXPORTED(TTX_TEST) const provider_api* flow_provider_open(
   }
 
   static const provider_api api = {
-    writer,     bootstrap_writer, selection,
-    primitives, primitive_schema, select_values,
+    provider,   bootstrap_provider,           selection,
+    primitives, get_primitive_representation, select_values,
   };
   return &api;
 }

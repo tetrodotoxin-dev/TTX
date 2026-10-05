@@ -4,7 +4,7 @@
 #define VALIDATION_HETEROGENEOUS_PROVIDER_H
 #include "ttx/semantic/negotiation/query.h"
 
-// The writer computes observations from a seed. Its state has no record whose
+// The provider computes observations from a seed. Its state has no record whose
 // layout matches the advertised tag, energy and frame schema.
 typedef struct heterogeneous_state {
   U32 seed;
@@ -12,6 +12,6 @@ typedef struct heterogeneous_state {
   Count descriptions;
 } heterogeneous_state;
 typedef struct heterogeneous_provider {
-  ttx_semantic_query (*writer)(heterogeneous_state*);
+  ttx_semantic_query (*provider)(heterogeneous_state*);
 } heterogeneous_provider;
 #endif

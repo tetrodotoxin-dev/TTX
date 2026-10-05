@@ -1,10 +1,9 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/abi/receiver.hpp"
-#include "perimortem/core/static/vector.hpp"
-
 #include "validation/unit_tests/semantic/fixtures.hpp"
+
+#include "perimortem/core/static/vector.hpp"
 
 using namespace Validation::FlowTests;
 
@@ -17,7 +16,7 @@ VALIDATION_TEST(TtxFlow, shared_lifetime) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {
+  Module::State provider = {
     .provides = PROVIDES_SHARED,
     .values =
         {
@@ -27,24 +26,25 @@ VALIDATION_TEST(TtxFlow, shared_lifetime) {
           4,
         },
   };
-  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
+  Validation::FlowTests::Consumer consumer =
+      Validation::FlowTests::Consumer(four);
 
   Flow flow;
   ASSERT(
-      flow.connect(reader.query(), module.writer(writer)) ==
+      flow.connect(consumer.query(), module.provider(provider)) ==
       Flow::Status::Success);
 
   Static::Vector<U32, 4> a, b;
   EXPECT(Copy::flow(flow, storage(four, a)) == Status::Success);
   EXPECT(Copy::flow(flow, storage(four, b)) == Status::Success);
 
-  EXPECT_EQ(writer.acquires, Count(1));
-  EXPECT_EQ(writer.releases, Count(0));
+  EXPECT_EQ(provider.acquires, Count(1));
+  EXPECT_EQ(provider.releases, Count(0));
   EXPECT_EQ(b[3], U32(4));
 
   flow.close();
   flow.close();
-  EXPECT_EQ(writer.releases, Count(1));
+  EXPECT_EQ(provider.releases, Count(1));
 }
 
 // A selected Shared provider can fail acquisition. The returned failure ends
@@ -56,18 +56,19 @@ VALIDATION_TEST(TtxFlow, shared_failure) {
   Module module;
   ASSERT(module.is_set());
 
-  Module::State writer = {
+  Module::State provider = {
     .provides = PROVIDES_SHARED | PROVIDES_BLOCK,
     .failure = 1,
   };
-  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
+  Validation::FlowTests::Consumer consumer =
+      Validation::FlowTests::Consumer(four);
 
   Flow flow;
   EXPECT(
-      flow.connect(reader.query(), module.writer(writer)) ==
+      flow.connect(consumer.query(), module.provider(provider)) ==
       Flow::Status::IoError);
-  EXPECT_EQ(writer.binds[2], Count(0));
-  EXPECT_EQ(writer.releases, Count(0));
+  EXPECT_EQ(provider.binds[2], Count(0));
+  EXPECT_EQ(provider.releases, Count(0));
 }
 
 // Release still invokes provider code even though acquisition and operations
@@ -75,14 +76,16 @@ VALIDATION_TEST(TtxFlow, shared_failure) {
 // reconnecting.
 struct OnRelease {
   Flow& flow;
-  Validation::FlowTests::Reader& reader;
+  Validation::FlowTests::Consumer& consumer;
   Query next;
   Bool was_closed = false;
   Flow::Status result = Flow::Status::Rejected;
 
-  auto run() -> void {
-    was_closed = flow.get_protocol() == Protocol::None;
-    result = flow.connect(reader.query(), next);
+  static void run(void* context) {
+    auto& observer = *static_cast<OnRelease*>(context);
+    observer.was_closed = observer.flow.get_protocol() == Protocol::None;
+    observer.result =
+        observer.flow.connect(observer.consumer.query(), observer.next);
   }
 };
 
@@ -106,15 +109,16 @@ VALIDATION_TEST(TtxFlow, release_reentrancy) {
           4,
         },
   };
-  Validation::FlowTests::Reader reader = Validation::FlowTests::Reader(four);
+  Validation::FlowTests::Consumer consumer =
+      Validation::FlowTests::Consumer(four);
   Flow flow;
 
-  OnRelease observer = OnRelease(flow, reader, module.writer(second));
-  first.observer = &observer;
-  first.released = [](void* object) { Ttx::Abi::Receiver::get<OnRelease>(object).run(); };
+  OnRelease observer = OnRelease(flow, consumer, module.provider(second));
+  first.context = &observer;
+  first.released = OnRelease::run;
 
   ASSERT(
-      flow.connect(reader.query(), module.writer(first)) ==
+      flow.connect(consumer.query(), module.provider(first)) ==
       Flow::Status::Success);
 
   flow.close();

@@ -1,7 +1,7 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "validation/unit_tests/library.hpp"
+#include "validation/support/library.hpp"
 
 #ifdef PERI_WINDOWS
 #include <windows.h>
@@ -42,7 +42,9 @@ auto Validation::open_library(View::Bytes name) -> System::Library {
   while (end && path[end - 1] != '/' && path[end - 1] != '\\') {
     --end;
   }
+
   Memory::Dynamic::Bytes location(View::Bytes(path.get_data(), end));
+  location.concat("validation/providers/"_view);
   location.concat(name);
   Memory::Allocator::Arena errors;
   return System::Library::open(location.get_view(), errors)

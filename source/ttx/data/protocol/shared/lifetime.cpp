@@ -9,6 +9,6 @@ auto ttx_shared_release(ttx_shared_lifetime* lifetime) -> void {
   const auto previous = *lifetime;
   *lifetime = ttx_shared_lifetime();
   if (previous.release) {
-    previous.release(previous.source);
+    previous.release(previous.context);
   }
 }

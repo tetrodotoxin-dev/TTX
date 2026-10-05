@@ -8,8 +8,8 @@
 
 namespace Ttx::Data::Protocol::Direct {
 
-// The admitted C carrier can lend its public pointer immediately. Copies
-// of this view borrow the same provider and share the supplying lifetime.
+// The API record supplies the operation that lends the payload pointer.
+// Copies borrow the same context and operations for the supplying lifetime.
 class Provider {
  public:
   using Api = ttx_direct_provider;
@@ -20,23 +20,23 @@ class Provider {
            api.operations->read_ptr;
   }
 
-  constexpr Provider(void* source, const Operations& operations)
-      : value(source, &operations) {}
+  constexpr Provider(void* context, const Operations& operations)
+      : api(context, &operations) {}
 
-  constexpr explicit Provider(ttx_direct_provider value) : value(value) {}
+  constexpr explicit Provider(ttx_direct_provider api) : api(api) {}
 
   auto get_representation() const -> const Form::Representation& {
-    return *value.operations->representation(value.source);
+    return *api.operations->representation(api.context);
   }
 
-  constexpr auto get_abi() const -> ttx_direct_provider { return value; }
+  constexpr auto get_abi() const -> ttx_direct_provider { return api; }
 
   auto read_ptr() const -> const void* {
-    return value.operations->read_ptr(value.source);
+    return api.operations->read_ptr(api.context);
   }
 
  private:
-  ttx_direct_provider value;
+  ttx_direct_provider api;
 };
 
 }  // namespace Ttx::Data::Protocol::Direct
@@ -48,5 +48,5 @@ TTX_DATA_RECORD(
 
 TTX_DATA_RECORD(
     ttx_direct_provider,
-    TTX_DATA_MEMBER(ttx_direct_provider, source),
+    TTX_DATA_MEMBER(ttx_direct_provider, context),
     TTX_DATA_MEMBER(ttx_direct_provider, operations));

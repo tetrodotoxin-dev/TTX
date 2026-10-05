@@ -11,7 +11,7 @@
 namespace Ttx::Data::Form {
 
 // C++ navigation uses the C record directly, so either language can borrow a
-// published Representation without copying its descriptors. Both establish
+// compiled Representation without copying its descriptors. Both establish
 // agreement by comparing those canonical bytes.
 using Representation = ttx_representation;
 

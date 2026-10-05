@@ -1,13 +1,13 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
-#include "validation/unit_tests/semantic/fixtures/heterogeneous_provider.h"
+#include "validation/providers/heterogeneous/provider.h"
 
 #include <stddef.h>
 
 #include "toolchain/export.h"
 #include "ttx/data/protocol/fragment/provider.h"
 #include "ttx/semantic/transport/flow.h"
-#include "validation/unit_tests/semantic/fixtures/provider_representation.h"
+#include "validation/providers/representation.h"
 
 typedef struct record {
   U16 tag;
@@ -88,14 +88,14 @@ static const ttx_schema schema = {
 };
 static const ttx_representation* prepared;
 
-static const ttx_representation* describe(void* source) {
-  ++((heterogeneous_state*)source)->descriptions;
+static const ttx_representation* describe(void* context) {
+  heterogeneous_state* source = context;
+  ++source->descriptions;
   return prepared;
 }
 
-static ttx_data_status
-    get_tag(void* source, Count position, U16* result) {
-  heterogeneous_state* state = (heterogeneous_state*)source;
+static ttx_data_status get_tag(void* context, Count position, U16* result) {
+  heterogeneous_state* state = context;
   ++state->reads;
   if (position != offsetof(record, tag)) {
     return TTX_DATA_BOUNDS;
@@ -105,9 +105,8 @@ static ttx_data_status
   return TTX_DATA_SUCCESS;
 }
 
-static ttx_data_status
-    get_energy(void* source, Count position, R64* result) {
-  heterogeneous_state* state = (heterogeneous_state*)source;
+static ttx_data_status get_energy(void* context, Count position, R64* result) {
+  heterogeneous_state* state = context;
   ++state->reads;
   if (position != offsetof(record, energy)) {
     return TTX_DATA_BOUNDS;
@@ -117,9 +116,8 @@ static ttx_data_status
   return TTX_DATA_SUCCESS;
 }
 
-static ttx_data_status
-    get_frame(void* source, Count position, U32* result) {
-  heterogeneous_state* state = (heterogeneous_state*)source;
+static ttx_data_status get_frame(void* context, Count position, U32* result) {
+  heterogeneous_state* state = context;
   ++state->reads;
   if (position != offsetof(record, frame)) {
     return TTX_DATA_BOUNDS;
@@ -136,7 +134,8 @@ static const ttx_fragment_provider_operations access = {
   .get_r64 = get_energy,
 };
 static ttx_binding_status
-    writer_bind(void* source, perimortem_uuid id, ttx_storage requested) {
+    provider_bind(void* context, perimortem_uuid id, ttx_storage requested) {
+  heterogeneous_state* source = context;
   if (id.high != TTX_FRAGMENT_PROVIDER_ID_HIGH ||
       id.low != TTX_FRAGMENT_PROVIDER_ID_LOW) {
     return TTX_BINDING_UNKNOWN;
@@ -150,10 +149,8 @@ static ttx_binding_status
       ttx_fragment_provider_representation(), &api, requested);
 }
 
-static ttx_binding_status writer_supports(
-    void* source,
-    perimortem_uuid id) {
-  (void)source;
+static ttx_binding_status provider_supports(void* context, perimortem_uuid id) {
+  (void)context;
   return id.high == TTX_FRAGMENT_PROVIDER_ID_HIGH &&
                  id.low == TTX_FRAGMENT_PROVIDER_ID_LOW
              ? TTX_BINDING_SATISFIED
@@ -163,8 +160,8 @@ static ttx_binding_status writer_supports(
 static ttx_semantic_query source(heterogeneous_state* state) {
   return (ttx_semantic_query){
     state,
-    writer_bind,
-    writer_supports,
+    provider_bind,
+    provider_supports,
   };
 }
 

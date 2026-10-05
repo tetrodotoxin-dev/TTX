@@ -3,15 +3,13 @@
 
 #pragma once
 
-#include "ttx/abi/operations.hpp"
-
 #include "ttx/concept/abstract.hpp"
 #include "ttx/concept/capabilities/callable.h"
 #include "ttx/data/form/representation.hpp"
 
 namespace Ttx::Concept::Capabilities {
 
-// Exposes the capability to describe an operation that another object can
+// Exposes the capability to describe an operation that another provider can
 // supply. `describe` returns a Result containing the operation's UUID, its API
 // Representation and its input and output frames. The caller uses that UUID
 // and Representation to bind the operation on the object it wants to call.
@@ -26,7 +24,7 @@ namespace Ttx::Concept::Capabilities {
 // A consumer keeping those observations copies their data or negotiates the
 // retention it needs. An Unknown failure leaves the description undetermined.
 // Rejected explicitly refuses it.
-class Callable : public Abstract {
+class Callable {
  public:
   static constexpr auto contract_id =
       Perimortem::System::Uuid(TTX_CALLABLE_ID_HIGH, TTX_CALLABLE_ID_LOW);
@@ -36,59 +34,62 @@ class Callable : public Abstract {
   static auto accept(Api api) -> Bool {
     return api.operations && api.operations->describe &&
            Abstract::accept(
-               ttx_abstract(api.source, &api.operations->abstract));
+               ttx_abstract(api.context, &api.operations->abstract));
   }
-  explicit constexpr Callable(Api api)
-      : Abstract(api.source, api.operations->abstract) {}
-  constexpr auto get_abi() const -> Api {
-    const auto value = Abstract::get_abi();
-    return Api(
-        value.source, &Abi::Operations::from_abstract<Operations>(*value.operations));
+
+  explicit constexpr Callable(Api api) : api(api) {}
+
+  constexpr auto get_abi() const -> Api { return api; }
+
+  constexpr auto get_abstract() const -> Abstract {
+    return Abstract(api.context, api.operations->abstract);
   }
 
   // Reads fields in argument order. Each field supplies its Abstract and byte
   // offset so the caller can interpret values and locate them in the frame.
   class Frame {
    public:
-    explicit constexpr Frame(ttx_callable_frame value) : value(value) {}
+    explicit constexpr Frame(ttx_callable_frame frame) : frame(frame) {}
 
     auto get_representation() const -> const Data::Form::Representation& {
-      return *value.representation;
+      return *frame.representation;
     }
 
-    auto get_size() const -> Count { return value.count; }
-    auto get_subject(Count index) const -> Abstract {
-      return Abstract(value.fields[index].subject);
+    auto get_size() const -> Count { return frame.count; }
+
+    auto get_abstract(Count index) const -> Abstract {
+      return Abstract(frame.fields[index].abstract);
     }
 
     auto get_offset(Count index) const -> Count {
-      return value.fields[index].offset;
+      return frame.fields[index].offset;
     }
 
    private:
-    ttx_callable_frame value;
+    ttx_callable_frame frame;
   };
 
   // Holds the copied UUID and frame records. Their pointers refer to the
   // provider's representations and fields for the supplying observation.
   class Description {
    public:
-    explicit constexpr Description(ttx_callable_description value)
-        : value(value) {}
+    explicit constexpr Description(ttx_callable_description description)
+        : description(description) {}
 
     auto get_contract() const -> Perimortem::System::Uuid {
-      return Perimortem::System::Uuid(value.contract);
+      return Perimortem::System::Uuid(description.contract);
     }
 
     auto get_representation() const -> const Data::Form::Representation& {
-      return *value.api;
+      return *description.api;
     }
 
-    auto get_inputs() const -> Frame { return Frame(value.inputs); }
-    auto get_outputs() const -> Frame { return Frame(value.outputs); }
+    auto get_inputs() const -> Frame { return Frame(description.inputs); }
+
+    auto get_outputs() const -> Frame { return Frame(description.outputs); }
 
    private:
-    ttx_callable_description value;
+    ttx_callable_description description;
   };
 
   // Adapts the provider's output to a Result. A successful response supplies
@@ -98,7 +99,7 @@ class Callable : public Abstract {
       Result<Description, Semantic::Negotiation::Binding::Failure> {
     const auto api = get_abi();
     ttx_callable_description output = ttx_callable_description();
-    const auto status = api.operations->describe(api.source, &output);
+    const auto status = api.operations->describe(api.context, &output);
     if (status == TTX_BINDING_SATISFIED && output.api) {
       return Description(output);
     }
@@ -109,13 +110,16 @@ class Callable : public Abstract {
 
     return Semantic::Negotiation::Binding::Failure::Rejected;
   }
+
+ private:
+  Api api;
 };
 
 }  // namespace Ttx::Concept::Capabilities
 
 TTX_DATA_RECORD(
     ttx_callable_field,
-    TTX_DATA_MEMBER(ttx_callable_field, subject),
+    TTX_DATA_MEMBER(ttx_callable_field, abstract),
     TTX_DATA_MEMBER(ttx_callable_field, offset));
 
 TTX_DATA_RECORD(
@@ -138,5 +142,5 @@ TTX_DATA_RECORD(
 
 TTX_DATA_RECORD(
     ttx_callable,
-    TTX_DATA_MEMBER(ttx_callable, source),
+    TTX_DATA_MEMBER(ttx_callable, context),
     TTX_DATA_MEMBER(ttx_callable, operations));

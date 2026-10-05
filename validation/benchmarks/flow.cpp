@@ -1,7 +1,6 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/abi/receiver.hpp"
 #include "ttx/semantic/transport/flow.hpp"
 
 #include "perimortem/core/static/vector.hpp"
@@ -47,10 +46,12 @@ static Static::Vector<Endpoint, 4> endpoints = {
   },
 };
 static Static::Vector<Flow, 4> flows;
+
 // Explicit alignment keeps linker placement from selecting a different native
 // copy path after unrelated symbols change. The second target deliberately
 // starts sixteen bytes into the same aligned region.
 alignas(64) static Static::Vector<U32, 516> destination;
+
 static const Storage output(
     ttx_storage(&form, reinterpret_cast<U8*>(destination.get_data()), 2048));
 static const Storage unaligned_output(ttx_storage(
@@ -62,114 +63,98 @@ static auto representation(void*) -> const Representation* {
   return &form;
 }
 
-// The consumer and provider each offer exactly one protocol. Establishment
-// therefore measures its ordinary preference search, including the earlier
-// unsupported requests. All four supply the same payload so transfer cost
-// changes only with access.
-static auto writer(Endpoint& endpoint) -> Query {
-  return Query(ttx_semantic_query(
-      &endpoint,
-      [](void* source, perimortem_uuid contract,
-         ttx_storage requested) -> ttx_binding_status {
-        const auto& endpoint = Ttx::Abi::Receiver::get<Endpoint>(source);
-        const System::Uuid id(contract);
-        if (endpoint.protocol == Flow::Protocol::Direct &&
-            id == Ttx::Semantic::Transport::Flow::direct.provider) {
-          static const Ttx::Data::Protocol::Direct::Provider::Operations
-              operations = Ttx::Data::Protocol::Direct::Provider::Operations(
-                  representation, [](void* source) -> const void* {
-                    return Ttx::Abi::Receiver::get<Endpoint>(source)
-                        .values.get_data();
-                  });
-          return static_cast<ttx_binding_status>(
-              Binding::provide<Ttx::Data::Protocol::Direct::Provider>(
-                  Ttx::Data::Protocol::Direct::Provider::Api(
-                      source, &operations),
-                  Storage(requested)));
-        } else if (
-            endpoint.protocol == Flow::Protocol::Shared &&
-            id == Ttx::Semantic::Transport::Flow::shared.provider) {
-          static const Ttx::Data::Protocol::Shared::Provider::Operations
-              operations = Ttx::Data::Protocol::Shared::Provider::Operations(
-                  representation,
-                  [](void* source,
-                     ttx_shared_lifetime* result) -> ttx_data_status {
-                    *result = {
-                      Ttx::Abi::Receiver::get<Endpoint>(source).values.get_data(),
-                      source,
-                      [](void*) {},
-                    };
-                    return TTX_DATA_SUCCESS;
-                  });
-          return static_cast<ttx_binding_status>(
-              Binding::provide<Ttx::Data::Protocol::Shared::Provider>(
-                  Ttx::Data::Protocol::Shared::Provider::Api(
-                      source, &operations),
-                  Storage(requested)));
-        } else if (
-            endpoint.protocol == Flow::Protocol::Block &&
-            id == Ttx::Semantic::Transport::Flow::block.provider) {
-          static const Ttx::Data::Protocol::Block::Provider::Operations
-              operations = Ttx::Data::Protocol::Block::Provider::Operations(
-                  representation,
-                  [](void* source,
-                     ttx_storage target) -> ttx_data_status {
-                    memmove(
-                        target.data,
-                        Ttx::Abi::Receiver::get<Endpoint>(source).values.get_data(),
-                        form.get_extent());
-                    return TTX_DATA_SUCCESS;
-                  });
-          return static_cast<ttx_binding_status>(
-              Binding::provide<Ttx::Data::Protocol::Block::Provider>(
-                  Ttx::Data::Protocol::Block::Provider::Api(
-                      source, &operations),
-                  Storage(requested)));
-        } else if (
-            endpoint.protocol == Flow::Protocol::Fragment &&
-            id == Ttx::Semantic::Transport::Flow::fragment.provider) {
-          static const Ttx::Data::Protocol::Fragment::Provider::Operations
-              operations = {
-                .representation = representation,
-                .get_u32 = [](void* source, Count position,
-                              U32* result) -> ttx_data_status {
-                  *result = Ttx::Abi::Receiver::get<Endpoint>(source)
-                                .values[position / 4];
-                  return TTX_DATA_SUCCESS;
-                },
-              };
-          return static_cast<ttx_binding_status>(
-              Binding::provide<Ttx::Data::Protocol::Fragment::Provider>(
-                  Ttx::Data::Protocol::Fragment::Provider::Api(
-                      source, &operations),
-                  Storage(requested)));
-        }
+static auto read(void* context) -> const void* {
+  return static_cast<Endpoint*>(context)->values.get_data();
+}
 
-        return TTX_BINDING_UNKNOWN;
-      },
-      [](void* source, perimortem_uuid contract) -> ttx_binding_status {
-        const System::Uuid id(contract);
-        switch (Ttx::Abi::Receiver::get<Endpoint>(source).protocol) {
-        case Flow::Protocol::Direct:
-          return id == Ttx::Semantic::Transport::Flow::direct.provider
-                     ? TTX_BINDING_SATISFIED
-                     : TTX_BINDING_UNKNOWN;
-        case Flow::Protocol::Shared:
-          return id == Ttx::Semantic::Transport::Flow::shared.provider
-                     ? TTX_BINDING_SATISFIED
-                     : TTX_BINDING_UNKNOWN;
-        case Flow::Protocol::Block:
-          return id == Ttx::Semantic::Transport::Flow::block.provider
-                     ? TTX_BINDING_SATISFIED
-                     : TTX_BINDING_UNKNOWN;
-        case Flow::Protocol::Fragment:
-          return id == Ttx::Semantic::Transport::Flow::fragment.provider
-                     ? TTX_BINDING_SATISFIED
-                     : TTX_BINDING_UNKNOWN;
-        default:
-          return TTX_BINDING_UNKNOWN;
-        }
-      }));
+static void release(void*) {}
+
+static auto acquire(void* context, ttx_shared_lifetime* output)
+    -> ttx_data_status {
+  *output = {read(context), context, release};
+  return TTX_DATA_SUCCESS;
+}
+
+static auto commit(void* context, ttx_storage output) -> ttx_data_status {
+  memmove(output.data, read(context), form.get_extent());
+  return TTX_DATA_SUCCESS;
+}
+
+static auto fragment(void* context, Count position, U32* output)
+    -> ttx_data_status {
+  *output = static_cast<Endpoint*>(context)->values[position / 4];
+  return TTX_DATA_SUCCESS;
+}
+
+static auto supports(void* context, perimortem_uuid contract)
+    -> ttx_binding_status {
+  const auto& endpoint = *static_cast<Endpoint*>(context);
+  const System::Uuid id(contract);
+  switch (endpoint.protocol) {
+  case Flow::Protocol::Direct:
+    return id == Flow::direct.provider ? TTX_BINDING_SATISFIED
+                                       : TTX_BINDING_UNKNOWN;
+  case Flow::Protocol::Shared:
+    return id == Flow::shared.provider ? TTX_BINDING_SATISFIED
+                                       : TTX_BINDING_UNKNOWN;
+  case Flow::Protocol::Block:
+    return id == Flow::block.provider ? TTX_BINDING_SATISFIED
+                                      : TTX_BINDING_UNKNOWN;
+  case Flow::Protocol::Fragment:
+    return id == Flow::fragment.provider ? TTX_BINDING_SATISFIED
+                                         : TTX_BINDING_UNKNOWN;
+  default:
+    return TTX_BINDING_UNKNOWN;
+  }
+}
+
+static auto bind(void* context, perimortem_uuid contract, ttx_storage requested)
+    -> ttx_binding_status {
+  if (supports(context, contract) != TTX_BINDING_SATISFIED) {
+    return TTX_BINDING_UNKNOWN;
+  }
+
+  const auto& endpoint = *static_cast<Endpoint*>(context);
+  const Storage output(requested);
+  switch (endpoint.protocol) {
+  case Flow::Protocol::Direct: {
+    using Provider = Ttx::Data::Protocol::Direct::Provider;
+    static const Provider::Operations operations = {representation, read};
+    return static_cast<ttx_binding_status>(
+        Binding::provide<Provider>({context, &operations}, output));
+  }
+
+  case Flow::Protocol::Shared: {
+    using Provider = Ttx::Data::Protocol::Shared::Provider;
+    static const Provider::Operations operations = {representation, acquire};
+    return static_cast<ttx_binding_status>(
+        Binding::provide<Provider>({context, &operations}, output));
+  }
+
+  case Flow::Protocol::Block: {
+    using Provider = Ttx::Data::Protocol::Block::Provider;
+    static const Provider::Operations operations = {representation, commit};
+    return static_cast<ttx_binding_status>(
+        Binding::provide<Provider>({context, &operations}, output));
+  }
+
+  case Flow::Protocol::Fragment: {
+    using Provider = Ttx::Data::Protocol::Fragment::Provider;
+    static const Provider::Operations operations = {
+      .representation = representation, .get_u32 = fragment};
+    return static_cast<ttx_binding_status>(
+        Binding::provide<Provider>({context, &operations}, output));
+  }
+
+  default:
+    return TTX_BINDING_UNKNOWN;
+  }
+}
+
+// Both sides offer one protocol. Establishment includes the preceding refused
+// requests. All four protocols read the same payload.
+static auto provider(Endpoint& endpoint) -> Query {
+  return Query({&endpoint, bind, supports});
 }
 
 static Toolchain::Validation::Harness Transfer = {
@@ -178,8 +163,9 @@ static Toolchain::Validation::Harness Transfer = {
       [] {
         for (Count i = 0; i < 4; ++i) {
           endpoints[i].values[511] = 42;
+
           const auto connected =
-              flows[i].connect(Flow::consumer(form), writer(endpoints[i]));
+              flows[i].connect(Flow::consumer(form), provider(endpoints[i]));
           if (connected != Flow::Status::Success ||
               flows[i].get_protocol() != endpoints[i].protocol) {
             Diagnostics::Log::fatal("Benchmark Flow failed to connect."_view);
@@ -190,6 +176,7 @@ static Toolchain::Validation::Harness Transfer = {
           if (copied != Status::Success || destination[511] != 42) {
             Diagnostics::Log::fatal("Benchmark Flow failed to copy."_view);
           }
+
           destination[511] = 0;
         }
       },
@@ -200,7 +187,7 @@ static Toolchain::Validation::Harness Transfer = {
 // Establishment includes closing its acquired lifetime, while warm copies
 // reuse one agreement and keep all negotiation outside their timed loop.
 static auto establish(Count index) -> void {
-  const auto source = writer(endpoints[index]);
+  const auto source = provider(endpoints[index]);
   const auto target = Flow::consumer(form);
   for (Count i = 0; i < repetitions; ++i) {
     Flow candidate;
@@ -221,24 +208,31 @@ static auto copy(Count index, const Storage& target = output) -> void {
 VALIDATION_BENCHMARK(Transfer, establish_direct) {
   establish(0);
 }
+
 VALIDATION_BENCHMARK(Transfer, establish_shared) {
   establish(1);
 }
+
 VALIDATION_BENCHMARK(Transfer, establish_block) {
   establish(2);
 }
+
 VALIDATION_BENCHMARK(Transfer, establish_fragment) {
   establish(3);
 }
+
 VALIDATION_BENCHMARK(Transfer, copy_direct_2k) {
   copy(0);
 }
+
 VALIDATION_BENCHMARK(Transfer, copy_shared_2k) {
   copy(1);
 }
+
 VALIDATION_BENCHMARK(Transfer, copy_block_2k) {
   copy(2);
 }
+
 VALIDATION_BENCHMARK(Transfer, copy_fragment_2k) {
   copy(3);
 }
@@ -246,9 +240,11 @@ VALIDATION_BENCHMARK(Transfer, copy_fragment_2k) {
 VALIDATION_BENCHMARK(Transfer, copy_direct_unaligned_2k) {
   copy(0, unaligned_output);
 }
+
 VALIDATION_BENCHMARK(Transfer, copy_shared_unaligned_2k) {
   copy(1, unaligned_output);
 }
+
 VALIDATION_BENCHMARK(Transfer, copy_block_unaligned_2k) {
   copy(2, unaligned_output);
 }

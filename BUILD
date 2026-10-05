@@ -1,45 +1,23 @@
 # Copyright (c) 2023-present Matt Kaes and contributors
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("@tetro_toolchain//source/bazel:library.bzl", "static_library")
-load("@tetro_toolchain//source/bazel:package.bzl", "package_release")
-load("@tetro_toolchain//source/bazel:vscode.bzl", "vscode")
 
-package(default_visibility = ["//visibility:public"])
+load("@tetro_toolchain//:defs.bzl", "benchmarks", "package", "tests", "vscode")
 
-vscode(name = "vscode")
+package(module = "ttx")
 
-cc_library(
-    name = "headers",
-    hdrs = glob([
-        "source/**/*.h",
-        "source/**/*.hpp",
-    ]),
-    includes = ["source"],
+vscode()
+
+tests(
+    srcs = ["//validation:test_sources"],
+    data = ["//validation/providers:libraries"],
     deps = [
-        "@perimortem//:core",
-        "@perimortem//:memory",
-        "@perimortem//:system",
+        ":ttx",
+        "//validation/providers:contracts",
+        "//validation/support:library",
+        "//validation/support:measurement",
     ],
 )
 
-static_library(
-    name = "implementation",
-    srcs = glob(["source/**/*.cpp"]),
-    visibility = ["//:__subpackages__"],
-    deps = [":headers"],
-)
-
-alias(
-    name = "ttx",
-    actual = ":implementation",
-)
-
-alias(
-    name = "build",
-    actual = ":implementation",
-)
-
-package_release(
-    name = "sdk",
-    static = ":implementation",
+benchmarks(
+    srcs = ["//validation:benchmark_sources"],
+    deps = [":ttx"],
 )
