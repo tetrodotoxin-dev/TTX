@@ -112,8 +112,8 @@ VALIDATION_TEST(TtxNavigation, padded_range_walk) {
 
 // Physical traversal finds an occupied start at or after the requested byte.
 // Checking every byte distinguishes a valid value from its interior bytes and
-// surrounding padding. Exact selection policies can compare the returned
-// coordinate with their request, as selected traversal admission requires.
+// surrounding padding. Consumers needing an exact start can compare the
+// returned coordinate with their requested offset.
 VALIDATION_TEST(TtxNavigation, physical_coordinates) {
   Preparation prepare;
   const Perimortem::Core::Storage::Vector<Schema::Position, 2> fields = {

@@ -65,8 +65,8 @@ struct Changing {
                                                   resolve,  lookup, visit};
 };
 
-// Fixed preserves the selected answer. Its outgoing routes still use the
-// target's operations and retain the promises supplied by those answers.
+// Fixed preserves the selected Abstract. Outgoing routes still use the
+// target's operations and carry their own policies independently of Constant.
 struct Fixed {
   ttx_abstract target;
 
@@ -169,7 +169,8 @@ VALIDATION_TEST(Constants, explicit_constant_policy) {
       Binding::Status::Unknown);
 }
 
-// The shared None answer does not freeze the original provider's selection.
+// The shared None result leaves the original provider free to select a
+// different Abstract on its next observation.
 VALIDATION_TEST(Constants, rejection_can_change) {
   Changing provider{ttx_none()};
   const Abstract subject(Changing::resolve(&provider));

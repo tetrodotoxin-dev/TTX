@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "perimortem/core/data.hpp"
 #include "perimortem/core/storage/vector.hpp"
 #include "perimortem/core/view/bytes.hpp"
 #include "perimortem/serialization/formats/uuid.hpp"
@@ -13,20 +14,15 @@
 
 namespace Ttx::Concept {
 
-// An Abstract carries the context and operations supplied by its provider.
-// Each operation interprets that context according to its own implementation.
-// The C++ view copies this record and forwards calls through its functions.
+// Abstract uses the provider's context and operations to traverse a semantic
+// graph. The C++ interface stores the C API record and forwards each call to
+// its supplied function. Binding another capability preserves the policies
+// governing that interface's operations and further negotiation.
 //
-// Abstract is a view valid within the observation that supplied it. Copying
-// the view keeps the same context and table. The supplying call or retained
-// provider determines when that access ends, and a later observation asks the
-// provider again. Stronger return contracts state how to retain their answers.
-//
-// A plain Abstract return requires no release call. Returning an acquired
-// result through this weaker type hides its cleanup obligation and can leak
-// resources. Providers must expose required lifetime policies in the declared
-// return contract. Binding another Concept selects its operations while
-// preserving the policy that governs further questions.
+// The supplying contract keeps the context and table accessible through use.
+// Copying an Abstract preserves that access duration. A plain Abstract result
+// requires no release. An operation transferring a release obligation returns
+// Borrowed or a stronger contract that exposes the obligation.
 class Abstract {
  public:
   static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
@@ -36,6 +32,9 @@ class Abstract {
   using Operations = ttx_abstract_ops;
   using Visitor = Concept::Visitor<Abstract>;
 
+  // Checks the context, table and required operation pointers for null. The
+  // caller establishes the representation and readability of any present table.
+  // The provider supplies the semantic guarantees and duration of access.
   static auto accept(Api api) -> Bool {
     return api.context && api.operations && api.operations->supports &&
            api.operations->bind && api.operations->get_data &&
@@ -43,9 +42,14 @@ class Abstract {
            api.operations->visit_concepts;
   }
 
+  // Uses context and a complete table supplied under the Abstract contract.
+  // Construction stores their addresses and relies on their existing access.
   constexpr Abstract(void* context, const Operations& operations)
       : api(context, &operations) {}
 
+  // Copies a record already supplied under the Abstract contract. The caller
+  // establishes its representation and required pointers. Explicit construction
+  // marks this unchecked conversion from the C record.
   explicit constexpr Abstract(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }
@@ -91,8 +95,7 @@ class Abstract {
   // copy the bytes or negotiate a contract that provides it.
   auto get_data() const -> Perimortem::Core::View::Bytes {
     const auto data = api.operations->get_data(api.context);
-    return Perimortem::Core::View::Bytes(
-        perimortem_view_bytes{data.data, data.size});
+    return Perimortem::Core::View::Bytes(data);
   }
 
   // Returns the Abstract represented by this observation. The provider decides
@@ -113,8 +116,9 @@ class Abstract {
   //
   // Each call is a separate observation and may return a different result.
   // A value that provides `Constant` promises it only for the particular edge
-  // established by the provider + route pair, allowing the consumer to retain
-  // its result without asking again.
+  // established by the Abstract and route pair. The consumer can reuse that
+  // selection while its supplying access remains valid. Constant preserves
+  // the selection independently of the contract that determines its lifetime.
   auto resolve_concept(Perimortem::Core::View::Bytes route) const -> Abstract {
     return Abstract(api.operations->resolve_concept(
         api.context,
@@ -123,7 +127,7 @@ class Abstract {
 
   // The provider advertises the routes visible through this Abstract's policy.
   // Callbacks let it walk its own representation without first constructing
-  // and transferring a collection of answers, at the cost of a callback for
+  // and transferring a collection of API records, at the cost of a callback for
   // each advertised route.
   //
   // Enumeration order has no implied meaning, and each visit is a separate
@@ -149,11 +153,13 @@ class Abstract {
   }
 
  private:
-  static void callback_concept(
+  // `visit_concepts` supplies its local Visitor as context and keeps it alive
+  // until synchronous enumeration finishes.
+  static auto callback_concept(
       void* context,
       perimortem_view_bytes route,
-      Api abstract) {
-    auto& visitor = *static_cast<Visitor*>(context);
+      Api abstract) -> void {
+    auto& visitor = *Perimortem::Core::Data::cast<Visitor>(context);
     visitor(Perimortem::Core::View::Bytes(route), Abstract(abstract));
   }
 

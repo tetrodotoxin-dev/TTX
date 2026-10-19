@@ -489,8 +489,8 @@ VALIDATION_TEST(TtxEncoding, native_count_limit) {
       [&](Status status) { EXPECT(status == Status::Bounds); });
 }
 
-// Final storage is requested only after admission. A rejected source keeps
-// both the output slot and the allocator's allocation count unchanged.
+// Final storage is requested after successful Schema validation. Rejection
+// keeps both the output slot and the allocator's allocation count unchanged.
 VALIDATION_TEST(TtxEncoding, final_allocation) {
   struct Allocation {
     alignas(Representation) Perimortem::Core::Storage::Vector<U8, 128> bytes;

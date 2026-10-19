@@ -6,12 +6,12 @@
 
 #include "toolchain/toolchain.h"
 
-// Data operates on completed descriptions. Matching those descriptions or
-// transferring the described values can still fail, so these statuses report
-// the outcome to the owning operation. Any semantic question that determines
-// geometry must be settled before transport, which requires known sizes and
-// positions.
+// Data operations report compilation, representation checks, traversal and
+// transfer outcomes with these values. Each operation defines the failure
+// conditions it can report and when its output becomes usable. Semantic
+// negotiation reports its own Satisfied, Unknown and Rejected outcomes.
 typedef U8 ttx_data_status;
+
 #define TTX_DATA_SUCCESS ((ttx_data_status)0)
 #define TTX_DATA_INVALID ((ttx_data_status)1)
 #define TTX_DATA_BOUNDS ((ttx_data_status)2)

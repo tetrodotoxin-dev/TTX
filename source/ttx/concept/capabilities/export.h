@@ -3,6 +3,7 @@
 
 #ifndef TTX_CONCEPT_CAPABILITIES_EXPORT_H
 #define TTX_CONCEPT_CAPABILITIES_EXPORT_H
+
 #include "ttx/concept/abstract.h"
 
 #define TTX_EXPORT_ID_HIGH 0x99ed754be007457fULL
@@ -12,8 +13,8 @@
 // selects the contracts and routes needed by its target. A graph can supply
 // services alongside the content being exported. For example, a terminal can
 // use a logger or report generated paths through a capability found on the
-// root or one of its routes. Each participating contract defines those
-// questions and whether their answers are required to produce the result.
+// root or one of its routes. Each participating contract defines the
+// required services, their arguments and their effect on the exported result.
 //
 // The graph is available through `expose`. Satisfied reports that the provider
 // fulfilled its request, Unknown leaves the outcome undetermined, and Rejected
@@ -31,4 +32,5 @@ typedef struct ttx_export_ops {
 
 C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_export_representation(
     void);
+
 #endif

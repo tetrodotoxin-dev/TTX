@@ -30,8 +30,9 @@ TTX_DATA_RECORD(
 
 static Toolchain::Validation::Harness NativeEntry = {.name = "TTX::Bootstrap"};
 
-// This is the public bootstrap sequence. The export is described data; the
-// first provider operation is called only after Data has admitted its Query.
+// This is the public bootstrap sequence. The export is described data. The
+// first provider operation is called only after Transfer establishes the
+// exported Query's representation and copies its record.
 VALIDATION_TEST(NativeEntry, storage_to_query_to_abstract) {
   Memory::Allocator::Arena errors;
   const auto path =
@@ -82,8 +83,10 @@ VALIDATION_TEST(NativeEntry, storage_to_query_to_abstract) {
           fail);
 }
 
-// Consumers can enter the graph through another negotiated Query or through
-// either supported representation of the export inventory.
+// The export inventory's UUID accepts both callback and indexed APIs. Another
+// UUID returns a Query with a different context. Each path reaches the same
+// Abstract, establishing that semantic negotiation supports several entry APIs
+// and chooses their representation independently of their contract UUID.
 VALIDATION_TEST(NativeEntry, independent_paths_and_formats) {
   auto library =
       Validation::Support::open_library("libabstract_subject.so"_view);

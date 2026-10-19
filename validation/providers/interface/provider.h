@@ -5,6 +5,7 @@
 #define VALIDATION_INTERFACE_PROVIDER_H
 
 #include "toolchain/export.h"
+
 #include "ttx/semantic/negotiation/query.h"
 
 #define COUNTER_ID_HIGH ((U64)0x2d4fc0031eda431bULL)
@@ -39,7 +40,9 @@ typedef struct counter_fixture {
   void (*compose)(enum counter_composition mode);
 } counter_fixture;
 
-// This consumer is compiled separately from the provider's private state.
+// Calls the supplied add operation with its context and then reads the counter.
+// This separate C translation unit sees only the API declaration, so the
+// provider's private storage layout cannot affect its calls.
 C_LINKAGE U64 counter_consume(counter_api api, U64 amount);
 
 typedef ttx_data_status (*interface_compile)(

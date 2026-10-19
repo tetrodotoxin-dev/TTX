@@ -6,13 +6,13 @@
 
 #include "ttx/data/form/storage.h"
 
-// Negotiating operations return one of these values for each synchronous
-// observation. They return Satisfied only after meeting the operation's
-// contract, Unknown when the provider leaves the request undetermined, and
-// Rejected when the provider explicitly refuses it. Callers use an output only
-// after Satisfied. After either failure they receive no usable result and no
-// promise of a later result. A subsequent call observes the provider again.
+// Negotiation reports the provider's decision for one synchronous operation.
+// Satisfied means the provider fulfilled the requested contract. Unknown leaves
+// the request undetermined. Rejected explicitly refuses it. The consumer uses
+// output only after Satisfied. Each subsequent call observes the provider again
+// and can produce a different status under the same contract.
 typedef U8 ttx_binding_status;
+
 #define TTX_BINDING_SATISFIED ((ttx_binding_status)0)
 #define TTX_BINDING_UNKNOWN ((ttx_binding_status)1)
 #define TTX_BINDING_REJECTED ((ttx_binding_status)3)

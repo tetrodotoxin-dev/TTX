@@ -8,34 +8,31 @@
 
 namespace Ttx::Concept::Policies {
 
-// Borrowed exposes an Abstract whose acquired access lasts until release. An
-// operation transferring retained access returns this contract and passes
-// responsibility for the release to its caller. The provider keeps the
-// result's data and policy available until that release.
-//
-// Binding or copying a view of the result shares the existing access and
-// release obligation. Borrow requests another acquired result, with its own
-// release, even when the provider returns the same context again. The C++
-// view leaves release explicit. The consumer of each acquired result calls
-// `release` once after using the retained result.
-//
-// Operations that require the caller to release their result must return
-// Borrowed or a stronger contract that requires it. Returning that result only
-// as Abstract hides the release obligation and can leak the retained
-// resources.
+// Borrowed gives C++ consumers acquired access with an explicit release call.
+// Copying the API record or binding another interface shares the existing
+// acquisition. Borrowing again creates a separate acquisition and obligation.
+// The consumer calls release once for each acquired result after its last use.
+// Using that acquisition or its copies after release is undefined behavior.
 class Borrowed {
  public:
-  static constexpr auto contract_id =
-      Perimortem::Serialization::Formats::Uuid(TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW);
+  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+      TTX_BORROWED_ID_HIGH,
+      TTX_BORROWED_ID_LOW);
   using Api = ttx_borrowed;
   using Operations = ttx_borrowed_ops;
 
+  // Checks release, context and all Abstract operation pointers for null. Any
+  // present table must be readable and match the negotiated representation.
+  // The supplying operation establishes the acquisition and release obligation.
   static auto accept(Api api) -> Bool {
     return api.operations && api.operations->release &&
            Abstract::accept(
                ttx_abstract(api.context, &api.operations->abstract));
   }
 
+  // Copies an existing acquisition's record. Explicit construction makes the
+  // caller's interpretation as Borrowed visible. Construction performs no
+  // acquisition, validation or release.
   explicit constexpr Borrowed(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }

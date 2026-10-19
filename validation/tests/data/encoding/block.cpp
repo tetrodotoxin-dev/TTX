@@ -16,7 +16,7 @@ static Toolchain::Validation::Harness EncodingBlock = {
 
 // This oracle reads individual bits rather than using the chunk algorithm.
 // Arbitrary bytes exercise both zero and nonzero high fields without relying
-// on the compiler or encoder to produce the expected answer.
+// on the compiler or encoder to produce the expected result.
 static constexpr auto bits(View::Bytes bytes, Count first, Count width)
     -> Count {
   Count result = 0;

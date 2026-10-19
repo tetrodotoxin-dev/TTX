@@ -13,12 +13,9 @@ namespace Ttx::Data::Form {
 
 // Native declarations can supply their Data description without repeating
 // each function's argument and result types. Record fields remain explicit:
-// C++ has no field reflection, and sizeof alone cannot describe their ABI.
+// sizeof alone cannot describe their member layout or callable ABI.
 // Specializations supply those fields using their actual offsetof values.
 // The resulting Schema goes through the ordinary representation compiler.
-//
-// TODO: Replace when we actually get C++ reflection in clang, unless it vastly
-// increases build times.
 template <typename Type>
 class Native {
   static consteval auto describe() -> Schema {
@@ -57,7 +54,7 @@ class Native {
 };
 
 // An array's element type and length establish its repeated storage geometry.
-// sizeof includes any element padding, so the Range preserves native spacing.
+// `sizeof` includes any element padding, so the Range preserves native spacing.
 template <typename Type, Count size>
 class Native<Type[size]> {
  public:
@@ -70,9 +67,14 @@ class Native<Type[size]> {
   static constexpr Schema::Reference reference = schema;
 };
 
+// Const qualification preserves storage layout and calling convention.
+// Access restrictions belong to the negotiated contract using that storage.
 template <typename Type>
 class Native<const Type> : public Native<Type> {};
 
+// A typed pointer describes one address and the layout reachable through it.
+// Pointer targets participate in canonical comparison without contributing
+// their extent to the pointer slot or requiring access to a pointed value.
 template <typename Type>
 class Native<Type*> {
  private:
@@ -87,6 +89,7 @@ class Native<Type*> {
             field,
             1,
           },
+
           sizeof(Type), alignof(Type));
       return &schema;
     } else {
@@ -106,18 +109,27 @@ class Native<void> {
   static constexpr Schema::Reference reference = Schema::Reference();
 };
 
+// An opaque pointer describes an address without a target layout. The supplied
+// operation determines how its context is interpreted.
 template <>
 class Native<void*> {
  public:
   static constexpr Schema::Reference reference = Schema::pointer();
 };
 
+// A const opaque pointer has the same address representation. Its supplying
+// operation establishes which observations that address permits.
 template <>
 class Native<const void*> : public Native<void*> {};
 
+// A function pointer describes the host's fixed C calling convention, ordered
+// arguments and return value. The resulting form compares the whole signature
+// while the pointer occupies one address in the containing record.
 template <typename Result, typename... Arguments>
 class Native<Result (*)(Arguments...)> {
+
 #if defined(_WIN64)
+
   // A C++ constructor can change a small record return into a hidden pointer
   // without changing its fields. Such records need a plain C return carrier
   // before their storage description can promise the C calling convention.
@@ -130,7 +142,9 @@ class Native<Result (*)(Arguments...)> {
 
         return true;
       }(),
+
       "Windows callable results must use plain C carriers, not C++ facades");
+
 #endif
 
   static constexpr Perimortem::Core::Storage::
@@ -140,19 +154,25 @@ class Native<Result (*)(Arguments...)> {
               Native<Arguments>::reference...,
               Schema::Argument(),
             },
-  };
+          };
 
  public:
   static constexpr Schema schema = Schema::callable(
       Schema::Convention::Native,
       arguments.get_view().slice(0, sizeof...(Arguments)),
       Native<Result>::reference);
+
   static constexpr Schema::Reference reference = schema;
 };
 
+// A variadic function pointer describes the fixed argument prefix and the
+// host's variadic C convention. Each invocation supplies the types and values
+// following that prefix under the operation's semantic contract.
 template <typename Result, typename... Arguments>
 class Native<Result (*)(Arguments..., ...)> {
+
 #if defined(_WIN64)
+
   // A C++ constructor can change a small record return into a hidden pointer
   // without changing its fields. Such records need a plain C return carrier
   // before their storage description can promise the C calling convention.
@@ -165,7 +185,9 @@ class Native<Result (*)(Arguments..., ...)> {
 
         return true;
       }(),
+
       "Windows callable results must use plain C carriers, not C++ facades");
+
 #endif
 
   static constexpr Perimortem::Core::Storage::
@@ -175,7 +197,7 @@ class Native<Result (*)(Arguments..., ...)> {
               Native<Arguments>::reference...,
               Schema::Argument(),
             },
-  };
+          };
 
  public:
   static constexpr Schema schema = Schema::callable(
@@ -188,7 +210,7 @@ class Native<Result (*)(Arguments..., ...)> {
 }  // namespace Ttx::Data::Form
 
 // These declarations use the actual C fields, so renaming, moving or changing a
-// field a function signature also changes its description at the same compile
+// field or function signature also changes its description at the same compile
 // boundary.
 #define TTX_DATA_MEMBER(type, member)                             \
   Ttx::Data::Form::Schema::Position(                              \
@@ -204,7 +226,7 @@ class Native<Result (*)(Arguments..., ...)> {
             __is_trivially_destructible(type),                              \
         "Native API records require a trivial C-compatible call boundary"); \
     static constexpr auto fields = [](auto... entries) {                    \
-      return Perimortem::Core::Storage::Vector<                              \
+      return Perimortem::Core::Storage::Vector<                             \
           Schema::Position, sizeof...(entries)>{                            \
         {                                                                   \
           entries...,                                                       \

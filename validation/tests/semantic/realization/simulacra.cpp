@@ -39,6 +39,9 @@ class Counter {
 
   static auto accept(Api api) -> Bool { return api.add && api.read; }
 
+  // Copies a negotiated API record. Explicit construction marks the unchecked
+  // conversion from that C record. The supplying contract keeps its context
+  // and functions available.
   explicit Counter(Api api) : api(api) {}
 
   auto get_abi() const -> Api { return api; }
@@ -92,7 +95,7 @@ VALIDATION_TEST(TtxSimulacra, support_without_abi) {
   EXPECT(query.supports<Counter>() == Binding::Status::Satisfied);
   EXPECT_EQ(foreign.api.statistics().queries, U64(1));
 
-  // The C entry answers the same question without any C++ descriptor machinery.
+  // The C operation reports the same support status directly from its UUID.
   EXPECT_EQ(
       foreign.api.query.supports(
           foreign.api.query.context, Counter::contract_id),
@@ -117,9 +120,8 @@ VALIDATION_TEST(TtxSimulacra, different_meaning_same_representation) {
   EXPECT_EQ(foreign.api.statistics().calls, U64(0));
 }
 
-// A refused or unsettled property cannot become false just because the caller
-// wanted a predicate. Retaining statuses keeps a later policy from bypassing
-// this answer or treating provisional absence as a completed fact.
+// Support queries preserve all three negotiation outcomes. An undetermined
+// contract remains distinguishable from an explicitly refused contract.
 VALIDATION_TEST(TtxSimulacra, support_outcomes) {
   Foreign foreign;
   const Query query(foreign.api.query);

@@ -89,8 +89,10 @@ class Report {
     expose};
 };
 
-// Each imported answer lives in the visit call. Its reporting service has an
-// independent context, so root binding can return that service directly.
+// ImportedByte exposes a byte observation during the import callback. At the
+// root it delegates Report negotiation to the reporting service, whose context
+// differs from the imported value. The resulting API must call the service's
+// functions with that service's context.
 class ImportedByte {
  public:
   U8 value;

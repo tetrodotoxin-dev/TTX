@@ -10,17 +10,21 @@
 // four or eight byte pointers explicitly for another target. Both supported
 // widths use their size as alignment, including function pointer storage.
 #ifdef __cplusplus
+
 static_assert(sizeof(void*) == 4 || sizeof(void*) == 8);
 static_assert(alignof(void*) == sizeof(void*));
 static_assert(sizeof(void (*)(void)) == sizeof(void*));
 static_assert(alignof(void (*)(void)) == sizeof(void*));
+
 #else
+
 _Static_assert(
     (sizeof(void*) == 4 || sizeof(void*) == 8) &&
         _Alignof(void*) == sizeof(void*) &&
         sizeof(void (*)(void)) == sizeof(void*) &&
         _Alignof(void (*)(void)) == sizeof(void*),
     "Unsupported native pointer storage");
+
 #endif
 
 #ifdef __cplusplus
@@ -33,6 +37,7 @@ _Static_assert(
 #define TTX_SCHEMA_CALLABLE ((U8)5)
 
 typedef U8 ttx_schema_value;
+
 #define TTX_SCHEMA_U8 ((ttx_schema_value)1)
 #define TTX_SCHEMA_U16 ((ttx_schema_value)2)
 #define TTX_SCHEMA_U32 ((ttx_schema_value)3)
@@ -61,6 +66,7 @@ typedef U8 ttx_schema_value;
 #else
 #define TTX_VECTOR_ALIGNMENT(size) _Alignas(size)
 #endif
+
 typedef struct ttx_vector64 {
   TTX_VECTOR_ALIGNMENT(8) U8 bytes[8];
 } ttx_vector64;
@@ -76,6 +82,7 @@ typedef struct ttx_vector256 {
 typedef struct ttx_vector512 {
   TTX_VECTOR_ALIGNMENT(64) U8 bytes[64];
 } ttx_vector512;
+
 #undef TTX_VECTOR_ALIGNMENT
 
 struct ttx_schema;
@@ -84,10 +91,13 @@ struct ttx_schema;
 // a pointer. Keeping that choice on the edge lets one struct or callable
 // description be reused without manufacturing a second Schema object.
 #define TTX_SCHEMA_REFERENCE_POINTER ((U8)1)
+
 typedef struct ttx_schema_reference {
   const struct ttx_schema* schema;
   U8 flags;
+
 #ifdef __cplusplus
+
   constexpr ttx_schema_reference(
       const ttx_schema* schema = nullptr,
       U8 flags = 0)
@@ -106,10 +116,12 @@ typedef struct ttx_schema_reference {
 
   constexpr auto get_alignment(Count pointer_size = sizeof(void*)) const
       -> Count;
+
 #endif
 } ttx_schema_reference;
 
 typedef U32 ttx_schema_convention;
+
 #define TTX_SCHEMA_SYSTEM_V_AMD64 ((ttx_schema_convention)1)
 #define TTX_SCHEMA_SYSTEM_V_AMD64_VARIADIC ((ttx_schema_convention)2)
 #define TTX_SCHEMA_EMSCRIPTEN_WASM32 ((ttx_schema_convention)3)
@@ -134,7 +146,9 @@ typedef U32 ttx_schema_convention;
 typedef struct ttx_schema_argument {
   ttx_schema_reference reference;
   Count count;
+
 #ifdef __cplusplus
+
   constexpr ttx_schema_argument() : reference(), count(0) {}
 
   constexpr ttx_schema_argument(ttx_schema_reference reference, Count count = 1)
@@ -145,6 +159,7 @@ typedef struct ttx_schema_argument {
   }
 
   constexpr auto get_count() const -> Count { return count; }
+
 #endif
 } ttx_schema_argument;
 
@@ -157,20 +172,23 @@ typedef struct ttx_schema_callable {
   Count count;
   ttx_schema_reference result;
   ttx_schema_convention convention;
+
 #ifdef __cplusplus
+
   constexpr auto get_arguments() const
       -> Perimortem::Core::View::Vector<ttx_schema_argument> {
     if (!arguments || count == 0) {
       return Perimortem::Core::View::Vector<ttx_schema_argument>();
     }
 
-    return Perimortem::Core::View::Vector<ttx_schema_argument>(arguments[0],
-                                                                count);
+    return Perimortem::Core::View::Vector<ttx_schema_argument>(
+        arguments[0], count);
   }
 
   constexpr auto get_result() const -> ttx_schema_reference { return result; }
 
   constexpr auto get_convention() const;
+
 #endif
 } ttx_schema_callable;
 
@@ -181,7 +199,9 @@ typedef struct ttx_schema_callable {
 typedef struct ttx_schema_position {
   ttx_schema_reference reference;
   Count offset;
+
 #ifdef __cplusplus
+
   constexpr ttx_schema_position(
       ttx_schema_reference reference = ttx_schema_reference(),
       Count offset = 0)
@@ -192,6 +212,7 @@ typedef struct ttx_schema_position {
   }
 
   constexpr auto get_offset() const -> Count { return offset; }
+
 #endif
 } ttx_schema_position;
 
@@ -204,12 +225,15 @@ typedef struct ttx_schema_range {
   ttx_schema_reference element;
   Count count;
   Count distance;
+
 #ifdef __cplusplus
+
   constexpr auto get_element() const -> ttx_schema_reference { return element; }
 
   constexpr auto get_count() const -> Count { return count; }
 
   constexpr auto get_distance() const -> Count { return distance; }
+
 #endif
 } ttx_schema_range;
 
@@ -226,8 +250,8 @@ typedef struct ttx_schema_primitive {
 // result.
 //
 // Composite preserves a real object boundary around its physical elements.
-// Range can then be used to describe repeated geometry compactly, so compiling
-// a million identical scalar positions can be processed in a single command.
+// Range describes repetition with an element, count and distance. A repeated
+// scalar therefore compiles to one run even when it describes many values.
 //
 // Names and the choice of which source supplies an output belong to the
 // semantic layer. Source descriptions may be runtime objects or C++ constants.
@@ -239,20 +263,27 @@ typedef struct ttx_schema {
   Count alignment;
   U8 kind;
   union {
+
 #ifdef __cplusplus
+
     ttx_schema_primitive value = {
       0,
       0,
     };
+
 #else
+
     ttx_schema_primitive value;
+
 #endif
+
     ttx_schema_composite composite;
     ttx_schema_range range;
     ttx_schema_callable callable;
   } data;
 
 #ifdef __cplusplus
+
   // Kind selects the target's description. Reference flags independently
   // choose pointer storage, so a struct definition can serve both uses.
   enum class Kind : U8 {
@@ -339,9 +370,10 @@ typedef struct ttx_schema {
 
   constexpr auto get_kind() const -> Kind { return static_cast<Kind>(kind); }
 
-  // Selecting the kind establishes which part of the description we can
-  // observe. These accessors preserve the source facts for compilation to
-  // validate, including missing children and malformed position arrays.
+  // The caller reads the union member selected by Kind. These accessors use
+  // the stored fields directly. `get_positions` returns an empty View for a
+  // null pointer or zero count. Compilation checks the original pointer and
+  // count before using that View so malformed arrays remain distinguishable.
   constexpr auto get_value() const -> Value {
     return static_cast<Value>(data.value.type);
   }

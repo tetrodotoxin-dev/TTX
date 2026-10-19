@@ -11,8 +11,9 @@ namespace Ttx::Concept::Capabilities {
 
 // Exposes the capability to describe an operation that another provider can
 // supply. `describe` returns a Result containing the operation's UUID, its API
-// Representation and its input and output frames. The caller uses that UUID
-// and Representation to bind the operation on the object it wants to call.
+// Representation and its input and output frames. The caller selects an API it
+// can use, checks that API's Representation against the description, and binds
+// the UUID with its required Representation before calling the operation.
 //
 // Each frame describes its storage and lists fields in argument order. A
 // field's Abstract supplies its meaning and its offset locates the value in
@@ -32,12 +33,18 @@ class Callable {
   using Api = ttx_callable;
   using Operations = ttx_callable_operations;
 
+  // Checks `describe`, context and the required Abstract operations for null.
+  // Any present table must be readable and match the established API
+  // representation. The supplying contract establishes Callable's meaning.
   static auto accept(Api api) -> Bool {
     return api.operations && api.operations->describe &&
            Abstract::accept(
                ttx_abstract(api.context, &api.operations->abstract));
   }
 
+  // Copies a record already supplied under the Callable contract. The caller
+  // establishes its representation and required pointers. Explicit construction
+  // marks this unchecked conversion from the C record.
   explicit constexpr Callable(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }
@@ -46,10 +53,15 @@ class Callable {
     return Abstract(api.context, api.operations->abstract);
   }
 
-  // Reads fields in argument order. Each field supplies its Abstract and byte
-  // offset so the caller can interpret values and locate them in the frame.
+  // Frame exposes argument or result storage and its ordered field meanings.
+  // Its Representation remains readable and canonical through use, and fields
+  // contains get_size() accessible entries. Indexed access reads an entry
+  // directly and requires an index below get_size().
   class Frame {
    public:
+    // Copies the provider's frame record under its existing access contract.
+    // Explicit construction marks the caller's responsibility for valid
+    // description and field storage, which construction leaves unchecked.
     explicit constexpr Frame(ttx_callable_frame frame) : frame(frame) {}
 
     auto get_representation() const -> const Data::Form::Representation& {
@@ -70,10 +82,14 @@ class Callable {
     ttx_callable_frame frame;
   };
 
-  // Holds the copied UUID and frame records. Their pointers refer to the
-  // provider's representations and fields for the supplying observation.
+  // Description supplies the UUID and API form for negotiation, then the
+  // payload forms and field Abstracts for preparing a call. Its referenced
+  // descriptions and fields remain accessible under the supplying contract.
+  // Binding the operation's UUID and API form establishes the callable record.
   class Description {
    public:
+    // Copies the description record. Explicit construction marks unchecked
+    // use of the provider's canonical forms, field arrays and Abstracts.
     explicit constexpr Description(ttx_callable_description description)
         : description(description) {}
 
@@ -93,9 +109,11 @@ class Callable {
     ttx_callable_description description;
   };
 
-  // Adapts the provider's output to a Result. A successful response supplies
-  // the API Representation required to use its description. A response that
-  // omits that Representation becomes a Rejected failure.
+  // Returns a Description when the provider reports Satisfied and supplies a
+  // nonnull API description pointer. Unknown is preserved. Every other status
+  // or a missing API pointer returns Rejected. The provider establishes valid
+  // canonical forms, field arrays and Abstracts. This operation checks the
+  // status and API pointer, leaving those contents and ranges to the provider.
   auto describe() const -> Perimortem::Core::Storage::
       Result<Description, Semantic::Negotiation::Binding::Status> {
     const auto api = get_abi();

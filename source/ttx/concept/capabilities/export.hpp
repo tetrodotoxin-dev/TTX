@@ -12,8 +12,8 @@ namespace Ttx::Concept::Capabilities {
 // selects the contracts and routes needed by its target. A graph can supply
 // services alongside the content being exported. For example, a terminal can
 // use a logger or report generated paths through a capability found on the
-// root or one of its routes. Each participating contract defines those
-// questions and whether their answers are required to produce the result.
+// root or one of its routes. Each participating contract defines the
+// required services, their arguments and their effect on the exported result.
 //
 // The graph is available through `expose`. Satisfied reports that the provider
 // fulfilled its request, Unknown leaves the outcome undetermined, and Rejected
@@ -21,17 +21,24 @@ namespace Ttx::Concept::Capabilities {
 // observations it reports through the supplied graph.
 class Export {
  public:
-  static constexpr auto contract_id =
-      Perimortem::Serialization::Formats::Uuid(TTX_EXPORT_ID_HIGH, TTX_EXPORT_ID_LOW);
+  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+      TTX_EXPORT_ID_HIGH,
+      TTX_EXPORT_ID_LOW);
   using Api = ttx_export;
   using Operations = ttx_export_ops;
 
+  // Checks `expose`, context and the required Abstract operations for null.
+  // Any present table must be readable and match the established API
+  // representation. The supplying contract establishes Export's meaning.
   static auto accept(Api api) -> Bool {
     return api.operations && api.operations->expose &&
            Abstract::accept(
                ttx_abstract(api.context, &api.operations->abstract));
   }
 
+  // Copies a record already supplied under the Export contract. The caller
+  // establishes its representation and required pointers. Explicit construction
+  // marks this unchecked conversion from the C record.
   explicit constexpr Export(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }

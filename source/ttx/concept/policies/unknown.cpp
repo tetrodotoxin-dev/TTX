@@ -7,18 +7,18 @@
 
 #include "ttx/data/transfer.hpp"
 
+using namespace Perimortem::Core;
+using namespace Perimortem::Serialization;
 using namespace Ttx::Concept;
-using namespace Ttx::Semantic::Negotiation;
-using namespace Perimortem;
+using namespace Ttx::Data;
 
-namespace {
-
-// This shared result has its own context. Its stability does not establish a
-// Constant promise for the question that selected it.
+// UnknownProvider supplies the shared Unknown result. Its own routes stay on
+// this result, while the original Abstract and route make a new selection on
+// each observation unless they also supply Constant.
 class UnknownProvider {
  public:
   static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
-    const Serialization::Formats::Uuid contract(id);
+    const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Policies::Unknown::contract_id
                ? TTX_BINDING_SATISFIED
@@ -32,9 +32,8 @@ class UnknownProvider {
     }
 
     Abstract::Api api = resolve(context);
-    return Ttx::Data::Transfer::copy(
-               Ttx::Data::Form::Storage::from(api),
-               Ttx::Data::Form::Storage(target)) == Ttx::Data::Status::Success
+    return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
+                   Status::Success
                ? TTX_BINDING_SATISFIED
                : TTX_BINDING_REJECTED;
   }
@@ -52,19 +51,17 @@ class UnknownProvider {
     return resolve(context);
   }
 
-  static void visit(void*, ttx_concept_visitor) {}
+  static auto visit(void*, ttx_concept_visitor) -> void {}
 
   static constexpr ttx_abstract_ops operations = {supports, bind,  data,
                                                   resolve,  route, visit};
 };
-
-}  // namespace
 
 auto Policies::Unknown::get_unknown() -> Unknown {
   static UnknownProvider provider;
   return Unknown(UnknownProvider::resolve(&provider));
 }
 
-C_LINKAGE ttx_abstract ttx_unknown(void) {
+C_LINKAGE auto ttx_unknown(void) -> ttx_abstract {
   return Policies::Unknown::get_unknown().get_abi();
 }

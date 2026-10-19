@@ -76,7 +76,7 @@ class ForeignInvocation {
   Library module;
 };
 
-// The admitted record carries both its call and payload forms. Keeping the
+// The negotiated record carries both its call and payload forms. Keeping the
 // record for repeated calls uses the provider's existing access contract.
 VALIDATION_TEST(InvocationTests, generated_results) {
   ForeignInvocation foreign;

@@ -7,9 +7,9 @@
 
 namespace Ttx::Semantic::Negotiation::Binding {
 
-// Status describes the exchange, independently of the shape of its result.
-// Typed C++ consumers return the admitted API record on success and the
-// negotiation Status when that record could not be established.
+// Status preserves the C negotiation outcomes in C++. A typed bind returns
+// the complete API on success or the negotiation Status when that API could
+// not be established.
 enum class Status : U8 {
   Satisfied = TTX_BINDING_SATISFIED,
   Unknown = TTX_BINDING_UNKNOWN,

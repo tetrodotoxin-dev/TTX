@@ -8,16 +8,17 @@
 
 namespace Ttx::Concept::Capabilities {
 
-// Exposes the capability to interpret data described by the supplied
-// Representation and supply an Abstract for the imported graph. The provider
-// checks the representation before interpreting the input. On success, `visit`
-// invokes the callback once with that Abstract and returns Satisfied after the
-// callback finishes.
+// Import interprets described data as a graph of Abstracts. The provider checks
+// the Representation before interpreting input and supplies the resulting
+// Abstract through one synchronous callback. A successful import returns
+// Satisfied after that callback finishes.
 //
 // The callback is a callable passed by reference and invoked with an Abstract.
-// Its captured state carries the consumer's observations. `visit` returns the
+// Its captured state carries the consumer's observations. The call returns the
 // provider's status and discards any value returned by the callback. The
-// input, Representation and callback remain available until `visit` returns.
+// input, Representation and callback remain available until the call returns.
+// The caller supplies a readable region with the represented extent and
+// alignment. The wrapper forwards these arguments to the provider directly.
 // The imported graph is available during the callback, where the consumer can
 // inspect it, copy data or negotiate retained access through the graph's
 // capabilities.
@@ -27,17 +28,24 @@ namespace Ttx::Concept::Capabilities {
 // explicitly refuses it.
 class Import {
  public:
-  static constexpr auto contract_id =
-      Perimortem::Serialization::Formats::Uuid(TTX_IMPORT_ID_HIGH, TTX_IMPORT_ID_LOW);
+  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+      TTX_IMPORT_ID_HIGH,
+      TTX_IMPORT_ID_LOW);
   using Api = ttx_import;
   using Operations = ttx_import_ops;
 
+  // Checks `visit`, context and the required Abstract operations for null.
+  // Any present table must be readable and match the established API
+  // representation. The supplying contract establishes Import's meaning.
   static auto accept(Api api) -> Bool {
     return api.operations && api.operations->visit &&
            Abstract::accept(
                ttx_abstract(api.context, &api.operations->abstract));
   }
 
+  // Copies a record already supplied under the Import contract. The caller
+  // establishes its representation and required pointers. Explicit construction
+  // marks this unchecked conversion from the C record.
   explicit constexpr Import(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }

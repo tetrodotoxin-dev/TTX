@@ -36,8 +36,9 @@ static ttx_binding_status
   return TTX_BINDING_UNKNOWN;
 }
 
-// Constant describes the subject's semantic answers. It does not make its
-// byte observation a constant, nor extend the returned buffer's lifetime.
+// Constant preserves the selection made by the supplying Abstract and route.
+// This provider's byte observation changes on each call, with access to its
+// buffer governed independently of that selection.
 static perimortem_view_bytes data(void* context) {
   observation_subject* subject = context;
   ++subject->value;

@@ -6,20 +6,21 @@
 
 #include "ttx/semantic/negotiation/query.h"
 
-// A consumer may know the data an operation accepts without having a native
-// declaration for its function. Invocation lets the provider expose that
-// operation through described input and output storage. Binding the operation's
-// UUID checks this record's callable ABI. Its input and output descriptors then
-// establish which payloads invoke can consume and produce.
+// Invocation calls an operation through represented input and output buffers.
+// A consumer uses it when the payload layouts are known but the provider's
+// native function declaration is private. Negotiating the operation's UUID
+// and this API record establishes the call convention. The input and output
+// Representations describe the buffers passed to `invoke`.
 //
-// A provider can construct this record when requested. Its context, frame
-// descriptions and executable code remain available for
-// the lifetime supplied by the provider. Copying the record acquires no
-// additional ownership. An operation requiring independent release exposes that
-// obligation in its own contract. Inputs and outputs are borrowed until the
-// synchronous call returns, after which only success provides usable output. A
-// policy offering asynchronous execution must establish its own lifetime for
-// the operation's data.
+// The caller supplies accessible, correctly sized and aligned buffers matching
+// those Representations. The provider borrows them until the synchronous call
+// returns. The consumer uses output after TTX_DATA_SUCCESS. The operation's
+// contract defines any other effects and any aliasing it permits.
+//
+// The supplying contract keeps context, Representations and executable code
+// accessible through each call. Copying the API record preserves that access
+// duration. Independent retention and release are supplied by the higher
+// contract governing the operation.
 typedef struct ttx_invocation {
   void* context;
   const ttx_representation* inputs;

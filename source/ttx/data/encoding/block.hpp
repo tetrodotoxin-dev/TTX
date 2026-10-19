@@ -11,11 +11,10 @@ namespace Ttx::Data::Encoding {
 // Fields in Struct, Element and Callable can share a U64 chunk or cross into
 // the next one. Block assembles those fields before writing each chunk so all
 // three formats use the same packing rules. The largest profile contains
-// fifteen U32 chunks, which fit in eight U64 scratch chunks. Updating those
-// scratch chunks required less memory traffic and measured faster than merging
-// each field directly into the destination.
+// fifteen U32 chunks, which fit in eight U64 scratch chunks. Fields merge in
+// that local array before the writer emits complete chunks to the destination.
 //
-// A reader needs only the chunks containing the requested field. extract()
+// A reader needs only the chunks containing the requested field. `extract`
 // locates them by their bit coordinates in the complete buffer. Canonical
 // padding makes every U64 load complete, even across descriptor boundaries.
 // Reading and writing both support unaligned storage in little endian order.
@@ -36,7 +35,7 @@ class Block {
     }
   }
 
-  // Bytes contains the complete admitted Representation, and first is an
+  // Bytes contains the complete canonical form, and first is an
   // absolute bit coordinate within it. A descriptor can start halfway through
   // a U64 chunk, so loads must be aligned relative to the buffer's start.
   // The field needs its containing chunk and, if it crosses that boundary,
@@ -51,8 +50,9 @@ class Block {
       Count width) -> Count {
     const auto chunk = [&](Count offset) -> U64 {
       // Clang permits builtin copies between byte arrays during constant
-      // evaluation. bit_cast can then read that array as a U64 without casting
-      // a pointer. The same code reduces to an unaligned U64 load at runtime.
+      // evaluation. `bit_cast` can then read that array as a U64 without
+      // casting a pointer. The same code reduces to an unaligned U64 load at
+      // runtime.
       Perimortem::Core::Storage::Vector<U8, sizeof(U64)> chunk_bytes;
       __builtin_memcpy(
           chunk_bytes.get_data(), bytes.get_data() + offset, sizeof(U64));
@@ -61,6 +61,7 @@ class Block {
           Perimortem::Core::Data::ByteOrder::Native>(
           __builtin_bit_cast(U64, chunk_bytes));
     };
+
     const Count offset = (first >> 6) << 3;
     const Count shift = first & 0x3f;
     Count value = chunk(offset) >> shift;

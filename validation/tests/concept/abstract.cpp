@@ -111,8 +111,9 @@ VALIDATION_TEST(Abstracts, fresh_abstract_binding) {
   EXPECT_EQ(provider.binds, Count(4));
 }
 
-// Resolving this layer exposes a different subject. Support and binding must
-// still use this layer's answers, including its explicit refusal.
+// Resolution returns None, while support on the original Abstract can report
+// Rejected or Unknown. Binding still calls that original Abstract's operation.
+// Its policy governs negotiation independently of the result of resolution.
 VALIDATION_TEST(Abstracts, encountered_policy) {
   struct Policy {
     ttx_abstract target;
@@ -163,8 +164,8 @@ VALIDATION_TEST(Abstracts, encountered_policy) {
   EXPECT_EQ(policy.binds, Count(1));
 }
 
-// A combined promise is one question. Its provider need not know the
-// consumer's vocabulary for any proposed constituent promise.
+// A combined contract has its own UUID. Its provider can establish that
+// contract while leaving separately requested constituent UUIDs undetermined.
 VALIDATION_TEST(Abstracts, qualified_question) {
   struct Subject {
     Count probes = 0;

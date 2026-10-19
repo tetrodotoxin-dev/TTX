@@ -8,16 +8,15 @@
 
 namespace Ttx::Concept::Capabilities {
 
-// Exposes the capability to create an Abstract from the supplied argument
-// graph. The provider interprets the arguments through their routes and
-// contracts. None represents intentionally absent arguments. If creation
-// succeeds, `create` invokes the callback once with the created Abstract and
-// returns Satisfied after the callback finishes.
+// Create constructs a result from an argument graph using the provider's
+// interpretation of its routes and contracts. None represents intentionally
+// absent arguments. A successful creation invokes the callback once with the
+// created Abstract and returns Satisfied after the callback finishes.
 //
 // The callback is a callable passed by reference and invoked with an Abstract.
-// Its captured state carries the consumer's observations. `create` returns the
+// Its captured state carries the consumer's observations. The call returns the
 // provider's status and discards any value returned by the callback. The
-// arguments and callback remain available until `create` returns. The created
+// arguments and callback remain available until the call returns. The created
 // Abstract is available during the callback. The consumer can use its
 // capabilities, copy observations or negotiate retained access, allowing
 // providers to create objects in temporary storage.
@@ -27,17 +26,24 @@ namespace Ttx::Concept::Capabilities {
 // explicitly refuses it.
 class Create {
  public:
-  static constexpr auto contract_id =
-      Perimortem::Serialization::Formats::Uuid(TTX_CREATE_ID_HIGH, TTX_CREATE_ID_LOW);
+  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+      TTX_CREATE_ID_HIGH,
+      TTX_CREATE_ID_LOW);
   using Api = ttx_create;
   using Operations = ttx_create_ops;
 
+  // Checks `create`, context and the required Abstract operations for null.
+  // Any present table must be readable and match the established API
+  // representation. The supplying contract establishes Create's meaning.
   static auto accept(Api api) -> Bool {
     return api.operations && api.operations->create &&
            Abstract::accept(
                ttx_abstract(api.context, &api.operations->abstract));
   }
 
+  // Copies a record already supplied under the Create contract. The caller
+  // establishes its representation and required pointers. Explicit construction
+  // marks this unchecked conversion from the C record.
   explicit constexpr Create(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }

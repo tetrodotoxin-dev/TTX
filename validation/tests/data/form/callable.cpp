@@ -129,8 +129,9 @@ VALIDATION_TEST(Callables, signature_differences) {
   EXPECT_NOT(constant.compatible(prepare(variadic)));
   EXPECT_NOT(constant.compatible(prepare(returned)));
 
-  // Equal fields do not make System V and Windows call boundaries agree.
-  // Windows fixed and variadic declarations also remain distinct promises.
+  // The same argument types can require different registers under System V
+  // and Windows conventions. Canonical comparison therefore includes the
+  // convention and distinguishes Windows fixed and variadic calls.
   const auto windows =
       Schema::callable(Schema::Convention::WindowsX64, {four, 1});
   const auto windows_variadic =
@@ -227,7 +228,7 @@ VALIDATION_TEST(Callables, invalid_signatures) {
 }
 
 // C authors its descriptions and executable table independently. Agreement
-// admits one ordinary copy into the C++ table, followed by actual fixed,
+// permits one ordinary copy into the C++ table, followed by actual fixed,
 // variadic and SIMD calls. No Semantic negotiation or invocation wrapper is
 // involved in this Data format proof.
 VALIDATION_TEST(Callables, foreign_calls) {

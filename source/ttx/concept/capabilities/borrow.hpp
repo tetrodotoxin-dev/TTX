@@ -13,18 +13,18 @@ namespace Ttx::Concept::Capabilities {
 // another object that preserves the encountered policy.
 //
 // `borrow` returns a Result containing the Borrowed result when access can be
-// retained, or an Unknown or Rejected failure. Unknown leaves the borrowing
+// retained, or an Unknown or Rejected status. Unknown leaves the borrowing
 // request undetermined. Rejected explicitly refuses it. Each successful call
 // creates one release obligation, even when several calls return the same
 // context. The caller fulfills that obligation by explicitly calling `release`
 // on the returned Borrowed view.
 //
-// Returning Satisfied promises an nonnull context and the full Borrowed
+// Returning Satisfied promises a nonnull context and the full Borrowed
 // interface, including its Abstract operations. Missing required pointers
 // violates that contract, so the C++ adapter reports Rejected. If the result
-// still contains an nonnull context and a release operation, the adapter first
+// still contains a nonnull context and a release operation, the adapter first
 // calls `release` with that context to return the acquired access. The caller
-// receives the failure after this cleanup.
+// receives Rejected after this cleanup.
 class Borrow {
  public:
   static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
@@ -33,12 +33,18 @@ class Borrow {
   using Api = ttx_borrow;
   using Operations = ttx_borrow_ops;
 
+  // Checks `borrow`, context and the required Abstract operations for null.
+  // Any present table must be readable and match the established API
+  // representation. The supplying contract establishes Borrow's meaning.
   static auto accept(Api api) -> Bool {
     return api.operations && api.operations->borrow &&
            Abstract::accept(
                ttx_abstract(api.context, &api.operations->abstract));
   }
 
+  // Copies a record already supplied under the Borrow contract. The caller
+  // establishes its representation and required pointers. Explicit construction
+  // marks this unchecked conversion from the C record.
   explicit constexpr Borrow(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }

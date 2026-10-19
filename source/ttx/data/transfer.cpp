@@ -14,7 +14,7 @@ auto ttx_transfer(const ttx_storage* input, const ttx_storage* output)
     return TTX_DATA_INVALID;
   }
 
-  // Compare the readable descriptor bytes with the admitted destination form
+  // Compare the readable descriptor bytes with the canonical destination form
   // before decoding source geometry. A bootstrap can therefore reject a
   // foreign form without following its encoded references.
   if (!input->representation->compatible(*output->representation)) {

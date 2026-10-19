@@ -11,10 +11,16 @@
 
 namespace Ttx::Data::Form {
 
-// Storage borrows a represented region. `create` checks its geometry;
-// construction from a C record uses the caller's admitted representation.
+// Storage supplies represented memory to Data and negotiation operations.
+// It copies the C record while keeping the representation and data under their
+// existing access contracts. `create` checks declared capacity and alignment.
+// Construction from a C record stores it for an operation to check or use under
+// geometry already established by the caller.
 class Storage {
  public:
+  // Uses a canonical Representation and the writable range supplied by Access.
+  // Returns the geometry check's status on failure. The caller keeps both the
+  // representation and region accessible for every use of the returned Storage.
   static auto create(
       const Representation& representation,
       Perimortem::Core::Access::Bytes bytes)
@@ -30,12 +36,13 @@ class Storage {
     return Storage(value);
   }
 
-  // The caller may already have admitted the supplied region. This constructor
-  // consumes that established precondition instead of checking it again.
+  // Copies the record without validating its pointers, capacity or alignment.
+  // Explicit construction keeps this unchecked path distinct from `create`.
   constexpr explicit Storage(ttx_storage value) : value(value) {}
 
-  // Native values supply their own declared layout and extent. This borrows
-  // that value's storage, so it remains available through the operation.
+  // Describes one writable native lvalue using Native<Value>. Its complete
+  // object size supplies capacity. The caller keeps the value alive and at
+  // the same address through every operation using this Storage.
   template <typename Value>
   static auto from(Value& data) -> Storage {
     return Storage(ttx_storage(
@@ -47,8 +54,9 @@ class Storage {
     return *value.representation;
   }
 
-  // Observation includes the empty region. Operations receiving this Storage
-  // establish writable access through its admitted destination contract.
+  // Observes the full declared capacity, including any bytes beyond the
+  // represented value's extent. The caller supplies readable memory for that
+  // capacity. Zero capacity produces the canonical empty View.
   constexpr auto get_bytes() const -> Perimortem::Core::View::Bytes {
     return Perimortem::Core::View::Bytes(
         perimortem_view_bytes{value.data, value.size});

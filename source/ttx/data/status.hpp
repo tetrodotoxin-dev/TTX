@@ -7,6 +7,8 @@
 
 namespace Ttx::Data {
 
+// Status exposes the C Data outcomes to C++ consumers with the same numeric
+// values. The supplying operation defines each outcome's effect on its output.
 enum class Status : U8 {
   Success = TTX_DATA_SUCCESS,
   Invalid = TTX_DATA_INVALID,

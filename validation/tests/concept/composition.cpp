@@ -48,6 +48,8 @@ class Expression {
            Abstract::accept({api.context, &api.operations->abstract});
   }
 
+  // Explicit construction marks an unchecked conversion of the complete C
+  // record. The provider supplies the evaluation and Abstract contracts.
   explicit Expression(Api api) : api(api) {}
 
   auto get_abstract() const -> Abstract {
@@ -71,6 +73,8 @@ class BorrowedExpression {
            Policies::Borrowed::accept({api.context, &api.operations->borrowed});
   }
 
+  // Copies an acquired C record under its original release obligation.
+  // Explicit construction marks this unchecked conversion from the C record.
   explicit BorrowedExpression(Api api) : api(api) {}
 
   auto get_borrowed() const -> Policies::Borrowed {

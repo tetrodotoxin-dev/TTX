@@ -17,6 +17,9 @@ struct PortableCounter {
       Perimortem::Serialization::Formats::Uuid(17, 23);
   Api api;
 
+  // Copies a negotiated record whose provider supplies callable code and its
+  // required context. Explicit construction marks this unchecked conversion
+  // from the C record.
   explicit PortableCounter(Api api) : api(api) {}
 };
 
@@ -34,6 +37,9 @@ struct Wrong {
   using Api = WrongApi;
   static constexpr Perimortem::Serialization::Formats::Uuid contract_id =
       Perimortem::Serialization::Formats::Uuid(17, 23);
+  // Explicit construction marks the conversion that a successful bind would
+  // select. This fixture requests an incompatible signature and expects that
+  // bind to reject the record before reaching this constructor.
   explicit Wrong(Api) {}
 };
 

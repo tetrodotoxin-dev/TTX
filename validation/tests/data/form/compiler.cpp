@@ -61,8 +61,9 @@ VALIDATION_TEST(TtxCompiler, composite_and_range) {
   EXPECT_NOT(prepare(flat).compatible(prepare(incompatible)));
 }
 
-// Admission catches incorrect fixed facts once. Runtime operations require an
-// admitted immutable descriptor so they never repeat this walk for each GEP.
+// Compilation checks placement, recursion and range overflow before emitting
+// a canonical description. Consumers use that description for subsequent byte
+// coordinate lookup without compiling the Schema again.
 VALIDATION_TEST(TtxCompiler, schema_validation) {
   Preparation prepare;
   Perimortem::Core::Storage::Vector<Schema::Position, 2> entries = {

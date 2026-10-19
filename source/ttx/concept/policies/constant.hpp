@@ -18,12 +18,18 @@ namespace Ttx::Concept::Policies {
 // obligation.
 class Constant {
  public:
-  static constexpr auto contract_id =
-      Perimortem::Serialization::Formats::Uuid(TTX_CONSTANT_ID_HIGH, TTX_CONSTANT_ID_LOW);
+  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+      TTX_CONSTANT_ID_HIGH,
+      TTX_CONSTANT_ID_LOW);
   using Api = ttx_abstract;
 
+  // Copies an Abstract already supplied under the Constant contract. Explicit
+  // construction makes the caller's interpretation visible. Construction
+  // performs a record copy, with the policy guaranteed by its provider.
   explicit constexpr Constant(Api api) : api(api) {}
 
+  // Uses Abstract's pointer presence check on a readable, correctly represented
+  // table. The supplying contract establishes the policy's semantic guarantee.
   static auto accept(Api api) -> Bool { return Abstract::accept(api); }
 
   constexpr auto get_abi() const -> Api { return api; }

@@ -17,15 +17,17 @@
 
 namespace Ttx::Data::Form {
 
-// The compiler is used to encode the canonical TTX format for transferring
-// structured data descriptors. The descriptor encoding is a sequence of fixed
+// Compiler prepares Schema graphs for encoded comparison and navigation.
+// Successful compilation or composition establishes the records and indices
+// consumed by `write`. Default construction provides empty preparation state.
+// The canonical descriptor encoding is a sequence of fixed
 // width blocks, always encoded in little endian order. The whole buffer uses
 // one width, but compilation promotes that width when any value needs more
 // room. We do the normalization before publishing so consumers can compare
 // bytes or follow offsets without reconstructing the source objects.
 //
 // Pointer storage can occupy four or eight bytes, aligned to that width.
-// Compilation takes this width as a constexpr input, defaulting to the host.
+// Compilation takes this width explicitly, defaulting to the host.
 // Compiled passes its template width through the same implementation.
 // Calling convention remains part of each callable description because
 // agreeing on pointer storage alone cannot establish how a function is called.
@@ -87,7 +89,7 @@ namespace Ttx::Data::Form {
 //      3 for Emscripten Wasm32, 4 for its variadic form, 5 for Windows x64
 //      and 6 for its variadic form.
 //
-//   x: Reserved, always zero. These bits participate in bytewise agreement.
+//   `x`: Reserved, always zero. These bits participate in bytewise agreement.
 //
 //   S, C, *, P: Return description using the element selectors. Setting every
 //      selector bit to one denotes void, only in this return slot.
@@ -285,9 +287,9 @@ namespace Ttx::Data::Form {
 // 11. Write only that final depth, with unused bits and final padding zero.
 //     Round the complete buffer size up to eight bytes. Hashing, runtime
 //     versus constant evaluation, and allocation policy cannot affect the
-//     output. Compiler owns temporary preparation and the caller owns the final
-//     buffer, so construction storage disappears from the resolve_references
-//     descriptor.
+//     output. Compiler manages preparation storage separately from the caller's
+//     final buffer. Encoded references are block indices and retain no
+//     addresses into Schema or preparation storage.
 //
 // For example, U8 at offsets zero, one and two followed by U32 at offset four
 // becomes one U8 descriptor with N three and D one, then one U32 descriptor
@@ -303,8 +305,9 @@ namespace Ttx::Data::Form {
 // requested primitive occurrence, not merely each compressed descriptor.
 //
 // Storage policy selects temporary allocation for the same normalization
-// algorithm. Runtime compilation uses the current thread; Compiled supplies
-// constant evaluation storage whose allocations end during translation.
+// algorithm. Runtime compilation uses the current thread's allocator.
+// Compiled supplies constant evaluation storage whose allocations end during
+// translation.
 template <template <typename> class Vector = Perimortem::Memory::Thread::Vector>
 class Compiler {
  public:
@@ -359,9 +362,9 @@ class Compiler {
     return publish(root);
   }
 
-  // Existing forms can be assembled without rebuilding their source Schemas.
-  // Admission checks only the new placements. Imported bodies then use the
-  // same interning and numbering as source compilation, including cycles.
+  // Assembles canonical child forms at checked offsets within the new extent
+  // and alignment. Imported bodies use the same interning and numbering as
+  // source compilation, including cycles. Their source Schemas are unnecessary.
   EXPORTED(TTX) auto compose(
       Perimortem::Core::View::Vector<ttx_representation_member> members,
       Count extent,
@@ -375,7 +378,7 @@ class Compiler {
   constexpr auto get_depth() const -> U8 { return depth; }
 
   // Preparation has settled indices and the common depth. Each content record
-  // can therefore emit one block directly into the caller's buffer. get_size()
+  // can therefore emit one block directly into the caller's buffer. `get_size`
   // includes final padding, so one capacity check covers every write.
   constexpr auto write(Perimortem::Core::Access::Bytes target) const -> Status {
     if (target.get_size() < get_size()) {
@@ -465,10 +468,9 @@ class Compiler {
     Count extent = 0;
   };
 
-  // Runtime composition remaps an admitted body's absolute block references
+  // Runtime composition remaps a canonical body's absolute block references
   // into this compiler's temporary inventory. These helpers share the same
-  // private record ownership as source compilation, so normalization has one
-  // implementation rather than a second externally mutable record API.
+  // records and normalization algorithm as source compilation.
   auto import_body(
       const ttx_representation& form,
       Count block,
@@ -819,8 +821,9 @@ class Compiler {
       ordered &= follows;
       if (follows && current.count && current.type == next.type &&
           current.attributes == next.attributes) {
-        // The first pair establishes a distance. Later occurrences continue
-        // the run when their start is one distance beyond its previous start.
+        // The first two matching occurrences establish the run's distance. An
+        // established run extends only at that distance, preserving the exact
+        // byte starts when separate source ranges are combined.
         const Count distance = next.offset - last;
         if (current.count == 1 || distance == current.distance) {
           current.distance = distance;
@@ -1062,7 +1065,7 @@ class Compiler {
 
   // Discovery has already compacted ordered fields. Only a source whose runs
   // interleave needs this merge. Splitting at the next start preserves compact
-  // ranges while exposing any actual overlap as an admission failure.
+  // ranges while rejecting overlapping occupied bytes.
   constexpr auto reorder(Count first) -> Status {
     Elements heap;
     for (Count i = first + 1; i < records.get_size(); ++i) {
@@ -1241,8 +1244,9 @@ class Compiler {
       }
     }
 
-    // Discovery already normalized these runs. Only a merged target identity
-    // can change that result and require another compaction pass.
+    // Discovery compacted runs using their original target indices. Merging
+    // equal child bodies can make adjacent runs refer to the same target, so
+    // changed references require another compaction before hashing this body.
     Body key;
     if (changed) {
       key = project(

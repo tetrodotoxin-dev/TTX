@@ -21,7 +21,7 @@ struct Observations {
   Count borrowed = 0, released = 0, created = 0, binds = 0;
 };
 
-// Discovery can end while this separately allocated answer remains available.
+// Discovery can end while this separately allocated provider remains available.
 // All of its tables share these functions because they use the same context.
 class Retained {
  public:
@@ -327,7 +327,8 @@ VALIDATION_TEST(Borrowing, scoped_and_refused) {
 }
 
 // A provider supplied a return operation but an incomplete Abstract table.
-// Admission returns the acquired state through that operation before rejecting.
+// Borrow returns the acquired access through that release operation before
+// reporting Rejected to the consumer.
 VALIDATION_TEST(Borrowing, malformed_answer_return) {
   struct Provider {
     Count releases = 0;
@@ -345,7 +346,7 @@ VALIDATION_TEST(Borrowing, malformed_answer_return) {
   } provider;
 
   // These Abstract operations use no private state, so the fixture can reuse
-  // them with its own context. The acquired answer deliberately omits them.
+  // them with its own context. The acquired API deliberately omits them.
   const ttx_borrow_ops operations = {*ttx_none().operations, Provider::borrow};
   const Capabilities::Borrow request({&provider, &operations});
   ASSERT(Capabilities::Borrow::accept(request.get_abi()));

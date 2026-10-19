@@ -19,21 +19,27 @@ typedef struct ttx_callable_field {
   Count offset;
 } ttx_callable_field;
 
+// Describes the storage of an argument or result frame and the meaning of its
+// fields. The provider supplies a readable canonical Representation and count
+// field entries in argument order. A zero count leaves fields unused. Each
+// field's offset locates its value within the represented frame.
 typedef struct ttx_callable_frame {
   const ttx_representation* representation;
   const ttx_callable_field* fields;
   Count count;
 } ttx_callable_frame;
 
-// Names an operation and describes the API record used to call it. The caller
-// binds contract using the Representation in api. Input and output frames give
-// the storage layouts and the Abstracts that describe each value's meaning.
+// Names an operation and describes the API record used to call it. The consumer
+// selects an API it can call, compares that API's Representation with api, then
+// binds contract using its required Representation. Input and output frames
+// give the storage layouts and Abstracts describing each value's meaning.
 // Fields follow argument order, with offsets locating their bytes in the frame.
 //
-// Copying the description copies these records. Their Representations, field
-// arrays and Abstracts remain borrowed from the supplying observation. A
-// consumer keeping those observations copies their data or negotiates the
-// retention it needs.
+// The provider supplies readable canonical API and frame Representations,
+// valid field arrays and usable Abstracts through the description's access
+// duration. Copying the description preserves the referenced storage's existing
+// lifetime. A consumer keeping a field's Abstract establishes any required
+// retention through that Abstract's capabilities.
 typedef struct ttx_callable_description {
   perimortem_uuid contract;
   const ttx_representation* api;

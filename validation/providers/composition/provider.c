@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "toolchain/export.h"
+
 #include "ttx/concept/policies/constant.h"
 #include "ttx/concept/policies/none.h"
 #include "ttx/data/transfer.h"
@@ -46,8 +47,8 @@ static ttx_binding_status supports(void* context, perimortem_uuid id) {
     return subject->state->additional;
   }
 
-  // Acquisition adds the retained contracts. Discovery still provides
-  // evaluation and the capability to request a borrow.
+  // Borrowed and Constant apply to the acquired expression. Discovery supports
+  // evaluation and Borrow, while this branch requires an existing acquisition.
   if (subject->acquired) {
     if (is(id, TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW) ||
         is(id, TTX_CONSTANT_ID_HIGH, TTX_CONSTANT_ID_LOW)) {
@@ -77,8 +78,8 @@ HIDDEN ttx_binding_status
     return status;
   }
 
-  // Each bound record keeps this context and bind function, so subsequent
-  // questions continue through the policy that admitted the record.
+  // Each bound record keeps this context and bind function. Further
+  // negotiation therefore uses the same governing policy.
   if (is(id, TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW)) {
     ttx_borrow api = {source, &borrow_operations};
     const ttx_storage input = {state->forms.borrow, (U8*)&api, sizeof(api)};

@@ -16,6 +16,7 @@
 
 static const perimortem_uuid increment_id = {
   0x75a9a5de1b164e82ULL, 0x823e42db676680acULL};
+
 static retention_statistics observed;
 static ttx_binding_status creation_status, borrowing_status;
 static const ttx_representation* integer_form;
@@ -24,8 +25,9 @@ static const ttx_borrowed_ops retained_operations;
 static const ttx_callable_operations callable_operations;
 static const ttx_create_ops factory_operations;
 
-// Create lends a stack value. Borrow substitutes separately allocated state
-// with a different layout; its operations establish the new context meaning.
+// The creation callback receives a stack value. Borrow substitutes separately
+// allocated state with a different layout. Its operations interpret that new
+// context through the same requested contract.
 typedef struct temporary_value {
   U64 initial;
 } temporary_value;
@@ -75,6 +77,7 @@ static ttx_binding_status
     ttx_borrow api = {context, &temporary_operations};
     const ttx_storage input = {
       ttx_borrow_representation(), (U8*)&api, sizeof(api)};
+
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_BINDING_SATISFIED
                : TTX_BINDING_REJECTED;
@@ -84,6 +87,7 @@ static ttx_binding_status
     ttx_abstract api = temporary_abstract(context);
     const ttx_storage input = {
       ttx_abstract_representation(), (U8*)&api, sizeof(api)};
+
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_BINDING_SATISFIED
                : TTX_BINDING_REJECTED;
@@ -107,7 +111,7 @@ static ttx_binding_status retained_supports(void* context, perimortem_uuid id) {
 }
 
 // This symbol is hidden from lookup. The consumer obtains it only as part of
-// an admitted API record, and repeated calls observe changing provider state.
+// a negotiated API record, and repeated calls observe changing provider state.
 HIDDEN ttx_data_status
     retention_invoke(void* context, const void* input, void* output) {
   retained_value* value = context;
@@ -125,6 +129,7 @@ static ttx_binding_status
     ttx_borrow api = {context, &retained_borrow_operations};
     const ttx_storage input = {
       ttx_borrow_representation(), (U8*)&api, sizeof(api)};
+
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_BINDING_SATISFIED
                : TTX_BINDING_REJECTED;
@@ -134,6 +139,7 @@ static ttx_binding_status
     ttx_borrowed api = {context, &retained_operations};
     const ttx_storage input = {
       ttx_borrowed_representation(), (U8*)&api, sizeof(api)};
+
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_BINDING_SATISFIED
                : TTX_BINDING_REJECTED;
@@ -143,6 +149,7 @@ static ttx_binding_status
     ttx_callable api = {context, &callable_operations};
     const ttx_storage input = {
       ttx_callable_representation(), (U8*)&api, sizeof(api)};
+
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_BINDING_SATISFIED
                : TTX_BINDING_REJECTED;
@@ -151,8 +158,10 @@ static ttx_binding_status
   if (is(id, increment_id.high, increment_id.low)) {
     ttx_invocation api = {
       context, integer_form, integer_form, retention_invoke};
+
     const ttx_storage input = {
       ttx_invocation_representation(), (U8*)&api, sizeof(api)};
+
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_BINDING_SATISFIED
                : TTX_BINDING_REJECTED;
@@ -162,6 +171,7 @@ static ttx_binding_status
     ttx_abstract api = retained_abstract(context);
     const ttx_storage input = {
       ttx_abstract_representation(), (U8*)&api, sizeof(api)};
+
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_BINDING_SATISFIED
                : TTX_BINDING_REJECTED;
@@ -206,6 +216,7 @@ static ttx_binding_status describe(
     void* context,
     ttx_callable_description* output) {
   (void)context;
+
   static ttx_callable_field field;
   field = (ttx_callable_field){ttx_unknown(), 0};
   *output = (ttx_callable_description){
@@ -213,6 +224,7 @@ static ttx_binding_status describe(
     ttx_invocation_representation(),
     {integer_form, &field, 1},
     {integer_form, &field, 1}};
+
   return TTX_BINDING_SATISFIED;
 }
 
@@ -234,6 +246,7 @@ static ttx_binding_status
     ttx_create api = {context, &factory_operations};
     const ttx_storage input = {
       ttx_create_representation(), (U8*)&api, sizeof(api)};
+
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_BINDING_SATISFIED
                : TTX_BINDING_REJECTED;
@@ -243,6 +256,7 @@ static ttx_binding_status
     ttx_abstract api = factory_abstract(context);
     const ttx_storage input = {
       ttx_abstract_representation(), (U8*)&api, sizeof(api)};
+
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_BINDING_SATISFIED
                : TTX_BINDING_REJECTED;
@@ -309,6 +323,7 @@ retention_fixture retention_provider_open(void) {
     8,
     TTX_SCHEMA_VALUE,
     {.value = {TTX_SCHEMA_U64, TTX_SCHEMA_LITTLE_ENDIAN}}};
+
   if (!integer_form) {
     compile_representation = ttx_representation_compile;
     integer_form = prepare_representation(&integer);

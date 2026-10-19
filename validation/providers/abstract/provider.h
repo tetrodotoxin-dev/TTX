@@ -11,7 +11,10 @@
 #define BOOTSTRAP_QUERY_HIGH 0x10d12c0061b54077ULL
 #define BOOTSTRAP_QUERY_LOW 0xb131bd52aa477f61ULL
 
-// Two callable representations of the fixture's single-root export inventory.
+// One export UUID supports callback enumeration and indexed access to the same
+// root Abstract. The provider selects the complete API matching the consumer's
+// requested Representation. Returned Abstracts remain available while the
+// fixture library is loaded.
 typedef struct bootstrap_exports {
   void* context;
   void (*visit)(

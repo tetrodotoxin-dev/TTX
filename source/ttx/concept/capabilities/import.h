@@ -3,6 +3,7 @@
 
 #ifndef TTX_CONCEPT_CAPABILITIES_IMPORT_H
 #define TTX_CONCEPT_CAPABILITIES_IMPORT_H
+
 #include "ttx/concept/abstract.h"
 
 #define TTX_IMPORT_ID_HIGH 0x73d6db5cd5954412ULL
@@ -16,9 +17,10 @@
 //
 // The caller can supply callback state through `callback_context`, which is
 // passed unchanged to `callback`. The input, Representation and callback state
-// remain available until `visit` returns. The imported graph is available
-// during the callback, where the consumer can inspect it, copy data or
-// negotiate retained access through the graph's capabilities.
+// remain available until `visit` returns. Input storage satisfies the extent
+// and alignment of its canonical Representation. The imported graph is
+// available during the callback, where the consumer can inspect it, copy data
+// or negotiate retained access through the graph's capabilities.
 //
 // A `visit` returning Unknown or Rejected guarantees that `callback` was never
 // called. Unknown leaves the import request undetermined. Rejected explicitly
@@ -40,4 +42,5 @@ typedef struct ttx_import_ops {
 
 C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_import_representation(
     void);
+
 #endif

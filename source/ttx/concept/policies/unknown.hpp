@@ -8,20 +8,23 @@
 
 namespace Ttx::Concept::Policies {
 
-// Unknown is the provisional result to a semantic question that the current
-// graph cannot settle. Since repeating the original question may later produce
-// a factual identity under a different observational state, Unknown can't be
-// used to assume the resolution would never produce a valid result.
-//
-// For explicit rejection None should be used instead.
+// Unknown carries the governing Abstract for an undetermined route result.
+// Its C++ interface preserves the supplied context and operations. To retry
+// resolution, the consumer uses the original Abstract and route.
 class Unknown {
  public:
-  static constexpr auto contract_id =
-      Perimortem::Serialization::Formats::Uuid(TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW);
+  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+      TTX_UNKNOWN_ID_HIGH,
+      TTX_UNKNOWN_ID_LOW);
   using Api = ttx_abstract;
 
+  // Copies an Abstract already supplied under the Unknown contract. Explicit
+  // construction makes the caller's interpretation visible. Construction
+  // performs a record copy, with the policy guaranteed by its provider.
   explicit constexpr Unknown(Api api) : api(api) {}
 
+  // Uses Abstract's pointer presence check on a readable, correctly represented
+  // table. The supplying contract establishes the policy's semantic guarantee.
   static auto accept(Api api) -> Bool { return Abstract::accept(api); }
 
   constexpr auto get_abi() const -> Api { return api; }

@@ -6,19 +6,17 @@
 
 #include "ttx/concept/abstract.h"
 
-// Ordered promises a stable, meaningful visitation order for this Abstract.
-// Repeated visits to an unchanged observation preserve the order. A change to
-// that order is a meaningful change in the supplying model. Repeated subjects
-// remain separate occurrences, so consumers preserve their sequence.
+// Ordered gives meaning to the sequence produced by Abstract visitation.
+// Repeated visits to unchanged provider state preserve that sequence. Changes
+// in order represent changes in the provider's model. Repeated Abstracts
+// remain separate occurrences, so consumers preserve their positions.
 //
-// An Unknown result leaves ordering undetermined by this policy. Rejected
-// states that visitation order carries no meaningful information, including
-// through other policies supplied by this Abstract. Consumers may then treat
-// the sequence as incidental even when repeated visits happen to agree.
+// Unknown leaves the ordering promise undetermined. Rejected establishes that
+// order carries no meaning, including through the other policies supplied by
+// this Abstract. An identical sequence across visits can still be incidental.
 //
-// `supports` asks for this promise. Binding supplies the governing Abstract
-// view whose visitation carries it. Execution and reuse of the visited answers
-// follow their own contracts.
+// Binding supplies the governing Abstract whose visitation has these rules.
+// The visited Abstracts keep the access guarantees of their own contracts.
 #define TTX_ORDERED_ID_HIGH 0x5a3855f4ad5243e7ULL
 #define TTX_ORDERED_ID_LOW 0xb049c60e356b0067ULL
 

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "perimortem/core/data.hpp"
 #include "perimortem/core/view/bytes.hpp"
 
 namespace Ttx::Concept {
@@ -25,19 +26,24 @@ class Visitor {
 
   template <typename Function>
     requires(!__is_same(__remove_cvref(Function), Visitor))
+  // The callback stays alive through synchronous visitation. Explicit
+  // construction exposes this borrowed reference at the call site.
   constexpr explicit Visitor(Function& callback)
       : Visitor(&callback, invoke<Function>) {}
 
-  auto operator()(Perimortem::Core::View::Bytes name, Value value) const
+  auto operator()(Perimortem::Core::View::Bytes route, Value value) const
       -> void {
-    callback(context, name, value);
+    callback(context, route, value);
   }
 
  private:
+  // Construction supplies the address of the caller's Function. Its lifetime
+  // covers every invocation through this Visitor.
   template <typename Function>
-  static void
-      invoke(void* context, Perimortem::Core::View::Bytes name, Value value) {
-    (*static_cast<Function*>(context))(name, value);
+  static auto
+      invoke(void* context, Perimortem::Core::View::Bytes route, Value value)
+          -> void {
+    (*Perimortem::Core::Data::cast<Function>(context))(route, value);
   }
 
   void* context;

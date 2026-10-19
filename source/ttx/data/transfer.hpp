@@ -8,8 +8,11 @@
 
 namespace Ttx::Data {
 
-// The two Storage records describe the readable source and writable
-// destination. Their regions remain borrowed through this synchronous copy.
+// Transfer copies a represented value through the C Data operation. The two
+// Storage records supply source and destination geometry. Their referenced
+// memory stays accessible until the synchronous copy returns. The operation
+// copies only the represented extent after checking both regions. A failed
+// check leaves destination bytes unchanged.
 class Transfer {
  public:
   static auto copy(Form::Storage input, Form::Storage output) -> Status {

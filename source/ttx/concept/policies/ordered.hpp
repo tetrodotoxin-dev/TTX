@@ -8,23 +8,24 @@
 
 namespace Ttx::Concept::Policies {
 
-// Ordered qualifies the route visitation behavior is both stable and ordered on
-// repeat visits and that any changes are meaningful changes.
-//
-// Ordered negotiation returning `Unknown` does not mean the data isn't stable
-// and ordered but it means that it's not guaranteed by this policy. Explicitly
-// rejecting this policy should promise that no other policy provided by the
-// abstract could be used to infer ordering and that consumers are allowed to
-// assume that no meaningful information is provided by ordering, even if its
-// stable for every subsequent visit.
+// Ordered carries the Abstract whose visitation order has semantic meaning.
+// The consumer preserves repeated occurrences and their positions. Unknown
+// leaves the ordering promise undetermined, while Rejected establishes that
+// visitation order is incidental under every policy of that Abstract.
 class Ordered {
  public:
-  static constexpr auto contract_id =
-      Perimortem::Serialization::Formats::Uuid(TTX_ORDERED_ID_HIGH, TTX_ORDERED_ID_LOW);
+  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+      TTX_ORDERED_ID_HIGH,
+      TTX_ORDERED_ID_LOW);
   using Api = ttx_abstract;
 
+  // Copies an Abstract already supplied under the Ordered contract. Explicit
+  // construction makes the caller's interpretation visible. Construction
+  // performs a record copy, with the policy guaranteed by its provider.
   explicit constexpr Ordered(Api api) : api(api) {}
 
+  // Uses Abstract's pointer presence check on a readable, correctly represented
+  // table. The supplying contract establishes the policy's semantic guarantee.
   static auto accept(Api api) -> Bool { return Abstract::accept(api); }
 
   constexpr auto get_abi() const -> Api { return api; }

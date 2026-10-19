@@ -6,11 +6,12 @@
 
 #include "ttx/concept/abstract.h"
 
-// Unknown results a question whose result is undetermined for this observation.
-// Binding returns its Abstract view. `ttx_unknown` supplies the shared
-// Abstract, whose further routes continue to answer Unknown.
+// Unknown represents a route whose result is undetermined for the current
+// observation. Binding supplies its governing Abstract. `ttx_unknown` supplies
+// a shared implementation whose further routes return the same Unknown result.
 //
-// A consumer seeking another observation asks the original provider again.
+// A consumer retries resolution through the original Abstract and route.
+// The provider evaluates that new observation under its current policy.
 #define TTX_UNKNOWN_ID_HIGH 0x84c6c053b3254f7aULL
 #define TTX_UNKNOWN_ID_LOW 0xa873409b31bcf608ULL
 

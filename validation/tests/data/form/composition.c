@@ -3,9 +3,8 @@
 
 #include "validation/tests/data/form/composition.h"
 
-// This C fixture composes the same admitted child through
-// the C entry and asks the caller for canonical form storage only after
-// admission.
+// This C operation places two copies of a canonical child form in one struct.
+// Composition requests final storage after validating their placement.
 ttx_data_status compose_pair(
     const ttx_representation* child,
     Count width,

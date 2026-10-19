@@ -6,13 +6,13 @@
 
 #include "ttx/concept/abstract.h"
 
-// None answers a route with explicit rejection. Binding returns its Abstract
-// view. `ttx_none` supplies the shared Abstract, whose further routes return
-// that same result.
+// None represents an explicitly rejected route for the current observation.
+// Binding supplies its governing Abstract. `ttx_none` supplies a shared
+// implementation whose further routes return the same None result.
 //
-// Rejection describes the observation that produced it. A provider can combine
-// None with Constant to promise rejection for that edge's entire graph
-// lifetime.
+// The original Abstract and route can select a different result later.
+// Combining None with Constant promises that this selection remains None
+// throughout the access established by the supplying contract.
 #define TTX_NONE_ID_HIGH 0x84c6c053b3254f7aULL
 #define TTX_NONE_ID_LOW 0xa873409b31bcf607ULL
 

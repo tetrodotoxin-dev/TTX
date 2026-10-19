@@ -15,6 +15,88 @@ static Toolchain::Validation::Harness Transfers = {
 
 static constexpr auto integer = Schema::primitive(Schema::Value::U32);
 static constexpr auto four = Schema::range(integer, 4, 4, 16, 4);
+static constexpr auto spaced = Schema::range(integer, 2, 256, 260, 4);
+
+// Moving canonical descriptor bytes preserves their meaning at every byte
+// alignment. Payload addresses still satisfy the alignment described by them.
+VALIDATION_TEST(Transfers, unaligned_descriptors) {
+  const Representation* forms[] = {
+    &Compiled<four>::get_representation(),
+    &Compiled<spaced>::get_representation()};
+
+  constexpr Count descriptor_size = Compiled<spaced>::get_representation().size;
+  alignas(8) U8 source_bytes[descriptor_size + 7] = {};
+  alignas(8) U8 target_bytes[descriptor_size + 7] = {};
+  alignas(U32) U8 input[260] = {};
+  alignas(U32) U8 output[261] = {};
+  memset(input, 0x3c, sizeof(input));
+
+  for (Count index = 0; index != 2; ++index) {
+    const auto& canonical = *forms[index];
+    const Count extent = index ? 260 : 16;
+    const Count distance = index ? 256 : 4;
+    const Count count = index ? 2 : 4;
+    ASSERT(canonical.size <= descriptor_size);
+    EXPECT_EQ(canonical.get_depth(), U8(index + 1));
+
+    for (Count offset = 1; offset != 8; ++offset) {
+      memcpy(source_bytes + offset, canonical.data, canonical.size);
+      memcpy(target_bytes + 8 - offset, canonical.data, canonical.size);
+
+      const Representation source(source_bytes + offset, canonical.size);
+      const Representation target(target_bytes + 8 - offset, canonical.size);
+      EXPECT(ttx_representation_compatible(&canonical, &source));
+      EXPECT(ttx_representation_compatible(&source, &target));
+      EXPECT_EQ(source.get_extent(), extent);
+      EXPECT_EQ(source.get_alignment(), Count(4));
+
+      ttx_representation_position position;
+      ASSERT_EQ(
+          ttx_representation_next(&source, 1, &position), TTX_DATA_SUCCESS);
+      EXPECT_EQ(position.offset, distance);
+      EXPECT(position.get_value() == Schema::Value::U32);
+
+      Count visited = 0;
+      EXPECT(source.visit([&](Representation::Position current) {
+        EXPECT_EQ(current.offset, visited * distance);
+        EXPECT_EQ(current.get_extent(), Count(4));
+        ++visited;
+        return Status::Success;
+      }) == Status::Success);
+
+      EXPECT_EQ(visited, count);
+
+      const Count last = (count - 1) * distance;
+      visited = 0;
+      EXPECT(
+          source.visit(
+              Perimortem::Core::View::Vector<Count>(last, 1),
+              [&](Representation::Position current) {
+                EXPECT_EQ(current.offset, last);
+                ++visited;
+                return Status::Success;
+              }) == Status::Success);
+
+      EXPECT_EQ(visited, Count(1));
+
+      memset(output, 0xa5, sizeof(output));
+
+      const ttx_storage from{&source, input, sizeof(input)};
+      const ttx_storage to{&target, output, sizeof(output)};
+      ASSERT_EQ(ttx_transfer(&from, &to), TTX_DATA_SUCCESS);
+      EXPECT_EQ(memcmp(input, output, extent), 0);
+      EXPECT_EQ(output[extent], U8(0xa5));
+
+      memset(output, 0xa5, sizeof(output));
+
+      const ttx_storage misaligned{&target, output + 1, sizeof(output) - 1};
+      EXPECT_EQ(ttx_transfer(&from, &misaligned), TTX_DATA_INVALID);
+      for (const U8 byte : output) {
+        EXPECT_EQ(byte, U8(0xa5));
+      }
+    }
+  }
+}
 
 VALIDATION_TEST(Transfers, complete_extent_and_overlap) {
   const auto& form = Compiled<four>::get_representation();

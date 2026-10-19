@@ -17,8 +17,8 @@ static Harness Sentinels = {
   .name = "TTX::Sentinels",
 };
 
-// Marker properties can be observed without negotiating even an Empty API.
-// Unknown knows what it is, but other property questions remain provisional.
+// Support queries report policy status without binding an API. Unknown
+// establishes its own contract while leaving Constant undetermined.
 VALIDATION_TEST(Sentinels, support_properties) {
   using Semantic::Negotiation::Binding::Status;
   const auto unknown = Concept::Policies::Unknown::get_unknown().get_abstract();
@@ -32,8 +32,8 @@ VALIDATION_TEST(Sentinels, support_properties) {
 }
 
 // Keep the outer record and every table slot the same size. Only get_data's
-// result differs, so rejection proves that agreement follows the typed table
-// pointer rather than treating the Abstract as two opaque pointer slots.
+// return description differs. Binding rejects that form because the canonical
+// description includes the operation table's function signatures.
 struct WrongAbstractOperations {
   decltype(ttx_abstract_ops::supports) supports;
   decltype(ttx_abstract_ops::bind) bind;
@@ -83,8 +83,8 @@ VALIDATION_TEST(Sentinels, nested_table_abi) {
       [&](Semantic::Negotiation::Binding::Status) { EXPECT(False); });
 }
 
-// Binding an answer preserves its Abstract operations. A different data form
-// still requires rejection before the caller can use the returned table.
+// Binding None or Unknown returns their governing Abstract operations. A
+// different requested representation is rejected before the output can be used.
 VALIDATION_TEST(Sentinels, concept_carrier) {
   const auto none = ttx_none();
   ttx_abstract answer = ttx_abstract();
@@ -123,8 +123,9 @@ VALIDATION_TEST(Sentinels, concept_carrier) {
       });
 }
 
-// Marker negotiation does not replace navigation. Abstract still binds its
-// own table, and Unknown preserves uncertainty for questions it cannot settle.
+// The Unknown sentinel binds its own Abstract with the same context and byte
+// observation. Further negotiation of Constant stays Unknown, preserving the
+// sentinel's policy through that bound API.
 VALIDATION_TEST(Sentinels, navigation_and_unknown) {
   const auto unknown = Concept::Abstract(ttx_unknown());
   unknown.get_query().bind<Concept::Abstract>().visit(
@@ -151,8 +152,9 @@ VALIDATION_TEST(Sentinels, navigation_and_unknown) {
           });
 }
 
-// Every Concept result supplies a usable Abstract table. An accepted status
-// with an empty result fails admission for both policies and base Abstract.
+// Each tested Concept interface checks its required Abstract operations. A
+// provider reporting Satisfied with an empty record is rejected by those
+// checks.
 VALIDATION_TEST(Sentinels, empty_table_admission) {
   Semantic::Negotiation::Query query(ttx_semantic_query(
       nullptr,
