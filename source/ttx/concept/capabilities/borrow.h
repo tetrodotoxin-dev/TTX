@@ -12,8 +12,8 @@
 // that supplied it. The provider can retain the current object or supply
 // another object that preserves the encountered policy.
 //
-// When access can be retained, `borrow` writes a Borrowed answer to output and
-// returns Satisfied. The caller then owes one release through that answer.
+// When access can be retained, `borrow` writes a Borrowed result to output and
+// returns Satisfied. The caller then owes one release through that result.
 // Each successful call creates a separate release obligation, even when the
 // provider returns the same context for several requests.
 //
@@ -29,5 +29,6 @@ typedef struct ttx_borrow_ops {
   ttx_binding_status (*borrow)(void* context, ttx_borrowed* output);
 } ttx_borrow_ops;
 
-C_LINKAGE const ttx_representation* ttx_borrow_representation(void);
+C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_borrow_representation(
+    void);
 #endif

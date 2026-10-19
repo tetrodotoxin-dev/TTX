@@ -38,5 +38,6 @@ typedef struct ttx_create_ops {
       void (*callback)(void* context, ttx_abstract abstract));
 } ttx_create_ops;
 
-C_LINKAGE const ttx_representation* ttx_create_representation(void);
+C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_create_representation(
+    void);
 #endif

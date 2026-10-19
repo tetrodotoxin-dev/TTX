@@ -5,7 +5,7 @@
 
 #include <stddef.h>
 
-#include "perimortem/core/static/vector.hpp"
+#include "perimortem/core/storage/vector.hpp"
 
 #include "ttx/data/form/schema.hpp"
 
@@ -17,7 +17,8 @@ namespace Ttx::Data::Form {
 // Specializations supply those fields using their actual offsetof values.
 // The resulting Schema goes through the ordinary representation compiler.
 //
-// TODO: Replace when we actually get C++ reflection in clang. Thank you C++26!
+// TODO: Replace when we actually get C++ reflection in clang, unless it vastly
+// increases build times.
 template <typename Type>
 class Native {
   static consteval auto describe() -> Schema {
@@ -83,7 +84,7 @@ class Native<Type*> {
       static constexpr Schema::Position field(Native<Type>::reference, 0);
       static constexpr Schema schema = Schema::composite(
           {
-            &field,
+            field,
             1,
           },
           sizeof(Type), alignof(Type));
@@ -132,7 +133,7 @@ class Native<Result (*)(Arguments...)> {
       "Windows callable results must use plain C carriers, not C++ facades");
 #endif
 
-  static constexpr Perimortem::Core::Static::
+  static constexpr Perimortem::Core::Storage::
       Vector<Schema::Argument, sizeof...(Arguments) + 1>
           arguments = {
             {
@@ -167,7 +168,7 @@ class Native<Result (*)(Arguments..., ...)> {
       "Windows callable results must use plain C carriers, not C++ facades");
 #endif
 
-  static constexpr Perimortem::Core::Static::
+  static constexpr Perimortem::Core::Storage::
       Vector<Schema::Argument, sizeof...(Arguments) + 1>
           arguments = {
             {
@@ -203,7 +204,7 @@ class Native<Result (*)(Arguments..., ...)> {
             __is_trivially_destructible(type),                              \
         "Native API records require a trivial C-compatible call boundary"); \
     static constexpr auto fields = [](auto... entries) {                    \
-      return Perimortem::Core::Static::Vector<                              \
+      return Perimortem::Core::Storage::Vector<                              \
           Schema::Position, sizeof...(entries)>{                            \
         {                                                                   \
           entries...,                                                       \

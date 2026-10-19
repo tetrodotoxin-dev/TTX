@@ -11,16 +11,15 @@
 // Borrowed exposes an Abstract whose acquired access lasts until release. An
 // operation transferring retained access returns this contract and passes
 // responsibility for the release to its caller. The provider keeps the
-// answer's data and policy available until that release.
+// result's data and policy available until that release.
 //
-// Binding or copying a view of the answer shares the existing access and
-// release obligation. Borrow requests another acquired answer, with its own
+// Binding or copying a view of the result shares the existing access and
+// release obligation. Borrow requests another acquired result, with its own
 // release, even when the provider returns the same context again.
 //
 // Operations that require the caller to release their result must return
 // Borrowed or a stronger contract that requires it. Returning that result only
-// as Abstract hides the release obligation and can leak the retained
-// resources.
+// as Abstract hides the release obligation which can leak resources.
 typedef struct ttx_borrowed {
   void* context;
   const struct ttx_borrowed_ops* operations;
@@ -31,5 +30,6 @@ typedef struct ttx_borrowed_ops {
   void (*release)(void* context);
 } ttx_borrowed_ops;
 
-C_LINKAGE const ttx_representation* ttx_borrowed_representation(void);
+C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_borrowed_representation(
+    void);
 #endif

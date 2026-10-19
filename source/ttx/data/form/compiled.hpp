@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "perimortem/core/static/bytes.hpp"
+#include "perimortem/core/storage/bytes.hpp"
 
 #include "ttx/data/form/compiler.hpp"
 #include "ttx/data/form/representation.hpp"
@@ -23,16 +23,17 @@ template <const auto& source, Count pointer_size = sizeof(void*)>
 class Compiled {
  private:
   static consteval auto measure() -> Count {
-    Compiler compiler;
+    Compiler<Perimortem::Memory::Compile::Vector> compiler;
     const auto status = compiler.compile(source, pointer_size);
     return status == Status::Success ? compiler.get_size() : 0;
   }
 
   static constexpr Count size = measure();
+
   static_assert(size != 0, "Invalid constant TTX Schema");
 
   struct Storage {
-    Perimortem::Core::Static::Bytes<size> bytes;
+    alignas(8) Perimortem::Core::Storage::Bytes<size> bytes;
     Representation representation;
 
     consteval Storage() : representation(bytes.get_data(), size) {
@@ -40,9 +41,9 @@ class Compiled {
       // output extent. The repeated preparation follows the same algorithm,
       // so writing the canonical form needs no second failure state or
       // allocation policy.
-      Compiler compiler;
+      Compiler<Perimortem::Memory::Compile::Vector> compiler;
       compiler.compile(source, pointer_size);
-      compiler.write(Perimortem::Core::Access::Bytes(bytes.get_data(), size));
+      compiler.write(bytes.get_access());
     }
   };
 

@@ -3,10 +3,9 @@
 
 #pragma once
 
+#include "perimortem/core/storage/vector.hpp"
 #include "perimortem/core/view/bytes.hpp"
-#include "perimortem/core/static/vector.hpp"
-
-#include "perimortem/system/uuid.hpp"
+#include "perimortem/serialization/formats/uuid.hpp"
 
 #include "ttx/concept/abstract.h"
 #include "ttx/concept/visitor.hpp"
@@ -24,14 +23,15 @@ namespace Ttx::Concept {
 // provider again. Stronger return contracts state how to retain their answers.
 //
 // A plain Abstract return requires no release call. Returning an acquired
-// answer through this weaker type hides its cleanup obligation and can leak
+// result through this weaker type hides its cleanup obligation and can leak
 // resources. Providers must expose required lifetime policies in the declared
 // return contract. Binding another Concept selects its operations while
 // preserving the policy that governs further questions.
 class Abstract {
  public:
-  static constexpr auto contract_id =
-      Perimortem::System::Uuid(TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW);
+  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+      TTX_ABSTRACT_ID_HIGH,
+      TTX_ABSTRACT_ID_LOW);
   using Api = ttx_abstract;
   using Operations = ttx_abstract_ops;
   using Visitor = Concept::Visitor<Abstract>;
@@ -55,7 +55,7 @@ class Abstract {
         api.context, api.operations->bind, api.operations->supports));
   }
 
-  auto supports(Perimortem::System::Uuid contract) const
+  auto supports(Perimortem::Serialization::Formats::Uuid contract) const
       -> Semantic::Negotiation::Binding::Status {
     return get_query().supports(contract);
   }
@@ -66,15 +66,15 @@ class Abstract {
   }
 
   auto bind_interface(
-      Perimortem::System::Uuid contract,
+      Perimortem::Serialization::Formats::Uuid contract,
       Data::Form::Storage destination) const
       -> Semantic::Negotiation::Binding::Status {
     return get_query().bind(contract, destination);
   }
 
   template <typename Contract>
-  auto bind() const -> Perimortem::Utility::
-      Result<Contract, Semantic::Negotiation::Binding::Failure> {
+  auto bind() const -> Perimortem::Core::Storage::
+      Result<Contract, Semantic::Negotiation::Binding::Status> {
     return get_query().template bind<Contract>();
   }
 
@@ -91,7 +91,8 @@ class Abstract {
   // copy the bytes or negotiate a contract that provides it.
   auto get_data() const -> Perimortem::Core::View::Bytes {
     const auto data = api.operations->get_data(api.context);
-    return Perimortem::Core::View::Bytes(data.data, data.size);
+    return Perimortem::Core::View::Bytes(
+        perimortem_view_bytes{data.data, data.size});
   }
 
   // Returns the Abstract represented by this observation. The provider decides
@@ -110,10 +111,10 @@ class Abstract {
   // the route format, so names are only one possible spelling. The bytes can
   // also encode instructions for negotiation between domains.
   //
-  // Each call is a separate observation and may return a different answer.
+  // Each call is a separate observation and may return a different result.
   // A value that provides `Constant` promises it only for the particular edge
   // established by the provider + route pair, allowing the consumer to retain
-  // its answer without asking again.
+  // its result without asking again.
   auto resolve_concept(Perimortem::Core::View::Bytes route) const -> Abstract {
     return Abstract(api.operations->resolve_concept(
         api.context,
@@ -138,10 +139,6 @@ class Abstract {
     api.operations->visit_concepts(api.context, callback);
   }
 
-  // This context identifies the Abstract within the supplying lifetime. It
-  // proves neither a C++ type nor identity across independent lifetimes.
-  constexpr auto get_identity() const -> const void* { return api.context; }
-
   constexpr auto operator==(const Abstract& other) const -> Bool {
     return api.context == other.api.context &&
            api.operations == other.api.operations;
@@ -157,9 +154,7 @@ class Abstract {
       perimortem_view_bytes route,
       Api abstract) {
     auto& visitor = *static_cast<Visitor*>(context);
-    visitor(
-        Perimortem::Core::View::Bytes(route.data, route.size),
-        Abstract(abstract));
+    visitor(Perimortem::Core::View::Bytes(route), Abstract(abstract));
   }
 
   Api api;
@@ -188,13 +183,13 @@ class Ttx::Data::Form::Native<ttx_abstract> {
     Schema resolve;
     Schema lookup;
     Schema visit;
-    Perimortem::Core::Static::Vector<Schema::Argument, 3> callback_arguments;
-    Perimortem::Core::Static::Vector<Schema::Argument, 1> resolve_arguments;
-    Perimortem::Core::Static::Vector<Schema::Argument, 2> lookup_arguments;
-    Perimortem::Core::Static::Vector<Schema::Argument, 2> visit_arguments;
-    Perimortem::Core::Static::Vector<Schema::Position, 2> root_fields;
-    Perimortem::Core::Static::Vector<Schema::Position, 6> operation_fields;
-    Perimortem::Core::Static::Vector<Schema::Position, 2> visitor_fields;
+    Perimortem::Core::Storage::Vector<Schema::Argument, 3> callback_arguments;
+    Perimortem::Core::Storage::Vector<Schema::Argument, 1> resolve_arguments;
+    Perimortem::Core::Storage::Vector<Schema::Argument, 2> lookup_arguments;
+    Perimortem::Core::Storage::Vector<Schema::Argument, 2> visit_arguments;
+    Perimortem::Core::Storage::Vector<Schema::Position, 2> root_fields;
+    Perimortem::Core::Storage::Vector<Schema::Position, 6> operation_fields;
+    Perimortem::Core::Storage::Vector<Schema::Position, 2> visitor_fields;
 
     // The lists retain schema addresses while construction is in progress.
     // Populate each shape after the vectors exist so every view borrows live
@@ -205,17 +200,21 @@ class Ttx::Data::Form::Native<ttx_abstract> {
             Native<perimortem_view_bytes>::reference,
             Schema::Argument(root),
           }),
+
           resolve_arguments({
             Schema::pointer(),
           }),
+
           lookup_arguments({
             Schema::pointer(),
             Native<perimortem_view_bytes>::reference,
           }),
+
           visit_arguments({
             Schema::pointer(),
             Schema::Argument(visitor),
           }),
+
           root_fields({
             Schema::Position(
                 Schema::pointer(),
@@ -225,6 +224,7 @@ class Ttx::Data::Form::Native<ttx_abstract> {
               offsetof(ttx_abstract, operations),
             },
           }),
+
           operation_fields({
             TTX_DATA_MEMBER(ttx_abstract_ops, supports),
             TTX_DATA_MEMBER(ttx_abstract_ops, bind),
@@ -233,15 +233,18 @@ class Ttx::Data::Form::Native<ttx_abstract> {
               resolve,
               offsetof(ttx_abstract_ops, resolve),
             },
+
             {
               lookup,
               offsetof(ttx_abstract_ops, resolve_concept),
             },
+
             {
               visit,
               offsetof(ttx_abstract_ops, visit_concepts),
             },
           }),
+
           visitor_fields({
             Schema::Position(
                 Schema::pointer(),
@@ -251,6 +254,7 @@ class Ttx::Data::Form::Native<ttx_abstract> {
               offsetof(ttx_concept_visitor, callback),
             },
           }) {
+
       root = Schema::composite(
           root_fields.get_view(), sizeof(ttx_abstract), alignof(ttx_abstract));
       operations = Schema::composite(

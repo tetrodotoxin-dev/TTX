@@ -10,7 +10,7 @@
 #define INVOCATION_METHOD_HIGH 0x7a2c283c70c0447dULL
 #define INVOCATION_METHOD_LOW 0x92230dc2db47d881ULL
 
-// The mixed record deliberately falls outside the old list of native call
+// The mixed record deliberately falls outside a narrow list of native call
 // signatures. Both languages consume this actual C type after form agreement.
 typedef struct invocation_input {
   S64 value;
@@ -22,14 +22,12 @@ typedef struct invocation_statistics {
   U64 binds;
   U64 transfers;
   U64 calls;
-  U64 acquisitions;
-  U64 releases;
 } invocation_statistics;
 
 typedef struct invocation_fixture {
   ttx_semantic_query query;
   invocation_statistics (*statistics)(void);
-  void (*configure)(U8 protocol, ttx_binding_status status, U8 fail_transfer);
+  void (*configure)(ttx_binding_status status, U8 malformed);
 } invocation_fixture;
 
 C_LINKAGE EXPORTED(TTX_TEST)

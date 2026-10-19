@@ -28,7 +28,7 @@ namespace Ttx::Concept::Capabilities {
 class Create {
  public:
   static constexpr auto contract_id =
-      Perimortem::System::Uuid(TTX_CREATE_ID_HIGH, TTX_CREATE_ID_LOW);
+      Perimortem::Serialization::Formats::Uuid(TTX_CREATE_ID_HIGH, TTX_CREATE_ID_LOW);
   using Api = ttx_create;
   using Operations = ttx_create_ops;
 

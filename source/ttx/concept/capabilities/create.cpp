@@ -7,5 +7,6 @@ using namespace Ttx::Concept;
 using namespace Ttx::Semantic::Negotiation;
 
 C_LINKAGE const ttx_representation* ttx_create_representation() {
-  return &Binding::representation<Capabilities::Create>();
+  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
+      Capabilities::Create::Api>::reference>::get_representation();
 }

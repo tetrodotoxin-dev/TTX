@@ -7,9 +7,8 @@
 #include "ttx/data/form/schema.h"
 
 #ifdef __cplusplus
+#include "perimortem/core/storage/result.hpp"
 #include "perimortem/memory/allocator/arena.hpp"
-
-#include "perimortem/utility/result.hpp"
 
 #include "ttx/data/status.hpp"
 #endif
@@ -29,7 +28,9 @@ typedef struct ttx_representation_position {
   ttx_schema_value type;
   U8 byte_order;
   U32 extent;
+
 #ifdef __cplusplus
+
   using Value = ttx_schema::Value;
   using ByteOrder = ttx_schema::ByteOrder;
 
@@ -56,6 +57,7 @@ typedef struct ttx_representation_position {
     return type == other.type && byte_order == other.byte_order &&
            extent == other.extent;
   }
+
 #endif
 } ttx_representation_position;
 
@@ -66,35 +68,45 @@ typedef struct ttx_representation_position {
 typedef struct ttx_representation_member {
   const struct ttx_representation* representation;
   Count offset;
+
 #ifdef __cplusplus
+
   constexpr ttx_representation_member() : representation(nullptr), offset(0) {}
 
   constexpr ttx_representation_member(
       const ttx_representation& representation,
       Count offset)
       : representation(&representation), offset(offset) {}
+
 #endif
 } ttx_representation_member;
 
 // A canonical form is the compiled description of data and callable layout.
-// Representation borrows the buffer containing that form. Compilation has
-// established its geometry, normalization and reference invariants.
-// Its complete byte size is a multiple of eight, with zero padding after the
-// last descriptor when necessary. Readers can therefore load whole U64 chunks
-// relative to the buffer start without requiring padding at each block.
-// An independent provider can publish the same format without using our
-// compiler, provided it establishes those same invariants before exposing it.
+// Compilation establishes the normalization and geometry needed for decoding.
+// An independent provider can publish the same format by establishing the
+// invariants specified in `compiler.hpp`:
 //
-// The provider retains the descriptor bytes for every consumer of this view.
-// Schema and compiler storage can disappear independently. Relocating the bytes
-// needs no reference fixups because every child reference is an absolute block
-// index from the root. A pointer width prefix can precede that root.
-// `get_bytes` includes the prefix for agreement, while `get_blocks` skips it
-// for descriptor decoding.
+//  * Its total byte size is a multiple of eight
+//  * Its start must be 8 byte aligned
+//  * Any padding is required to be zeroed
+//  * Any two representations are equal only if they are byte for byte equal
+//
+// Readers can therefore load whole U64 chunks relative to the buffer start
+// without requiring padding at each block. Geometry and navigation operations
+// require an admitted canonical form; decoding a noncanonical form is undefined
+// behavior. Byte comparison only requires readable descriptor memory. Transfer
+// uses that comparison to admit a foreign source against the destination's
+// established canonical form before interpreting source geometry.
+//
+// The provider keeps the descriptor bytes available and unchanged through each
+// use. Compiler and Schema storage may end independently. References are block
+// indices, so moving the bytes preserves their meaning.
 typedef struct ttx_representation {
   const U8* data;
   Count size;
+
 #ifdef __cplusplus
+
   using Position = ttx_representation_position;
   using Member = ttx_representation_member;
   using Value = ttx_schema::Value;
@@ -104,12 +116,12 @@ typedef struct ttx_representation {
       : data(data), size(size) {}
 
   constexpr auto get_bytes() const -> Perimortem::Core::View::Bytes {
-    return Perimortem::Core::View::Bytes(data, size);
+    return Perimortem::Core::View::Bytes(perimortem_view_bytes{data, size});
   }
 
   constexpr auto get_blocks() const -> Perimortem::Core::View::Bytes {
     const Count prefix = (data[0] & 15) ? 0 : 8;
-    return Perimortem::Core::View::Bytes(data + prefix, size - prefix);
+    return get_bytes().slice(prefix, size - prefix);
   }
 
   constexpr auto get_pointer_size() const -> Count {
@@ -129,26 +141,26 @@ typedef struct ttx_representation {
 
   constexpr auto compatible(const ttx_representation& other) const -> Bool;
 
-  static auto compile(
+  static EXPORTED(TTX) auto compile(
       ttx_schema_reference schema,
       Perimortem::Memory::Allocator::Arena& arena,
-      Count pointer_size = sizeof(void*)) -> Perimortem::Utility::
+      Count pointer_size = sizeof(void*)) -> Perimortem::Core::Storage::
       Result<const ttx_representation&, Ttx::Data::Status>;
 
-  static auto compose(
+  static EXPORTED(TTX) auto compose(
       Perimortem::Core::View::Vector<Member> members,
       Count extent,
       Count alignment,
-      Perimortem::Memory::Allocator::Arena& arena) -> Perimortem::Utility::
-      Result<const ttx_representation&, Ttx::Data::Status>;
+      Perimortem::Memory::Allocator::Arena& arena) -> Perimortem::Core::
+      Storage::Result<const ttx_representation&, Ttx::Data::Status>;
 
   // A byte coordinate selects the first primitive whose start is at or after
   // it. Padding is skipped, and a coordinate inside a primitive advances to
   // the following primitive rather than returning a partial value. Bounds
   // means there is no such start. Use visit when consuming a whole record so
   // each successive observation does not repeat this search from the root.
-  auto next(Count offset) const
-      -> Perimortem::Utility::Result<Position, Ttx::Data::Status>;
+  EXPORTED(TTX) auto next(Count offset) const
+      -> Perimortem::Core::Storage::Result<Position, Ttx::Data::Status>;
 
   // Whole operations consume primitive occurrences in byte order. Repeated
   // composites revisit their shared body for each instance, but successive
@@ -167,6 +179,7 @@ typedef struct ttx_representation {
   constexpr auto visit(
       Perimortem::Core::View::Vector<Count> coordinates,
       Consumer consumer) const -> Ttx::Data::Status;
+
 #endif
 } ttx_representation;
 
@@ -182,22 +195,26 @@ typedef struct ttx_representation_allocator {
 // Four and eight are supported for both data and function pointers. An
 // unsupported width declines before requesting output storage from the
 // allocator.
-C_LINKAGE ttx_data_status ttx_representation_compile(
+C_LINKAGE EXPORTED(TTX)
+ttx_data_status ttx_representation_compile(
     ttx_schema_reference schema,
     Count pointer_size,
     ttx_representation_allocator allocator,
     const ttx_representation** result);
-C_LINKAGE ttx_data_status ttx_representation_compose(
+C_LINKAGE EXPORTED(TTX)
+ttx_data_status ttx_representation_compose(
     const ttx_representation_member* members,
     Count count,
     Count extent,
     Count alignment,
     ttx_representation_allocator allocator,
     const ttx_representation** result);
-C_LINKAGE U8 ttx_representation_compatible(
+C_LINKAGE EXPORTED(TTX)
+U8 ttx_representation_compatible(
     const ttx_representation* source,
     const ttx_representation* destination);
-C_LINKAGE ttx_data_status ttx_representation_next(
+C_LINKAGE EXPORTED(TTX)
+ttx_data_status ttx_representation_next(
     const ttx_representation* source,
     Count offset,
     ttx_representation_position* result);
@@ -212,13 +229,15 @@ typedef struct ttx_representation_visitor {
   ttx_data_status (*visit)(void* context, ttx_representation_position position);
 } ttx_representation_visitor;
 
-C_LINKAGE ttx_data_status ttx_representation_visit(
+C_LINKAGE EXPORTED(TTX)
+ttx_data_status ttx_representation_visit(
     const ttx_representation* source,
     ttx_representation_visitor visitor);
 
 // The coordinates are a borrowed, strictly increasing selection of primitive
 // starts. Unselected repetitions consume no callbacks or expanded inventory.
-C_LINKAGE ttx_data_status ttx_representation_visit_selected(
+C_LINKAGE EXPORTED(TTX)
+ttx_data_status ttx_representation_visit_selected(
     const ttx_representation* source,
     const Count* coordinates,
     Count count,

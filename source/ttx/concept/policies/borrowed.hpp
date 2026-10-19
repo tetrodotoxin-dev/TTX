@@ -11,13 +11,13 @@ namespace Ttx::Concept::Policies {
 // Borrowed exposes an Abstract whose acquired access lasts until release. An
 // operation transferring retained access returns this contract and passes
 // responsibility for the release to its caller. The provider keeps the
-// answer's data and policy available until that release.
+// result's data and policy available until that release.
 //
-// Binding or copying a view of the answer shares the existing access and
-// release obligation. Borrow requests another acquired answer, with its own
+// Binding or copying a view of the result shares the existing access and
+// release obligation. Borrow requests another acquired result, with its own
 // release, even when the provider returns the same context again. The C++
-// view leaves release explicit. The consumer of each acquired answer calls
-// `release` once after using the retained answer.
+// view leaves release explicit. The consumer of each acquired result calls
+// `release` once after using the retained result.
 //
 // Operations that require the caller to release their result must return
 // Borrowed or a stronger contract that requires it. Returning that result only
@@ -26,7 +26,7 @@ namespace Ttx::Concept::Policies {
 class Borrowed {
  public:
   static constexpr auto contract_id =
-      Perimortem::System::Uuid(TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW);
+      Perimortem::Serialization::Formats::Uuid(TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW);
   using Api = ttx_borrowed;
   using Operations = ttx_borrowed_ops;
 

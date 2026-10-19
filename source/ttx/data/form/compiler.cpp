@@ -3,20 +3,21 @@
 
 #include "ttx/data/form/compiler.hpp"
 
-#include "perimortem/memory/dynamic/map.hpp"
+#include "perimortem/memory/thread/map.hpp"
 
 #include "ttx/data/form/representation.hpp"
 
 using namespace Ttx::Data;
 using namespace Ttx::Data::Form;
 
-auto Compiler::import_body(
+template <>
+auto Compiler<>::import_body(
     const Representation& form,
     Count block,
     Bool callable,
     Indices& indices) -> Count {
-  if (indices[block]) {
-    return indices[block] - 1;
+  if (indices.get_data()[block]) {
+    return indices.get_data()[block] - 1;
   }
 
   const auto bytes = form.get_blocks();
@@ -43,7 +44,7 @@ auto Compiler::import_body(
   const Count id = bodies.get_size();
   const Count first = records.get_size();
   bodies.insert(Body(first, count + 1, 0));
-  indices[block] = id + 1;
+  indices.get_data()[block] = id + 1;
   records.resize(first + count + 1);
   for (Count i = 0; i <= count; ++i) {
     auto entry = i ? Element::decode(bytes, block + i, depth) : head;
@@ -64,13 +65,14 @@ auto Compiler::import_body(
       }
     }
 
-    records[first + i] = entry;
+    records.get_data()[first + i] = entry;
   }
 
   return id;
 }
 
-auto Compiler::compose(
+template <>
+auto Compiler<>::compose(
     Perimortem::Core::View::Vector<ttx_representation_member> members,
     Count size,
     Count alignment) -> Status {
@@ -81,9 +83,10 @@ auto Compiler::compose(
     return Status::Invalid;
   }
 
-  Dynamic::Map<const U8*, Count> imported;
+  Thread::Map<const U8*, Count> imported;
   Indices children;
-  for (const auto member : members) {
+  for (Count i = 0; i < members.get_size(); ++i) {
+    const auto member = members[i];
     if (!member.representation) {
       return Status::Invalid;
     }
@@ -96,15 +99,17 @@ auto Compiler::compose(
     const Count child =
         imported.find(form.get_bytes().get_data())
             .visit(
+                [](Count value) { return value; },
                 [&]() -> Count {
                   Indices indices;
                   indices.resize(
                       form.get_bytes().get_size() / (4 * form.get_depth()));
+
                   const Count id = import_body(form, 0, False, indices);
                   imported.insert(form.get_bytes().get_data(), id);
                   return id;
-                },
-                [](const auto& entry) { return entry.value; });
+                });
+
     if (child == Unseen) {
       return Status::Incompatible;
     }
@@ -115,13 +120,14 @@ auto Compiler::compose(
   const Count first = begin(size, alignment);
   Count root = bodies.get_size();
   bodies.insert(Body());
+
   Run run;
   for (Count i = 0; i < members.get_size(); ++i) {
-    const Count size = extent(children[i]);
+    const Count size = extent(children.get_data()[i]);
     if (size) {
       run.push(
           Element(
-              1, members.get_data()[i].offset, size, children[i],
+              1, members.get_data()[i].offset, size, children.get_data()[i],
               Element::Struct),
           size, [&](Element entry) { records.insert(entry); });
     }
@@ -132,7 +138,7 @@ auto Compiler::compose(
 }
 
 static auto publish(
-    const Compiler& compiler,
+    const Compiler<>& compiler,
     ttx_representation_allocator allocator,
     const ttx_representation** result) -> ttx_data_status {
   const Count size = compiler.get_size();
@@ -140,22 +146,26 @@ static auto publish(
     return TTX_DATA_OVERFLOW;
   }
 
+  // Canonical bytes retain eight byte alignment on targets whose pointer
+  // alignment is smaller. The record's size keeps its following bytes aligned.
+  static_assert(sizeof(Representation) % 8 == 0);
+  const Count alignment = Perimortem::Core::Math::Scalar::max(
+      Count(8), Count(alignof(Representation)));
   auto* allocation = allocator.allocate(
-      allocator.context, sizeof(Representation) + size,
-      alignof(Representation));
+      allocator.context, sizeof(Representation) + size, alignment);
   if (!allocation) {
     return TTX_DATA_BOUNDS;
   }
 
   auto* bytes = static_cast<U8*>(allocation) + sizeof(Representation);
   const auto written =
-      compiler.write(Perimortem::Core::Access::Bytes(bytes, size));
+      compiler.write(Perimortem::Core::Access::Bytes(*bytes, size));
   if (written != Status::Success) {
     return static_cast<ttx_data_status>(written);
   }
 
-  *result = new (allocation, Perimortem::Core::Placement::Construct)
-      Representation(bytes, size);
+  *result = &Toolchain::Memory::Lifetime::construct<Representation>(
+      allocation, [&] { return Representation(bytes, size); });
   return TTX_DATA_SUCCESS;
 }
 
@@ -187,14 +197,16 @@ auto ttx_representation_compose(
     Count alignment,
     ttx_representation_allocator allocator,
     const ttx_representation** result) -> ttx_data_status {
-  if (!allocator.allocate || !result) {
+  if (!allocator.allocate || !result || (count && !members)) {
     return TTX_DATA_INVALID;
   }
 
   Compiler compiler;
-  const auto status = compiler.compose(
-      Perimortem::Core::View::Vector<ttx_representation_member>(members, count),
-      extent, alignment);
+  const auto member_view =
+      count ? Perimortem::Core::View::Vector<ttx_representation_member>(
+                  members[0], count)
+            : Perimortem::Core::View::Vector<ttx_representation_member>();
+  const auto status = compiler.compose(member_view, extent, alignment);
   return status == Status::Success ? publish(compiler, allocator, result)
                                    : static_cast<ttx_data_status>(status);
 }

@@ -7,11 +7,12 @@ using namespace Ttx::Concept;
 using namespace Ttx::Semantic::Negotiation;
 
 C_LINKAGE const ttx_representation* ttx_borrow_representation() {
-  return &Binding::representation<Capabilities::Borrow>();
+  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
+      Capabilities::Borrow::Api>::reference>::get_representation();
 }
 
 auto Capabilities::Borrow::borrow() const
-    -> Perimortem::Utility::Result<Policies::Borrowed, Binding::Failure> {
+    -> Perimortem::Core::Storage::Result<Policies::Borrowed, Binding::Status> {
   const auto api = get_abi();
   ttx_borrowed output = ttx_borrowed();
   const auto status = api.operations->borrow(api.context, &output);
@@ -24,9 +25,9 @@ auto Capabilities::Borrow::borrow() const
       output.operations->release(output.context);
     }
 
-    return Binding::Failure::Rejected;
+    return Binding::Status::Rejected;
   }
 
-  return status == TTX_BINDING_UNKNOWN ? Binding::Failure::Unknown
-                                       : Binding::Failure::Rejected;
+  return status == TTX_BINDING_UNKNOWN ? Binding::Status::Unknown
+                                       : Binding::Status::Rejected;
 }

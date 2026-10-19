@@ -11,7 +11,7 @@
 // that order is a meaningful change in the supplying model. Repeated subjects
 // remain separate occurrences, so consumers preserve their sequence.
 //
-// An Unknown answer leaves ordering undetermined by this policy. Rejected
+// An Unknown result leaves ordering undetermined by this policy. Rejected
 // states that visitation order carries no meaningful information, including
 // through other policies supplied by this Abstract. Consumers may then treat
 // the sequence as incidental even when repeated visits happen to agree.

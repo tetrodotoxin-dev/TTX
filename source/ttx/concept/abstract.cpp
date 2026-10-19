@@ -4,6 +4,6 @@
 #include "ttx/concept/abstract.hpp"
 
 auto ttx_abstract_representation() -> const ttx_representation* {
-  return &Ttx::Semantic::Negotiation::Binding::representation<
-      Ttx::Concept::Abstract>();
+  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
+      Ttx::Concept::Abstract::Api>::reference>::get_representation();
 }

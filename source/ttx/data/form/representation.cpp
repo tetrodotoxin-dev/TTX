@@ -70,7 +70,7 @@ auto ttx_representation_next(
 }
 
 auto ttx_representation::next(Count offset) const
-    -> Perimortem::Utility::Result<Position, Status> {
+    -> Perimortem::Core::Storage::Result<Position, Status> {
   Position result;
   const auto status = ttx_representation_next(this, offset, &result);
   if (status != TTX_DATA_SUCCESS) {
@@ -102,8 +102,11 @@ auto ttx_representation_visit_selected(
     return TTX_DATA_INVALID;
   }
 
+  const auto coordinate_view =
+      count ? Perimortem::Core::View::Vector<Count>(coordinates[0], count)
+            : Perimortem::Core::View::Vector<Count>();
   return static_cast<ttx_data_status>(source->visit(
-      Perimortem::Core::View::Vector<Count>(coordinates, count),
+      coordinate_view,
       [&](Representation::Position position) {
         return static_cast<Status>(visitor.visit(visitor.context, position));
       }));
@@ -119,7 +122,7 @@ auto ttx_representation::compile(
     ttx_schema_reference schema,
     Perimortem::Memory::Allocator::Arena& arena,
     Count pointer_size)
-    -> Perimortem::Utility::Result<const ttx_representation&, Status> {
+    -> Perimortem::Core::Storage::Result<const ttx_representation&, Status> {
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&arena, allocate_representation);
   const ttx_representation* result = nullptr;
@@ -137,7 +140,7 @@ auto ttx_representation::compose(
     Count extent,
     Count alignment,
     Perimortem::Memory::Allocator::Arena& arena)
-    -> Perimortem::Utility::Result<const ttx_representation&, Status> {
+    -> Perimortem::Core::Storage::Result<const ttx_representation&, Status> {
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&arena, allocate_representation);
   const ttx_representation* result = nullptr;

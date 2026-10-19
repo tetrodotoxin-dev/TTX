@@ -22,7 +22,7 @@ namespace Ttx::Concept::Capabilities {
 class Export {
  public:
   static constexpr auto contract_id =
-      Perimortem::System::Uuid(TTX_EXPORT_ID_HIGH, TTX_EXPORT_ID_LOW);
+      Perimortem::Serialization::Formats::Uuid(TTX_EXPORT_ID_HIGH, TTX_EXPORT_ID_LOW);
   using Api = ttx_export;
   using Operations = ttx_export_ops;
 

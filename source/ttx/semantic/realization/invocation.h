@@ -12,8 +12,8 @@
 // UUID checks this record's callable ABI. Its input and output descriptors then
 // establish which payloads invoke can consume and produce.
 //
-// The record may be populated through Block without a persistent backing
-// table. Context, frame descriptions and executable code remain borrowed for
+// A provider can construct this record when requested. Its context, frame
+// descriptions and executable code remain available for
 // the lifetime supplied by the provider. Copying the record acquires no
 // additional ownership. An operation requiring independent release exposes that
 // obligation in its own contract. Inputs and outputs are borrowed until the
@@ -27,6 +27,7 @@ typedef struct ttx_invocation {
   ttx_data_status (*invoke)(void* context, const void* inputs, void* outputs);
 } ttx_invocation;
 
-C_LINKAGE const ttx_representation* ttx_invocation_representation(void);
+C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_invocation_representation(
+    void);
 
 #endif

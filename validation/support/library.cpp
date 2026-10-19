@@ -3,25 +3,28 @@
 
 #include "validation/support/library.hpp"
 
-#ifdef PERI_WINDOWS
+#ifdef TOOLCHAIN_WINDOWS
 #include <windows.h>
 #else
 #include <unistd.h>
 #endif
 
-#include "perimortem/core/static/vector.hpp"
 #include "perimortem/core/diagnostics/log.hpp"
-#include "perimortem/core/null_terminated.hpp"
+#include "perimortem/core/storage/vector.hpp"
+#include "perimortem/core/view/null_terminated.hpp"
+#include "perimortem/memory/thread/bytes.hpp"
 
-#include "perimortem/memory/dynamic/bytes.hpp"
-
-using namespace Perimortem;
 using namespace Perimortem::Core;
+using namespace Perimortem::Memory;
+using namespace Perimortem::System::Process;
+using namespace Validation::Support;
 
-auto Validation::open_library(View::Bytes name) -> System::Library {
-  Static::Vector<U8, 4096> path;
-#ifdef PERI_WINDOWS
-  Static::Vector<WCHAR, 4096> native;
+auto Validation::Support::library_path(View::Bytes name) -> Thread::Bytes {
+  Perimortem::Core::Storage::Vector<U8, 4096> path;
+
+#ifdef TOOLCHAIN_WINDOWS
+
+  Perimortem::Core::Storage::Vector<WCHAR, 4096> native;
   const auto length =
       GetModuleFileNameW(nullptr, native.get_data(), native.get_size());
   const auto size = length && length < native.get_size()
@@ -30,10 +33,14 @@ auto Validation::open_library(View::Bytes name) -> System::Library {
                               length, reinterpret_cast<char*>(path.get_data()),
                               path.get_size(), nullptr, nullptr)
                         : 0;
+
 #else
+
   const auto size = readlink(
       "/proc/self/exe", reinterpret_cast<char*>(path.get_data()), sizeof(path));
+
 #endif
+
   if (size <= 0 || Count(size) == sizeof(path)) {
     Diagnostics::Log::fatal("Cannot locate the fixture executable."_view);
   }
@@ -43,21 +50,26 @@ auto Validation::open_library(View::Bytes name) -> System::Library {
     --end;
   }
 
-  Memory::Dynamic::Bytes location(View::Bytes(path.get_data(), end));
+  Thread::Bytes location(View::Bytes(path[0], end));
   location.concat("validation/providers/"_view);
   location.concat(name);
-  Memory::Allocator::Arena errors;
-  return System::Library::open(location.get_view(), errors)
+  return location;
+}
+
+auto Validation::Support::open_library(View::Bytes name) -> Library {
+  const auto location = library_path(name);
+  Allocator::Arena errors;
+  return Library::open(location.get_view(), errors)
       .visit(
-          [](System::Library& library) { return Data::take(library); },
-          [](View::Bytes message) -> System::Library {
+          [](Library& library) { return Data::take(library); },
+          [](View::Bytes message) -> Library {
             Diagnostics::Log::fatal(message);
           });
 }
 
-auto Validation::find_symbol(const System::Library& library, View::Bytes name)
+auto Validation::Support::find_symbol(const Library& library, View::Bytes name)
     -> void* {
-  Memory::Allocator::Arena errors;
+  Allocator::Arena errors;
   return library.symbol(name, errors)
       .visit(
           [](void* symbol) { return symbol; },

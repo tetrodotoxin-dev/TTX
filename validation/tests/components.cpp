@@ -1,0 +1,32 @@
+// # Tetrodotoxin
+// Copyright (c) 2023-present Matt Kaes and contributors
+
+#include "toolchain/validation/test.hpp"
+
+#include "perimortem/core/algorithm/search.hpp"
+
+#include "ttx/concept/abstract.hpp"
+#include "ttx/concept/policies/unknown.hpp"
+
+#if __has_include("perimortem/compression/deflate.hpp")
+#error TTX received an undeclared Perimortem component.
+#endif
+
+using namespace Toolchain::Validation;
+
+static Harness SdkComponents = {.name = "Ttx::SdkComponents"};
+
+VALIDATION_TEST(SdkComponents, core_runtime) {
+  const U8 source[] = {'t', 't', 'x', ':', 'c', 'o', 'r', 'e'};
+  const U8 value[] = {'c', 'o', 'r', 'e'};
+  EXPECT_EQ(
+      Perimortem::Core::Algorithm::Search::match(source, value), Count(4));
+}
+
+VALIDATION_TEST(SdkComponents, unknown_policy) {
+  const auto value =
+      Ttx::Concept::Policies::Unknown::get_unknown().get_abstract();
+  EXPECT_EQ(
+      value.supports<Ttx::Concept::Policies::Unknown>(),
+      Ttx::Semantic::Negotiation::Binding::Status::Satisfied);
+}

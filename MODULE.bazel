@@ -6,30 +6,30 @@ module(
 bazel_dep(name = "rules_cc", version = "0.2.17")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_pkg", version = "1.3.0")
-bazel_dep(name = "tetro_toolchain", version = "0.3.0")
+bazel_dep(name = "tetro_toolchain", version = "0.4.0")
 archive_override(
     module_name = "tetro_toolchain",
-    sha256 = "470c5cc73699ed8bfbe1ba53a2deee8ba407ec9ca80f078038bcd50d853004a4",
-    urls = ["https://github.com/tetrodotoxin-dev/Toolchain/releases/download/v0.3.0/tetro_toolchain-0.3.0-source.tar.gz"],
+    sha256 = "3b9ea310f5373919740db51801d051115db63a5ea118bce2e72ddd760750aa47",
+    urls = ["https://github.com/tetrodotoxin-dev/Toolchain/releases/download/v0.4.0/tetro_toolchain-0.4.0-source.tar.gz"],
 )
 
-register_toolchains("@tetro_toolchain//:cc_toolchain_for_linux_x86_64", "@tetro_toolchain//:cc_toolchain_for_wasm32", "@tetro_toolchain//:cc_toolchain_for_windows_x64")
+register_toolchains("@tetro_toolchain//:cc_toolchain_for_linux_x86_64", "@tetro_toolchain//:cc_toolchain_for_wasm32", "@tetro_toolchain//:cc_toolchain_for_wasm32_runner", "@tetro_toolchain//:cc_toolchain_for_windows_x64")
 
 sdks = use_extension("@tetro_toolchain//source/bazel:sdk.bzl", "dependencies")
 sdks.release(
     name = "perimortem",
     archives = {
-        "headers": "5529f06dfd04ffb7e708cd3e681e4b804032d003cbb878b267f08bc080431598",
-        "linux-x86_64-v3-static": "05452cc800b3fd66b10a53a0bb212fa03068b186b37251ffbdeec555b0ca2156",
-        "linux-x86_64-v3-shared": "827d30ce74e7a37024a6afbf8ceef7cf727d444d6a4c9bd4b0b9aa9a6be3b1ba",
-        "windows-x86_64-msvc-static": "fa931d2efb4c8f4573ca777534d9e60c8b30cabbc3e75700f975eb76e0f98ccb",
-        "windows-x86_64-msvc-shared": "ccd1938069536c7722495f4ae710ecc26248b571a7b98cc36c4ed592413e47f1",
-        "wasm32-emscripten-static": "548f8df4a743beff7ecfeaa11f338cab4c1cc35b4c86a840efbb18c1aec77906",
-        "wasm32-emscripten-shared": "06ff9e16f8c82c4b5b782f0443a6623d5270791b3f7802af8744929955a92eb5",
+        "headers": "9b9086d847123369b199b751bc2382ef50fc85e25a65757203e03644fac263b0",
+        "linux-x86_64-v3-static": "42933b95dc074cc683d99af5f2ecfe1cacb908bf6d36cccd8805bead53bc0985",
+        "linux-x86_64-v3-shared": "68009c2b53c80320c124009b6202dc9482dd350f02a13a901b5f85861f6eb848",
+        "windows-x86_64-msvc-static": "99866d90501a92d2ae5589407f27774ea4dbdc9e4ed06135eb74a4f3840f63f7",
+        "windows-x86_64-msvc-shared": "b1b9ab7540b22fe94b30a4488e6428356b0fde4c7678c7a202858f25cfcdc11d",
+        "wasm32-emscripten-static": "d1d5ec06ec9017472fea98e4d9985fd0794607984803de4103c2eb98c54e2842",
+        "wasm32-emscripten-shared": "b8027f125ab0a7b6b9daaf8cc156f67f11ede217c3710941e1507ebb2bad94a1",
     },
     linkage = "shared",
     project = "Perimortem",
-    version = "0.3.0",
+    version = "0.4.0",
     deps = [],
 )
 use_repo(sdks, "perimortem")

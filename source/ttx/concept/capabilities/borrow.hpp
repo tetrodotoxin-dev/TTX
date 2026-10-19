@@ -12,23 +12,24 @@ namespace Ttx::Concept::Capabilities {
 // that supplied it. The provider can retain the current object or supply
 // another object that preserves the encountered policy.
 //
-// `borrow` returns a Result containing the Borrowed answer when access can be
+// `borrow` returns a Result containing the Borrowed result when access can be
 // retained, or an Unknown or Rejected failure. Unknown leaves the borrowing
 // request undetermined. Rejected explicitly refuses it. Each successful call
 // creates one release obligation, even when several calls return the same
 // context. The caller fulfills that obligation by explicitly calling `release`
 // on the returned Borrowed view.
 //
-// Returning Satisfied promises an object pointer and the full Borrowed
+// Returning Satisfied promises an nonnull context and the full Borrowed
 // interface, including its Abstract operations. Missing required pointers
 // violates that contract, so the C++ adapter reports Rejected. If the result
-// still contains an object pointer and a release operation, the adapter first
-// calls `release` with that pointer to return the acquired access. The caller
+// still contains an nonnull context and a release operation, the adapter first
+// calls `release` with that context to return the acquired access. The caller
 // receives the failure after this cleanup.
 class Borrow {
  public:
-  static constexpr auto contract_id =
-      Perimortem::System::Uuid(TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW);
+  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+      TTX_BORROW_ID_HIGH,
+      TTX_BORROW_ID_LOW);
   using Api = ttx_borrow;
   using Operations = ttx_borrow_ops;
 
@@ -46,8 +47,8 @@ class Borrow {
     return Abstract(api.context, api.operations->abstract);
   }
 
-  auto borrow() const -> Perimortem::Utility::
-      Result<Policies::Borrowed, Semantic::Negotiation::Binding::Failure>;
+  EXPORTED(TTX) auto borrow() const -> Perimortem::Core::Storage::
+      Result<Policies::Borrowed, Semantic::Negotiation::Binding::Status>;
 
  private:
   Api api;

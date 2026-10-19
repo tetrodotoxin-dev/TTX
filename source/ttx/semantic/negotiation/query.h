@@ -4,60 +4,79 @@
 #ifndef TTX_SEMANTIC_NEGOTIATION_QUERY_H
 #define TTX_SEMANTIC_NEGOTIATION_QUERY_H
 
-#include "perimortem/system/uuid.h"
+#include "perimortem/serialization/formats/uuid.h"
 
 #include "ttx/semantic/negotiation/binding.h"
 
-// Two systems need an agreed entry point before either can ask the other for
-// an interface. A module can return this Query from its entry function, or a
-// native provider can lend it directly. That enclosing agreement supplies the
-// `bind` function and its lifetime, so calling `bind` does not first require a
-// Flow. Systems can therefore begin cooperating without constructing a TTX
-// graph. Once that first Query is available, `bind` can acquire interfaces that
-// support further negotiation, such as an Abstract exposed by a plugin.
+// Query is an agreed entry point for semantic negotiation. A module can expose
+// the initial Query through a described data export, while another provider can
+// supply one through an already agreed contract. This initial agreement covers
+// Query's record layout and callable convention so later interfaces can be
+// negotiated without first constructing an Abstract graph.
 //
-// A caller sometimes needs to know which contracts a provider supports without
-// acquiring any operations. `supports` answers that semantic question using
-// only the UUID. For example, an unsigned policy can exclude negative values
-// without exposing a callable interface. The answer transfers no bytes and
-// requires no agreed Representation. Satisfied establishes that promise,
-// Unknown leaves the question unsettled, and Rejected records an explicit
-// refusal. An unfamiliar UUID therefore need not be rejected. These answers are
-// observations, with no implied background work or obligation to become
-// determined later.
+// A UUID identifies an interface's semantic contract independently of its
+// implementation, but does not describe an API record or how to call it.
+// `supports` asks only whether the provider establishes that semantic promise.
+// It can establish support while the API representation is still unknown.
+// The provider returns Satisfied after establishing the promise,
+// Unknown when the contract is unfamiliar or available evidence cannot
+// determine it, and Rejected when its policy explicitly refuses the contract. A
+// support answer grants no callable access and does not remove the need for
+// representation agreement.
 //
-// `bind` asks the stronger question: can this provider supply the promised API
-// in the concrete form the caller can consume? Success populates that admitted
-// Storage. `supports` may succeed while every requested binding is rejected,
-// since a shared semantic promise does not repair an incompatible API format.
-// A support answer therefore grants no permission to call or cast anything.
-// Callers needing operations can bind directly without a preliminary probe.
+// `bind` asks the provider for the API identified by the same UUID. The
+// consumer lends admitted destination Storage whose Representation describes
+// the exact record it can consume, including callable signatures and calling
+// conventions.
+// The provider agrees its API with that Representation before transferring
+// bytes or exposing operations from the record. A consumer needing the API can
+// bind directly because a preliminary `supports` call cannot prove this
+// representation agreement.
 //
-// The canonical descriptor builds off of the TTX::Data protocol and includes
-// callable signatures along with their calling conventions, so this exchange
-// checks how to call the supplied API as well as how to store it. This is why
-// a Query provider using the consumer's native calling convention simplifies
-// bootstrapping. It establishes how to call `bind` before negotiating other
-// interfaces. Providers using other calling conventions remain useful once
-// that initial agreement exists. Marker bindings still agree on an empty API,
-// while `supports` avoids that representation exchange altogether. Binding's
-// status and borrowing rules are described in
-// ttx/semantic/negotiation/binding.h.
+// The provider can select stored data, compose a record, or delegate
+// production. When `bind` returns Satisfied, the destination contains the
+// complete agreed API. When it returns Unknown or Rejected, the destination
+// contains no usable API even if the provider touched its bytes. The consumer
+// publishes the record only after Satisfied.
 //
-// `context` is opaque and each supplied function interprets it. A consumer
-// accessing that state through Query is undefined behavior under TTX. The
-// provider may substitute a different implementation satisfying the same
-// contracts. The consumer uses the supplied functions and lifetime agreement
-// independently of the provider's storage or implementation language.
+// An API record can contain an opaque context and any number of operations.
+// Each supplied function interprets its own context. The provider can reuse a
+// function with a compatible context or supply a wrapper that delegates to
+// another implementation. A bound context can differ from this Query's context,
+// and its relationship to provider storage remains private. The consumer calls
+// the supplied functions and never inspects that private layout. Inspecting it
+// through Query is undefined behavior.
 //
-// The supplying protocol keeps the provider state and implementation code
-// alive through negotiation and every use of the returned bindings. Copying
-// this Query borrows that agreement without acquiring another lifetime.
+// The consumer retains the complete admitted record. It obtains an embedded
+// interface through that record's declared member. The member does not
+// establish the layout of its enclosing record. This lets providers compose
+// records while consumers depend only on their negotiated contracts.
+//
+// The synchronous exchange borrows the destination only until `bind` returns.
+// The consumer controls those destination bytes. The supplying contract keeps
+// every referenced context, description, and executable function available
+// for every use permitted by the returned interface's contract. Copying a
+// Query, an API record, or their pointers does not extend that access. An
+// interface with independent ownership declares its retention and release
+// obligations in its own contract.
+//
+// Both operations finish synchronously. The provider schedules no background
+// work for an Unknown answer and promises no later result. A subsequent call is
+// a new observation under the provider's policy. The provider can delegate an
+// undetermined question as that policy permits. The consumer cannot bypass
+// delegation or refusal by inspecting the opaque context.
+//
+// Query promises no invalidation notification or hot reload. A higher contract
+// must establish those guarantees because their required behavior is specific
+// to the system performing the reload.
 typedef struct ttx_semantic_query {
   void* context;
   ttx_binding_status (
       *bind)(void* context, perimortem_uuid contract, ttx_storage requested);
   ttx_binding_status (*supports)(void* context, perimortem_uuid contract);
 } ttx_semantic_query;
+
+C_LINKAGE EXPORTED(TTX) const ttx_representation*
+    ttx_semantic_query_representation(void);
 
 #endif

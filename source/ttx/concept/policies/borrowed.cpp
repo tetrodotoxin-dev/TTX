@@ -4,6 +4,6 @@
 #include "ttx/concept/policies/borrowed.hpp"
 
 C_LINKAGE const ttx_representation* ttx_borrowed_representation() {
-  return &Ttx::Semantic::Negotiation::Binding::representation<
-      Ttx::Concept::Policies::Borrowed>();
+  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
+      Ttx::Concept::Policies::Borrowed::Api>::reference>::get_representation();
 }

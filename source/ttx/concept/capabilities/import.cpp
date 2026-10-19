@@ -7,5 +7,6 @@ using namespace Ttx::Concept;
 using namespace Ttx::Semantic::Negotiation;
 
 C_LINKAGE const ttx_representation* ttx_import_representation() {
-  return &Binding::representation<Capabilities::Import>();
+  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
+      Capabilities::Import::Api>::reference>::get_representation();
 }

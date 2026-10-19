@@ -1,11 +1,12 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "perimortem/core/static/vector.hpp"
-#include "perimortem/core/diagnostics/log.hpp"
-#include "perimortem/core/null_terminated.hpp"
-
 #include "toolchain/validation/benchmark.hpp"
+
+#include "perimortem/core/diagnostics/log.hpp"
+#include "perimortem/core/storage/vector.hpp"
+#include "perimortem/core/view/null_terminated.hpp"
+
 #include "ttx/data/form/compiler.hpp"
 #include "ttx/data/form/representation.hpp"
 
@@ -16,7 +17,7 @@ using namespace Ttx::Data::Form;
 
 static constexpr auto integer = Schema::primitive(Schema::Value::U32);
 static constexpr auto real = Schema::primitive(Schema::Value::R32);
-static Static::Vector<Schema::Position, 16384> positions;
+static Perimortem::Core::Storage::Vector<Schema::Position, 16384> positions;
 static Toolchain::Validation::Harness Forms = {
   .name = "TTX::Compiler",
   .init =
@@ -32,9 +33,10 @@ static Toolchain::Validation::Harness Forms = {
 static auto compile(Count count) -> void {
   const auto schema = Schema::composite(
       {
-        positions.get_data(),
+        positions[0],
         count,
       },
+
       count * 4, 4);
   Compiler compiler;
   if (compiler.compile(schema) != Status::Success) {
@@ -57,7 +59,9 @@ VALIDATION_BENCHMARK(Forms, compile_16384) {
   compile(16384);
 }
 
-static Static::Vector<Static::Vector<U8, (16384 + 1) * 8>, 2> publications;
+static Perimortem::Core::Storage::
+    Vector<Perimortem::Core::Storage::Vector<U8, (16384 + 1) * 8>, 2>
+        publications;
 static Representation first;
 static Representation second;
 static Toolchain::Validation::Harness Agreement = {
@@ -65,21 +69,23 @@ static Toolchain::Validation::Harness Agreement = {
   .init =
       [] {
         Forms.init();
+
         const auto schema = Schema::composite(
             {
-              positions.get_data(),
+              positions[0],
               16384,
             },
+
             65536, 4);
         Compiler compiler;
         if (compiler.compile(schema) != Status::Success ||
             compiler.write(
                 Access::Bytes(
-                    publications[0].get_data(), publications[0].get_size())) !=
+                    publications[0][0], publications[0].get_size())) !=
                 Status::Success ||
             compiler.write(
                 Access::Bytes(
-                    publications[1].get_data(), publications[1].get_size())) !=
+                    publications[1][0], publications[1].get_size())) !=
                 Status::Success) {
           Diagnostics::Log::fatal(
               "Benchmark representation failed to compile."_view);

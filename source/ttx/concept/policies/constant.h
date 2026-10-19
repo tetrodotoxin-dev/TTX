@@ -6,14 +6,14 @@
 
 #include "ttx/concept/abstract.h"
 
-// Constant promises the same answer for this provider and semantic question
-// throughout the graph lifetime. Consumers can reuse that answer while its
-// supplying storage remains available. Each outgoing question has its own
-// promise.
+// Constant promises that the Abstract and route which supplied this result
+// continue to select the same semantic value. The selected value's outgoing
+// routes and byte observations establish their own promises independently.
 //
-// Binding returns the governing Abstract view, so further questions continue
-// through that policy. Storage retention follows its own contract. An acquired
-// Borrowed answer still requires release when its caller finishes using it.
+// The governing Abstract preserves this policy through further negotiation.
+// Storage and executable code remain available through the supplying access
+// contract. An acquired Borrowed result carries its separate release
+// obligation.
 #define TTX_CONSTANT_ID_HIGH 0x84c6c053b3254f7aULL
 #define TTX_CONSTANT_ID_LOW 0xa873409b31bcf606ULL
 

@@ -20,7 +20,7 @@ namespace Ttx::Concept::Policies {
 class Ordered {
  public:
   static constexpr auto contract_id =
-      Perimortem::System::Uuid(TTX_ORDERED_ID_HIGH, TTX_ORDERED_ID_LOW);
+      Perimortem::Serialization::Formats::Uuid(TTX_ORDERED_ID_HIGH, TTX_ORDERED_ID_LOW);
   using Api = ttx_abstract;
 
   explicit constexpr Ordered(Api api) : api(api) {}

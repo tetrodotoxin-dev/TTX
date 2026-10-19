@@ -3,7 +3,9 @@
 
 #include "ttx/concept/policies/unknown.hpp"
 
-#include "perimortem/core/null_terminated.hpp"
+#include "perimortem/core/view/null_terminated.hpp"
+
+#include "ttx/data/transfer.hpp"
 
 using namespace Ttx::Concept;
 using namespace Ttx::Semantic::Negotiation;
@@ -11,12 +13,12 @@ using namespace Perimortem;
 
 namespace {
 
-// This shared answer has its own context. Its stability does not establish a
+// This shared result has its own context. Its stability does not establish a
 // Constant promise for the question that selected it.
 class UnknownProvider {
  public:
   static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
-    const System::Uuid contract(id);
+    const Serialization::Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Policies::Unknown::contract_id
                ? TTX_BINDING_SATISFIED
@@ -29,8 +31,12 @@ class UnknownProvider {
       return TTX_BINDING_UNKNOWN;
     }
 
-    return static_cast<ttx_binding_status>(Binding::provide<Abstract>(
-        resolve(context), Ttx::Data::Form::Storage(target)));
+    Abstract::Api api = resolve(context);
+    return Ttx::Data::Transfer::copy(
+               Ttx::Data::Form::Storage::from(api),
+               Ttx::Data::Form::Storage(target)) == Ttx::Data::Status::Success
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_REJECTED;
   }
 
   static auto data(void*) -> perimortem_view_bytes {

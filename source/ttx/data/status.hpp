@@ -14,9 +14,7 @@ enum class Status : U8 {
   Overflow = TTX_DATA_OVERFLOW,
   Incompatible = TTX_DATA_INCOMPATIBLE,
   Unsupported = TTX_DATA_UNSUPPORTED,
-  Busy = TTX_DATA_BUSY,
   Denied = TTX_DATA_DENIED,
-  IoError = TTX_DATA_IO_ERROR,
 };
 
 }  // namespace Ttx::Data

@@ -26,8 +26,9 @@ namespace Ttx::Concept::Capabilities {
 // Rejected explicitly refuses it.
 class Callable {
  public:
-  static constexpr auto contract_id =
-      Perimortem::System::Uuid(TTX_CALLABLE_ID_HIGH, TTX_CALLABLE_ID_LOW);
+  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+      TTX_CALLABLE_ID_HIGH,
+      TTX_CALLABLE_ID_LOW);
   using Api = ttx_callable;
   using Operations = ttx_callable_operations;
 
@@ -76,8 +77,8 @@ class Callable {
     explicit constexpr Description(ttx_callable_description description)
         : description(description) {}
 
-    auto get_contract() const -> Perimortem::System::Uuid {
-      return Perimortem::System::Uuid(description.contract);
+    auto get_contract() const -> Perimortem::Serialization::Formats::Uuid {
+      return Perimortem::Serialization::Formats::Uuid(description.contract);
     }
 
     auto get_representation() const -> const Data::Form::Representation& {
@@ -95,8 +96,8 @@ class Callable {
   // Adapts the provider's output to a Result. A successful response supplies
   // the API Representation required to use its description. A response that
   // omits that Representation becomes a Rejected failure.
-  auto describe() const -> Perimortem::Utility::
-      Result<Description, Semantic::Negotiation::Binding::Failure> {
+  auto describe() const -> Perimortem::Core::Storage::
+      Result<Description, Semantic::Negotiation::Binding::Status> {
     const auto api = get_abi();
     ttx_callable_description output = ttx_callable_description();
     const auto status = api.operations->describe(api.context, &output);
@@ -105,10 +106,10 @@ class Callable {
     }
 
     if (status == TTX_BINDING_UNKNOWN) {
-      return Semantic::Negotiation::Binding::Failure::Unknown;
+      return Semantic::Negotiation::Binding::Status::Unknown;
     }
 
-    return Semantic::Negotiation::Binding::Failure::Rejected;
+    return Semantic::Negotiation::Binding::Status::Rejected;
   }
 
  private:

@@ -8,7 +8,7 @@
 
 // None answers a route with explicit rejection. Binding returns its Abstract
 // view. `ttx_none` supplies the shared Abstract, whose further routes return
-// that same answer.
+// that same result.
 //
 // Rejection describes the observation that produced it. A provider can combine
 // None with Constant to promise rejection for that edge's entire graph
@@ -16,6 +16,7 @@
 #define TTX_NONE_ID_HIGH 0x84c6c053b3254f7aULL
 #define TTX_NONE_ID_LOW 0xa873409b31bcf607ULL
 
-C_LINKAGE ttx_abstract ttx_none(void);
+C_LINKAGE EXPORTED(TTX)
+ttx_abstract ttx_none(void);
 
 #endif

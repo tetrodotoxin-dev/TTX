@@ -6,7 +6,7 @@
 using namespace Perimortem;
 using namespace Ttx::Semantic::Negotiation;
 
-auto Query::supports(System::Uuid contract) const -> Binding::Status {
+auto Query::supports(Serialization::Formats::Uuid contract) const -> Binding::Status {
   if (!api.supports) {
     return Binding::Status::Rejected;
   }
@@ -17,9 +17,9 @@ auto Query::supports(System::Uuid contract) const -> Binding::Status {
              : Binding::Status::Rejected;
 }
 
-auto Query::bind(System::Uuid contract, Ttx::Data::Form::Storage requested)
+auto Query::bind(Serialization::Formats::Uuid contract, Ttx::Data::Form::Storage requested)
     const -> Binding::Status {
-  if (!api.bind) {
+  if (!api.bind || ttx_storage_check(requested.get_abi()) != TTX_DATA_SUCCESS) {
     return Binding::Status::Rejected;
   }
 
@@ -27,4 +27,9 @@ auto Query::bind(System::Uuid contract, Ttx::Data::Form::Storage requested)
   return status == TTX_BINDING_SATISFIED || status == TTX_BINDING_UNKNOWN
              ? static_cast<Binding::Status>(status)
              : Binding::Status::Rejected;
+}
+
+auto ttx_semantic_query_representation() -> const ttx_representation* {
+  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
+      ttx_semantic_query>::reference>::get_representation();
 }

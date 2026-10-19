@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "perimortem/core/static/vector.hpp"
+#include "perimortem/core/storage/vector.hpp"
 #include "perimortem/core/writer/binary.hpp"
 
 namespace Ttx::Data::Encoding {
@@ -53,7 +53,7 @@ class Block {
       // Clang permits builtin copies between byte arrays during constant
       // evaluation. bit_cast can then read that array as a U64 without casting
       // a pointer. The same code reduces to an unaligned U64 load at runtime.
-      Perimortem::Core::Static::Vector<U8, sizeof(U64)> chunk_bytes;
+      Perimortem::Core::Storage::Vector<U8, sizeof(U64)> chunk_bytes;
       __builtin_memcpy(
           chunk_bytes.get_data(), bytes.get_data() + offset, sizeof(U64));
       return Perimortem::Core::Data::ensure_endian<
@@ -99,7 +99,7 @@ class Block {
   }
 
  private:
-  Perimortem::Core::Static::Vector<U64, 8> chunks_64;
+  Perimortem::Core::Storage::Vector<U64, 8> chunks_64;
 };
 
 }  // namespace Ttx::Data::Encoding

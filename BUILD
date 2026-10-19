@@ -1,23 +1,31 @@
 # Copyright (c) 2023-present Matt Kaes and contributors
 
-load("@tetro_toolchain//:defs.bzl", "benchmarks", "package", "tests", "vscode")
+load(
+    "@tetro_toolchain//:defs.bzl",
+    "format",
+    "package",
+    "snapshot",
+    "validation",
+    "vscode",
+)
 
-package(module = "ttx")
+package(
+    linkage = "shared",
+    module = "ttx",
+    shared = "//source:ttx_shared",
+    static = "//source:ttx_static",
+)
 
-vscode()
+format()
 
-tests(
-    srcs = ["//validation:test_sources"],
-    data = ["//validation/providers:libraries"],
-    deps = [
-        ":ttx",
+snapshot()
+
+validation(
+    test_data = ["//validation/providers:libraries"],
+    test_deps = [
         "//validation/providers:contracts",
         "//validation/support:library",
-        "//validation/support:measurement",
     ],
 )
 
-benchmarks(
-    srcs = ["//validation:benchmark_sources"],
-    deps = [":ttx"],
-)
+vscode()

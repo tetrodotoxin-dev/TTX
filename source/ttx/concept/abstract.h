@@ -5,9 +5,9 @@
 #define TTX_CONCEPT_ABSTRACT_H
 
 #include "perimortem/core/view/bytes.h"
-#include "perimortem/core/perimortem.h"
+#include "toolchain/toolchain.h"
 
-#include "perimortem/system/uuid.h"
+#include "perimortem/serialization/formats/uuid.h"
 
 #include "ttx/semantic/negotiation/binding.h"
 
@@ -37,21 +37,19 @@
 // A later observation queries the provider again.
 //
 // Returning plain Abstract permits a caller to finish without releasing it.
-// An acquired answer must advertise its required lifetime policy in its return
+// An acquired result must advertise its required lifetime policy in its return
 // contract, since hiding a release obligation behind Abstract can leak data.
-// `context` is nonnull and identifies the Abstract within the supplying
-// lifetime.
+// `context` is nonnull and is interpreted by the supplied operations.
+// Distinct interfaces can use the same context with different operations.
 typedef struct ttx_abstract {
   void* context;
   const struct ttx_abstract_ops* operations;
 } ttx_abstract;
 
-// A provider can enumerate its own storage directly when the callback is
-// borrowed for just this call. Routes need only survive `callback`, while
-// values keep their ordinary provider lifetime. A consumer that sorts or
-// retains routes copies them during the callback. The provider finishes all
-// callbacks before visitation returns and cannot retain this callback for later
-// work.
+// A provider enumerates its storage through synchronous callbacks. Each route
+// and value is available during its callback. The supplying contract can
+// establish longer access to a value; consumers obtain any required retention
+// during the callback and copy route bytes they keep afterward.
 typedef struct ttx_concept_visitor {
   void* context;
   void (*callback)(
@@ -61,22 +59,30 @@ typedef struct ttx_concept_visitor {
 } ttx_concept_visitor;
 
 typedef struct ttx_abstract_ops {
-  // Checks if the context provides the contract interface in some form. It
-  // doesn't promise any exact representation which is useful for asking
-  // semantic questions that don't need the additional overhead of negotating
-  // actual storage.
+  // Provides a path to quickly check if an Abstract adheres to the requested
+  // semantic policy or capability contract. Accessing a possible API still
+  // requires a separate `bind` call with a negotiated representation. That bind
+  // can then return Rejected if the provider does not supply the API in the
+  // requested form. `supports` also does not promise that any such form exists.
   //
-  // It's important to note that binding can still fail due to storage and ABI
-  // disagreements even if the contract is supported in another form. Support is
-  // a seperate semantic question about capabilities.
+  // Using a context pointer other than the pointer provided when `supports` was
+  // acquired is undefined behavior.
   ttx_binding_status (*supports)(void* context, perimortem_uuid contract);
 
-  // Separating selection from value production lets a consumer obtain an
-  // interface without triggering its computation or data transfers. `bind`
-  // therefore selects an implementation without invoking its value operations.
-  // Requested storage describes the complete API the caller can consume.
-  // The returned record carries the context selected for this request. It may
-  // differ from the discovery context. Its operations interpret that context.
+  // Fills the caller's admitted destination with the complete API for contract
+  // in the destination's representation. The representation defines the record
+  // layout, including callable signatures and calling conventions. The provider
+  // may select stored data, compose a record, or delegate its production.
+  //
+  // When `bind` returns Satisfied, the destination contains the complete API.
+  // When it returns Unknown or Rejected, the destination contains no usable API.
+  // The caller controls the destination bytes but does not thereby own any
+  // context, data, descriptions, or executable code referenced by the record.
+  // The contract supplying each reference defines how long it remains available.
+  // Copying the record copies those pointers without extending that access.
+  //
+  // Using a context pointer other than the pointer provided when `bind` was
+  // acquired is undefined behavior.
   ttx_binding_status (
       *bind)(void* context, perimortem_uuid contract, ttx_storage requested);
 
@@ -102,6 +108,7 @@ typedef struct ttx_abstract_ops {
   void (*visit_concepts)(void* context, ttx_concept_visitor visitor);
 } ttx_abstract_ops;
 
-C_LINKAGE const ttx_representation* ttx_abstract_representation(void);
+C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_abstract_representation(
+    void);
 
 #endif

@@ -28,7 +28,7 @@ namespace Ttx::Concept::Capabilities {
 class Import {
  public:
   static constexpr auto contract_id =
-      Perimortem::System::Uuid(TTX_IMPORT_ID_HIGH, TTX_IMPORT_ID_LOW);
+      Perimortem::Serialization::Formats::Uuid(TTX_IMPORT_ID_HIGH, TTX_IMPORT_ID_LOW);
   using Api = ttx_import;
   using Operations = ttx_import_ops;
 

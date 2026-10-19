@@ -3,11 +3,11 @@
 
 #pragma once
 
-#include "perimortem/core/static/vector.hpp"
-#include "perimortem/core/hash.hpp"
-#include "perimortem/core/scalar.hpp"
-
-#include "perimortem/memory/const/vector.hpp"
+#include "perimortem/core/algorithm/hash.hpp"
+#include "perimortem/core/math/scalar.hpp"
+#include "perimortem/core/storage/vector.hpp"
+#include "perimortem/memory/compile/vector.hpp"
+#include "perimortem/memory/thread/vector.hpp"
 
 #include "ttx/data/encoding/callable.hpp"
 #include "ttx/data/encoding/struct.hpp"
@@ -302,6 +302,10 @@ namespace Ttx::Data::Form {
 // without storing an entry for each value. Enumeration necessarily visits each
 // requested primitive occurrence, not merely each compressed descriptor.
 //
+// Storage policy selects temporary allocation for the same normalization
+// algorithm. Runtime compilation uses the current thread; Compiled supplies
+// constant evaluation storage whose allocations end during translation.
+template <template <typename> class Vector = Perimortem::Memory::Thread::Vector>
 class Compiler {
  public:
   constexpr Compiler() = default;
@@ -342,9 +346,9 @@ class Compiler {
     }
 
     for (Count i = 0; status == Status::Success && i < bodies.get_size(); ++i) {
-      if (bodies[i].size == Unseen) {
+      if (bodies.get_data()[i].size == Unseen) {
         Count body = 0;
-        status = prepare(*bodies[i].schema, body);
+        status = prepare(*bodies.get_data()[i].schema, body);
       }
     }
 
@@ -358,7 +362,7 @@ class Compiler {
   // Existing forms can be assembled without rebuilding their source Schemas.
   // Admission checks only the new placements. Imported bodies then use the
   // same interning and numbering as source compilation, including cycles.
-  auto compose(
+  EXPORTED(TTX) auto compose(
       Perimortem::Core::View::Vector<ttx_representation_member> members,
       Count extent,
       Count alignment) -> Status;
@@ -383,9 +387,9 @@ class Compiler {
       writer << U64(0x100000010);
     }
 
-    for (Count item = first; item; item = bodies[item - 1].next) {
-      const auto& body = bodies[item - 1];
-      const auto& head = records[body.first];
+    for (Count item = first; item; item = bodies.get_data()[item - 1].next) {
+      const auto& body = bodies.get_data()[item - 1];
+      const auto& head = records.get_data()[body.first];
       if (head.distance) {
         Encoding::Struct(body.size - 1, head.distance, head.offset)
             .encode(depth)
@@ -400,7 +404,7 @@ class Compiler {
       }
 
       for (Count i = 1; i < body.size; ++i) {
-        resolve_references(records[body.first + i])
+        resolve_references(records.get_data()[body.first + i])
             .encode(depth)
             .write(writer, depth);
       }
@@ -415,8 +419,8 @@ class Compiler {
 
  private:
   using Element = Encoding::Element;
-  using Elements = Perimortem::Memory::Const::Vector<Element>;
-  using Indices = Perimortem::Memory::Const::Vector<Count>;
+  using Elements = Vector<Element>;
+  using Indices = Vector<Count>;
   using View = Perimortem::Core::View::Vector<Element>;
   using Writer = Perimortem::Core::Writer::Binary<
       Perimortem::Core::Data::ByteOrder::Little>;
@@ -447,8 +451,9 @@ class Compiler {
     constexpr Body(Count first, Count size, U64 hash)
         : first(first), size(size), hash(hash) {}
   };
+
   struct Octets {
-    Perimortem::Core::Static::Vector<U8, sizeof(Element)> bytes;
+    Perimortem::Core::Storage::Vector<U8, sizeof(Element)> bytes;
   };
 
   // Numbering already visits every emitted field. Accumulate their occupied
@@ -503,24 +508,28 @@ class Compiler {
   // the same representation into byte storage for the existing byte hasher.
   static constexpr auto hash(View content) -> U64 {
     if consteval {
-      Perimortem::Memory::Const::Vector<U8> bytes;
+      Vector<U8> bytes;
       bytes.resize(content.get_size() * sizeof(Element));
       for (Count i = 0; i < content.get_size(); ++i) {
         const auto word = __builtin_bit_cast(Octets, content[i]);
         for (Count j = 0; j < sizeof(Element); ++j) {
-          bytes[i * sizeof(Element) + j] = word.bytes[j];
+          bytes.get_data()[i * sizeof(Element) + j] = word.bytes[j];
         }
       }
 
-      return Perimortem::Core::Hash(
+      return Perimortem::Core::Algorithm::Hash(
                  Perimortem::Core::View::Bytes(
-                     bytes.get_data(), bytes.get_size()))
+                     perimortem_view_bytes{bytes.get_data(), bytes.get_size()}))
           .get_value();
     } else {
-      return Perimortem::Core::Hash(
+      const Count byte_count = content.get_size() * sizeof(Element);
+      return Perimortem::Core::Algorithm::Hash(
                  Perimortem::Core::View::Bytes(
-                     reinterpret_cast<const U8*>(content.get_data()),
-                     content.get_size() * sizeof(Element)))
+                     perimortem_view_bytes{
+                       Perimortem::Core::Data::cast<const U8>(
+                           content.get_data()),
+                       byte_count}))
+
           .get_value();
     }
   }
@@ -533,11 +542,11 @@ class Compiler {
 
   static constexpr auto span(const Elements& data, Count first, Count size)
       -> View {
-    return View(data.get_data() + first, size);
+    return data.get_view().slice(first, size);
   }
 
   constexpr auto header(Count body) const -> const Element& {
-    return records[bodies[body].first];
+    return records.get_data()[bodies.get_data()[body].first];
   }
 
   constexpr auto extent(Count body) const -> Count {
@@ -553,7 +562,7 @@ class Compiler {
 
   constexpr auto resolve_references(Element entry) const -> Element {
     if (entry.references()) {
-      entry.type = bodies[entry.type].block;
+      entry.type = bodies.get_data()[entry.type].block;
     }
 
     return entry;
@@ -569,14 +578,16 @@ class Compiler {
       auto matches) -> Count {
     if (buckets.is_empty()) {
       for (Count i = 0; i < entries.get_size(); ++i) {
-        if (entries[i].hash == fingerprint && matches(i)) {
+        if (entries.get_data()[i].hash == fingerprint && matches(i)) {
           return i;
         }
       }
     } else {
-      for (Count item = buckets[fingerprint & (buckets.get_size() - 1)]; item;
-           item = entries[item - 1].next) {
-        if (entries[item - 1].hash == fingerprint && matches(item - 1)) {
+      for (Count item =
+               buckets.get_data()[fingerprint & (buckets.get_size() - 1)];
+           item; item = entries.get_data()[item - 1].next) {
+        if (entries.get_data()[item - 1].hash == fingerprint &&
+            matches(item - 1)) {
           return item - 1;
         }
       }
@@ -587,22 +598,22 @@ class Compiler {
 
   static constexpr auto place(auto& entries, Indices& buckets, Count id)
       -> void {
-    auto& entry = entries[id];
+    auto& entry = entries.get_data()[id];
     const Count bucket = entry.hash & (buckets.get_size() - 1);
-    entry.next = buckets[bucket];
-    buckets[bucket] = id + 1;
+    entry.next = buckets.get_data()[bucket];
+    buckets.get_data()[bucket] = id + 1;
   }
 
   static constexpr auto reset(Indices& buckets, Count size) -> void {
     // Rounding table capacity to a power of two lets bucket lookup use a mask.
     // This capacity only affects scratch storage, leaving emitted order intact.
     if (size) {
-      size = Count(1) << Perimortem::Core::Scalar::log2(size - 1);
+      size = Count(1) << Perimortem::Core::Math::Scalar::bit_width(size - 1);
     }
 
     buckets.resize(size);
     for (Count i = 0; i < size; ++i) {
-      buckets[i] = 0;
+      buckets.get_data()[i] = 0;
     }
   }
 
@@ -630,13 +641,13 @@ class Compiler {
       // their addresses. Only source memoization uses this common bucket.
       return 0;
     } else {
-      return Perimortem::Core::Hash(schema).get_value();
+      return Perimortem::Core::Algorithm::Hash(schema).get_value();
     }
   }
 
   constexpr auto find_source(const Schema* schema) const -> Count {
     return find(bodies, buckets, source_hash(schema), [&](Count i) {
-      return bodies[i].schema == schema;
+      return bodies.get_data()[i].schema == schema;
     });
   }
 
@@ -744,12 +755,12 @@ class Compiler {
 
   constexpr auto prepare(const Schema& source, Count& result) -> Status {
     const Count slot = source_slot(&source);
-    if (bodies[slot].size == Active) {
+    if (bodies.get_data()[slot].size == Active) {
       return Status::Invalid;
     }
 
     result = slot;
-    if (bodies[slot].size != Unseen) {
+    if (bodies.get_data()[slot].size != Unseen) {
       return Status::Success;
     }
 
@@ -758,7 +769,8 @@ class Compiler {
       return Status::Invalid;
     }
 
-    bodies[slot].size = Active;
+    bodies.get_data()[slot].size = Active;
+
     Status status = Status::Invalid;
     switch (source.get_kind()) {
     case Schema::Kind::Value:
@@ -860,8 +872,8 @@ class Compiler {
     const auto emit = [&](Element entry) { records.insert(entry); };
     if (!reference.is_pointer() &&
         reference.schema->get_kind() == Schema::Kind::Range) {
-      const auto child = bodies[find_source(reference.schema)];
-      const auto first = records[child.first + 1];
+      const auto child = bodies.get_data()[find_source(reference.schema)];
+      const auto first = records.get_data()[child.first + 1];
       const Bool joins =
           first.count == 1 || distance == first.count * first.distance;
       if (child.size == 2 && (count == 1 || joins)) {
@@ -876,7 +888,7 @@ class Compiler {
       } else {
         for (Count repeat = 0; repeat < count; ++repeat) {
           for (Count i = 1; i < child.size; ++i) {
-            auto entry = records[child.first + i];
+            auto entry = records.get_data()[child.first + i];
             entry.offset += offset + repeat * distance;
             run.push(entry, width(entry), emit);
           }
@@ -895,12 +907,13 @@ class Compiler {
   }
 
   constexpr auto composite(const Schema& source, Count& result) -> Status {
-    const auto positions = source.get_positions();
-    if (positions.get_size() && !positions.get_data()) {
+    if (source.data.composite.count && !source.data.composite.positions) {
       return Status::Invalid;
     }
 
-    for (const auto position : positions) {
+    const auto positions = source.get_positions();
+    for (Count i = 0; i < positions.get_size(); ++i) {
+      const auto position = positions[i];
       const auto reference = position.get_reference();
       if (position.offset > source.get_extent() ||
           reference.get_extent(pointer_size) >
@@ -916,7 +929,8 @@ class Compiler {
 
     const Count first = begin(source.get_extent(), source.get_alignment());
     Run run;
-    for (const auto position : positions) {
+    for (Count i = 0; i < positions.get_size(); ++i) {
+      const auto position = positions[i];
       append(position.get_reference(), position.offset, 1, 0, run);
     }
 
@@ -980,7 +994,7 @@ class Compiler {
     }
 
     const auto arguments = value.get_arguments();
-    if (arguments.get_size() && !arguments.get_data()) {
+    if (value.count && !value.arguments) {
       return Status::Invalid;
     }
 
@@ -996,16 +1010,19 @@ class Compiler {
     head.count = 0;
     head.offset = static_cast<U32>(convention);
     head.distance = 0;
+
     const Count first = records.get_size();
     records.insert(head);
+
     Run run;
     const auto emit = [&](Element entry) { records.insert(entry); };
-    for (const auto& argument : arguments) {
+    for (Count i = 0; i < arguments.get_size(); ++i) {
+      const auto argument = arguments[i];
       if (!argument.count) {
         return Status::Invalid;
       }
 
-      if (argument.count > Count(-1) - records[first].count) {
+      if (argument.count > Count(-1) - records.get_data()[first].count) {
         return Status::Overflow;
       }
 
@@ -1014,7 +1031,8 @@ class Compiler {
         return status;
       }
 
-      records[first].count += argument.count;
+      records.get_data()[first].count += argument.count;
+
       auto entry = describe(argument.get_reference());
       entry.count = argument.count;
       entry.offset = entry.distance = 0;
@@ -1028,15 +1046,16 @@ class Compiler {
     for (Count child = parent * 2 + 1; child < heap.get_size();
          child = parent * 2 + 1) {
       if (child + 1 < heap.get_size() &&
-          heap[child + 1].offset < heap[child].offset) {
+          heap.get_data()[child + 1].offset < heap.get_data()[child].offset) {
         ++child;
       }
 
-      if (heap[parent].offset <= heap[child].offset) {
+      if (heap.get_data()[parent].offset <= heap.get_data()[child].offset) {
         return;
       }
 
-      Perimortem::Core::Data::swap(heap[parent], heap[child]);
+      Perimortem::Core::Data::swap(
+          heap.get_data()[parent], heap.get_data()[child]);
       parent = child;
     }
   }
@@ -1047,7 +1066,7 @@ class Compiler {
   constexpr auto reorder(Count first) -> Status {
     Elements heap;
     for (Count i = first + 1; i < records.get_size(); ++i) {
-      heap.insert(records[i]);
+      heap.insert(records.get_data()[i]);
     }
 
     for (Count i = heap.get_size() / 2; i; --i) {
@@ -1055,16 +1074,18 @@ class Compiler {
     }
 
     records.resize(first + 1);
+
     Run run;
     Count end = 0;
     const auto emit = [&](Element entry) { records.insert(entry); };
     while (!heap.is_empty()) {
-      auto entry = heap[0];
+      auto entry = heap.get_data()[0];
       if (heap.get_size() > 1 && entry.count > 1) {
         const Count next =
             heap.get_size() > 2
-                ? Perimortem::Core::Scalar::min(heap[1].offset, heap[2].offset)
-                : heap[1].offset;
+                ? Perimortem::Core::Math::Scalar::min(
+                      heap.get_data()[1].offset, heap.get_data()[2].offset)
+                : heap.get_data()[1].offset;
         const Count gap = next - entry.offset;
         const Count prefix = gap / entry.distance + (gap % entry.distance != 0);
         if (prefix && prefix < entry.count) {
@@ -1074,11 +1095,11 @@ class Compiler {
 
       // Advancing this run in place leaves its remainder in the heap. Restoring
       // heap order then selects the next start without reinserting that run.
-      heap[0].count -= entry.count;
-      if (heap[0].count) {
-        heap[0].offset += entry.count * entry.distance;
+      heap.get_data()[0].count -= entry.count;
+      if (heap.get_data()[0].count) {
+        heap.get_data()[0].offset += entry.count * entry.distance;
       } else {
-        heap[0] = heap[heap.get_size() - 1];
+        heap.get_data()[0] = heap.get_data()[heap.get_size() - 1];
         heap.resize(heap.get_size() - 1);
       }
 
@@ -1105,12 +1126,12 @@ class Compiler {
       }
     }
 
-    if (records[first].distance && records.get_size() == first + 1) {
-      if (records[first].offset) {
+    if (records.get_data()[first].distance && records.get_size() == first + 1) {
+      if (records.get_data()[first].offset) {
         return Status::Invalid;
       }
 
-      records[first].distance = 1;
+      records.get_data()[first].distance = 1;
     }
 
     seal(first, result);
@@ -1118,11 +1139,11 @@ class Compiler {
   }
 
   constexpr auto seal(Count first, Count id) -> void {
-    auto& body = bodies[id];
+    auto& body = bodies.get_data()[id];
     body.first = first;
     body.size = records.get_size() - first;
-    if (records[first].distance) {
-      records[first].count = body.size - 1;
+    if (records.get_data()[first].distance) {
+      records.get_data()[first].count = body.size - 1;
     }
   }
 
@@ -1133,18 +1154,21 @@ class Compiler {
       Count id,
       Body body,
       const Elements& data,
-      Perimortem::Memory::Const::Vector<Body>& entries,
+      Vector<Body>& entries,
       Indices& buckets) -> Count {
-    entries[id] = body;
+    entries.get_data()[id] = body;
+
     const auto content = span(data, body.first, body.size);
     const Count found = find(entries, buckets, body.hash, [&](Count prior) {
-      return entries[prior].block < Active &&
+      return entries.get_data()[prior].block < Active &&
              equal(
-                 content,
-                 span(data, entries[prior].first, entries[prior].size));
+                 content, span(
+                              data, entries.get_data()[prior].first,
+                              entries.get_data()[prior].size));
     });
+
     const Count selected = found == Unseen ? id : found;
-    entries[id].block = selected;
+    entries.get_data()[id].block = selected;
     if (found == Unseen && !buckets.is_empty()) {
       place(entries, buckets, id);
     }
@@ -1157,8 +1181,8 @@ class Compiler {
   // so every body observes the same previous set of reference identities.
   constexpr auto project(Count id, auto canonical, Elements& target) const
       -> Body {
-    const auto body = bodies[id];
-    auto head = records[body.first];
+    const auto body = bodies.get_data()[id];
+    auto head = records.get_data()[body.first];
     if (head.references()) {
       head.type = canonical(head.type);
     }
@@ -1169,15 +1193,17 @@ class Compiler {
       if (output == target.get_size()) {
         target.insert(entry);
       } else {
-        target[output] = entry;
+        target.get_data()[output] = entry;
       }
 
       ++output;
     };
+
     emit(head);
+
     Run run;
     for (Count i = 1; i < body.size; ++i) {
-      auto entry = records[body.first + i];
+      auto entry = records.get_data()[body.first + i];
       const Count size = head.distance ? width(entry) : 0;
       if (entry.references()) {
         entry.type = canonical(entry.type);
@@ -1188,7 +1214,7 @@ class Compiler {
 
     run.flush(emit);
     if (head.distance) {
-      target[first].count = output - first - 1;
+      target.get_data()[first].count = output - first - 1;
     }
 
     const Count size = output - first;
@@ -1196,21 +1222,22 @@ class Compiler {
   }
 
   constexpr auto settle(Count id) -> Bool {
-    if (bodies[id].block != Unseen) {
-      return bodies[id].block != Active;
+    if (bodies.get_data()[id].block != Unseen) {
+      return bodies.get_data()[id].block != Active;
     }
 
-    bodies[id].block = Active;
-    const auto body = bodies[id];
+    bodies.get_data()[id].block = Active;
+
+    const auto body = bodies.get_data()[id];
     Bool changed = False;
     for (Count i = 0; i < body.size; ++i) {
-      const auto entry = records[body.first + i];
+      const auto entry = records.get_data()[body.first + i];
       if (entry.references()) {
         if (!settle(entry.type)) {
           return False;
         }
 
-        changed |= entry.type != bodies[entry.type].block;
+        changed |= entry.type != bodies.get_data()[entry.type].block;
       }
     }
 
@@ -1219,7 +1246,8 @@ class Compiler {
     Body key;
     if (changed) {
       key = project(
-          id, [&](Count target) { return bodies[target].block; }, records);
+          id, [&](Count target) { return bodies.get_data()[target].block; },
+          records);
     } else {
       key = Body(
           body.first, body.size, hash(span(records, body.first, body.size)));
@@ -1235,9 +1263,9 @@ class Compiler {
   constexpr auto reconcile(Count& root) -> void {
     reset(buckets, bodies.get_size() < 8 ? 0 : bodies.get_size() * 2 + 1);
     if (settle(root)) {
-      root = bodies[root].block;
+      root = bodies.get_data()[root].block;
       for (Count i = 0; i < bodies.get_size(); ++i) {
-        bodies[i].block = Unseen;
+        bodies.get_data()[i].block = Unseen;
       }
 
       return;
@@ -1246,19 +1274,21 @@ class Compiler {
     Indices classes, next;
     classes.resize(bodies.get_size());
     next.resize(bodies.get_size());
+
     Elements keys;
-    Perimortem::Memory::Const::Vector<Body> candidates;
+    Vector<Body> candidates;
     candidates.resize(bodies.get_size());
+
     Bool changed;
     do {
       keys.resize(0);
       reset(buckets, bodies.get_size() * 2 + 1);
       changed = False;
       for (Count id = 0; id < bodies.get_size(); ++id) {
-        const auto key =
-            project(id, [&](Count target) { return classes[target]; }, keys);
-        next[id] = intern(id, key, keys, candidates, buckets);
-        changed |= next[id] != classes[id];
+        const auto key = project(
+            id, [&](Count target) { return classes.get_data()[target]; }, keys);
+        next.get_data()[id] = intern(id, key, keys, candidates, buckets);
+        changed |= next.get_data()[id] != classes.get_data()[id];
       }
 
       Perimortem::Core::Data::swap(classes, next);
@@ -1267,31 +1297,32 @@ class Compiler {
     Perimortem::Core::Data::swap(records, keys);
     Perimortem::Core::Data::swap(bodies, candidates);
     for (Count i = 0; i < bodies.get_size(); ++i) {
-      bodies[i].block = Unseen;
+      bodies.get_data()[i].block = Unseen;
     }
 
-    root = classes[root];
+    root = classes.get_data()[root];
   }
 
   constexpr auto number(Count id, Limits& limits, Count& last) -> void {
-    if (bodies[id].block != Unseen) {
+    if (bodies.get_data()[id].block != Unseen) {
       return;
     }
 
-    const auto body = bodies[id];
-    bodies[id].block = block_count;
+    const auto body = bodies.get_data()[id];
+    bodies.get_data()[id].block = block_count;
     block_count += body.size;
     if (last != Unseen) {
-      bodies[last].next = id + 1;
+      bodies.get_data()[last].next = id + 1;
     }
 
     last = id;
-    bodies[id].next = 0;
-    const auto& head = records[body.first];
+    bodies.get_data()[id].next = 0;
+
+    const auto& head = records.get_data()[body.first];
     limits.common |= head.count | (head.distance ? head.distance : head.offset);
     limits.extent |= head.distance ? head.offset : 0;
     for (Count i = 0; i < body.size; ++i) {
-      const auto& entry = records[body.first + i];
+      const auto& entry = records.get_data()[body.first + i];
       has_pointers |= entry.is_pointer();
       if (i) {
         limits.common |= entry.count | entry.offset;
@@ -1300,7 +1331,7 @@ class Compiler {
 
       if (entry.references()) {
         number(entry.type, limits, last);
-        limits.reference |= bodies[entry.type].block;
+        limits.reference |= bodies.get_data()[entry.type].block;
       } else {
         limits.reference |= entry.type;
       }
@@ -1308,12 +1339,15 @@ class Compiler {
   }
 
   constexpr auto choose_depth(const Limits& limits) -> Status {
-    using Perimortem::Core::Scalar::log2;
-    using Perimortem::Core::Scalar::max;
-    Count required = max(Count(1), (log2(limits.common) + 7) / 8);
-    required = max(required, (log2(limits.reference) + 8) / 8);
-    required = max(required, (log2(limits.distance) + 9) / 8);
-    required = max(required, (log2(limits.extent) + 19) / 16);
+    using Perimortem::Core::Math::Scalar;
+    Count required =
+        Scalar::max(Count(1), (Scalar::bit_width(limits.common) + 7) / 8);
+    required =
+        Scalar::max(required, (Scalar::bit_width(limits.reference) + 8) / 8);
+    required =
+        Scalar::max(required, (Scalar::bit_width(limits.distance) + 9) / 8);
+    required =
+        Scalar::max(required, (Scalar::bit_width(limits.extent) + 19) / 16);
     if (required > 15 || block_count > (Count(-1) - 15) / (4 * required)) {
       return Status::Overflow;
     }
@@ -1322,7 +1356,7 @@ class Compiler {
     return Status::Success;
   }
 
-  Perimortem::Memory::Const::Vector<Body> bodies;
+  Vector<Body> bodies;
   Elements records;
   Indices buckets;
   Count first = 0;

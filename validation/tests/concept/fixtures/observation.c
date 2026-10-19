@@ -1,0 +1,104 @@
+// # Tetrodotoxin
+// Copyright (c) 2023-present Matt Kaes and contributors
+
+#include "validation/tests/concept/fixtures/observation.h"
+
+#include "ttx/concept/policies/constant.h"
+#include "ttx/concept/policies/none.h"
+#include "ttx/data/transfer.h"
+
+static ttx_binding_status
+    bind(void* context, perimortem_uuid id, ttx_storage output) {
+  observation_subject* subject = context;
+  ++subject->binds;
+  if (subject->answer != TTX_BINDING_SATISFIED) {
+    return subject->answer;
+  }
+
+  if (id.high == TTX_ABSTRACT_ID_HIGH && id.low == TTX_ABSTRACT_ID_LOW) {
+    ttx_abstract api = subject->selected.operations
+                           ? subject->selected
+                           : observation_abstract(subject);
+    const ttx_storage input = {subject->abstract_form, (U8*)&api, sizeof(api)};
+    return ttx_transfer(&input, &output) == TTX_DATA_SUCCESS
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_REJECTED;
+  }
+
+  if (id.high == TTX_CONSTANT_ID_HIGH && id.low == TTX_CONSTANT_ID_LOW) {
+    ttx_abstract api = observation_abstract(subject);
+    const ttx_storage input = {subject->marker_form, (U8*)&api, sizeof(api)};
+    return ttx_transfer(&input, &output) == TTX_DATA_SUCCESS
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_REJECTED;
+  }
+
+  return TTX_BINDING_UNKNOWN;
+}
+
+// Constant describes the subject's semantic answers. It does not make its
+// byte observation a constant, nor extend the returned buffer's lifetime.
+static perimortem_view_bytes data(void* context) {
+  observation_subject* subject = context;
+  ++subject->value;
+
+  const perimortem_view_bytes bytes = {
+    &subject->value,
+    1,
+  };
+
+  return bytes;
+}
+
+static ttx_abstract resolve(void* context) {
+  observation_subject* source = context;
+  return observation_abstract(source);
+}
+
+static ttx_abstract lookup(void* context, perimortem_view_bytes route) {
+  observation_subject* source = context;
+  if (route.size == 3 && route.data[0] == 7 && route.data[1] == 0 &&
+      route.data[2] == 9) {
+    return resolve(source);
+  }
+
+  return ttx_none();
+}
+
+static void visit(void* context, ttx_concept_visitor visitor) {
+  observation_subject* source = context;
+  const U8 route[] = {
+    7,
+    0,
+    9,
+  };
+
+  const perimortem_view_bytes bytes = {
+    route,
+    sizeof(route),
+  };
+
+  visitor.callback(visitor.context, bytes, resolve(source));
+}
+
+static ttx_binding_status supports(void* context, perimortem_uuid id) {
+  (void)context;
+  return (id.high == TTX_ABSTRACT_ID_HIGH && id.low == TTX_ABSTRACT_ID_LOW) ||
+                 (id.high == TTX_CONSTANT_ID_HIGH &&
+                  id.low == TTX_CONSTANT_ID_LOW)
+             ? TTX_BINDING_SATISFIED
+             : TTX_BINDING_UNKNOWN;
+}
+
+ttx_abstract observation_abstract(observation_subject* subject) {
+  static const ttx_abstract_ops operations = {
+    supports, bind, data, resolve, lookup, visit,
+  };
+
+  const ttx_abstract result = {
+    subject,
+    &operations,
+  };
+
+  return result;
+}

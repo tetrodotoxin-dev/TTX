@@ -2,9 +2,6 @@
 
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("@tetro_toolchain//source/bazel:package.bzl", "source_files")
-
-source_files()
 
 # The runner compiles against the provider contracts and loads their binaries
 # through the entry points exercised by the tests.
@@ -27,7 +24,10 @@ cc_library(
 cc_binary(
     name = "libabstract_subject.so",
     testonly = True,
-    srcs = glob(["abstract/*.cpp"]),
+    srcs = glob([
+        "abstract/*.cpp",
+        "abstract/*.h",
+    ]),
     linkshared = True,
     local_defines = ["TTX_TEST_EXPORT=1"],
     deps = ["//:ttx"],
@@ -46,35 +46,23 @@ cc_binary(
 )
 
 cc_binary(
-    name = "libflow_provider.so",
-    testonly = True,
-    srcs = glob([
-        "flow/*.c",
-        "flow/*.h",
-    ]),
-    linkshared = True,
-    local_defines = ["TTX_TEST_EXPORT=1"],
-    deps = [":representation"],
-)
-
-cc_binary(
-    name = "libheterogeneous_provider.so",
-    testonly = True,
-    srcs = glob([
-        "heterogeneous/*.c",
-        "heterogeneous/*.h",
-    ]),
-    linkshared = True,
-    local_defines = ["TTX_TEST_EXPORT=1"],
-    deps = [":representation"],
-)
-
-cc_binary(
     name = "libinterface_provider.so",
     testonly = True,
     srcs = glob([
         "interface/*.c",
         "interface/*.h",
+    ]),
+    linkshared = True,
+    local_defines = ["TTX_TEST_EXPORT=1"],
+    deps = [":representation"],
+)
+
+cc_binary(
+    name = "libretention_provider.so",
+    testonly = True,
+    srcs = glob([
+        "retention/*.c",
+        "retention/*.h",
     ]),
     linkshared = True,
     local_defines = ["TTX_TEST_EXPORT=1"],
@@ -99,10 +87,9 @@ filegroup(
     srcs = [
         ":libabstract_subject.so",
         ":libcomposition.so",
-        ":libflow_provider.so",
-        ":libheterogeneous_provider.so",
         ":libinterface_provider.so",
         ":libinvocation_provider.so",
+        ":libretention_provider.so",
     ],
     visibility = ["//:__pkg__"],
 )

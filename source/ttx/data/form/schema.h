@@ -52,7 +52,7 @@ typedef U8 ttx_schema_value;
 #define TTX_SCHEMA_BIG_ENDIAN ((U8)1)
 
 // Vector observations use fixed, aligned bit carriers. Returning these through
-// an output pointer keeps Fragment usable without compiling its bootstrap for
+// an output pointer permits access without compiling that caller for
 // AVX or AVX512. Native callables use the corresponding SIMD register ABI.
 // Lane interpretation belongs to the operation using those bits. Big endian
 // storage reverses the whole carrier, just as for another primitive bit value.
@@ -160,8 +160,12 @@ typedef struct ttx_schema_callable {
 #ifdef __cplusplus
   constexpr auto get_arguments() const
       -> Perimortem::Core::View::Vector<ttx_schema_argument> {
-    return Perimortem::Core::View::Vector<ttx_schema_argument>(
-        arguments, count);
+    if (!arguments || count == 0) {
+      return Perimortem::Core::View::Vector<ttx_schema_argument>();
+    }
+
+    return Perimortem::Core::View::Vector<ttx_schema_argument>(arguments[0],
+                                                                count);
   }
 
   constexpr auto get_result() const -> ttx_schema_reference { return result; }
@@ -348,8 +352,12 @@ typedef struct ttx_schema {
 
   constexpr auto get_positions() const
       -> Perimortem::Core::View::Vector<Position> {
+    if (!data.composite.positions || data.composite.count == 0) {
+      return Perimortem::Core::View::Vector<Position>();
+    }
+
     return Perimortem::Core::View::Vector<Position>(
-        data.composite.positions, data.composite.count);
+        data.composite.positions[0], data.composite.count);
   }
 
   constexpr auto get_range() const -> const Range& { return data.range; }

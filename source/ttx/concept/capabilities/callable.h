@@ -57,6 +57,7 @@ typedef struct ttx_callable {
   const ttx_callable_operations* operations;
 } ttx_callable;
 
-C_LINKAGE const ttx_representation* ttx_callable_representation(void);
+C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_callable_representation(
+    void);
 
 #endif

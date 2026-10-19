@@ -8,16 +8,16 @@
 
 namespace Ttx::Concept::Policies {
 
-// Unknown is the provisional answer to a semantic question that the current
+// Unknown is the provisional result to a semantic question that the current
 // graph cannot settle. Since repeating the original question may later produce
 // a factual identity under a different observational state, Unknown can't be
-// used to assume the resolution would never produce a valid answer.
+// used to assume the resolution would never produce a valid result.
 //
 // For explicit rejection None should be used instead.
 class Unknown {
  public:
   static constexpr auto contract_id =
-      Perimortem::System::Uuid(TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW);
+      Perimortem::Serialization::Formats::Uuid(TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW);
   using Api = ttx_abstract;
 
   explicit constexpr Unknown(Api api) : api(api) {}
@@ -28,7 +28,7 @@ class Unknown {
 
   constexpr auto get_abstract() const -> Abstract { return Abstract(api); }
 
-  static auto get_unknown() -> Unknown;
+  static EXPORTED(TTX) auto get_unknown() -> Unknown;
 
  private:
   Api api;

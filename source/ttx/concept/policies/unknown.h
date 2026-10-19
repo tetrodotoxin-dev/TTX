@@ -6,7 +6,7 @@
 
 #include "ttx/concept/abstract.h"
 
-// Unknown answers a question whose result is undetermined for this observation.
+// Unknown results a question whose result is undetermined for this observation.
 // Binding returns its Abstract view. `ttx_unknown` supplies the shared
 // Abstract, whose further routes continue to answer Unknown.
 //
@@ -14,6 +14,7 @@
 #define TTX_UNKNOWN_ID_HIGH 0x84c6c053b3254f7aULL
 #define TTX_UNKNOWN_ID_LOW 0xa873409b31bcf608ULL
 
-C_LINKAGE ttx_abstract ttx_unknown(void);
+C_LINKAGE EXPORTED(TTX)
+ttx_abstract ttx_unknown(void);
 
 #endif

@@ -9,6 +9,7 @@
 #include "toolchain/export.h"
 #include "ttx/concept/policies/constant.h"
 #include "ttx/concept/policies/none.h"
+#include "ttx/data/transfer.h"
 
 static const ttx_abstract_ops abstract_operations;
 static const ttx_borrowed_ops borrowed_operations;
@@ -79,27 +80,42 @@ HIDDEN ttx_binding_status
   // Each bound record keeps this context and bind function, so subsequent
   // questions continue through the policy that admitted the record.
   if (is(id, TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW)) {
-    const ttx_borrow api = {source, &borrow_operations};
-    return ttx_binding_provide(state->forms.borrow, &api, target);
+    ttx_borrow api = {source, &borrow_operations};
+    const ttx_storage input = {state->forms.borrow, (U8*)&api, sizeof(api)};
+    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_REJECTED;
   }
 
   if (is(id, TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW)) {
-    const ttx_borrowed api = {source, &borrowed_operations};
-    return ttx_binding_provide(state->forms.borrowed, &api, target);
+    ttx_borrowed api = {source, &borrowed_operations};
+    const ttx_storage input = {state->forms.borrowed, (U8*)&api, sizeof(api)};
+    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_REJECTED;
   }
 
   if (is(id, COMPOSITION_ID_HIGH, EXPRESSION_ID_LOW)) {
-    const expression api = {source, &expression_operations};
-    return ttx_binding_provide(state->forms.expression, &api, target);
+    expression api = {source, &expression_operations};
+    const ttx_storage input = {state->forms.expression, (U8*)&api, sizeof(api)};
+    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_REJECTED;
   }
 
   if (is(id, COMPOSITION_ID_HIGH, BORROWED_EXPRESSION_ID_LOW)) {
-    const borrowed_expression api = {source, &qualified_operations};
-    return ttx_binding_provide(state->forms.qualified, &api, target);
+    borrowed_expression api = {source, &qualified_operations};
+    const ttx_storage input = {state->forms.qualified, (U8*)&api, sizeof(api)};
+    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_REJECTED;
   }
 
-  const ttx_abstract api = abstract_view(source);
-  return ttx_binding_provide(state->forms.abstract, &api, target);
+  ttx_abstract api = abstract_view(source);
+  const ttx_storage input = {state->forms.abstract, (U8*)&api, sizeof(api)};
+  return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
+             ? TTX_BINDING_SATISFIED
+             : TTX_BINDING_REJECTED;
 }
 
 static perimortem_view_bytes data(void* context) {

@@ -5,6 +5,7 @@
 
 #include <stddef.h>
 
+#include "ttx/data/transfer.h"
 #include "validation/providers/representation.h"
 
 typedef struct counter_state {
@@ -40,8 +41,8 @@ static U64 read(void* context) {
   return source ? *source : 0;
 }
 
-// The wrapper owns the relationship between the enclosing state and the
-// counter word. The lower operation only receives its own expected context.
+// The provider selects the counter word from its private state. The lower
+// operation receives the context it expects.
 static U64 embedded_add(void* context, U64 amount) {
   counter_state* subject = context;
   return add(&subject->value, amount);
@@ -99,7 +100,10 @@ static ttx_binding_status
     api = (counter_api){&state, temporary_add, temporary_read};
   }
 
-  return ttx_binding_provide(representation, &api, requested);
+  const ttx_storage input = {representation, (U8*)&api, sizeof(api)};
+  return ttx_transfer(&input, &requested) == TTX_DATA_SUCCESS
+             ? TTX_BINDING_SATISFIED
+             : TTX_BINDING_REJECTED;
 }
 
 static void reset(ttx_binding_status status, U8 omit, U8 stateless) {
@@ -170,8 +174,8 @@ counter_fixture interface_provider_open(interface_compile compiler) {
     },
   };
   static const ttx_schema addition = {
-    8,
-    8,
+    sizeof(void*),
+    _Alignof(void*),
     TTX_SCHEMA_CALLABLE,
     {
       .callable =
@@ -182,13 +186,13 @@ counter_fixture interface_provider_open(interface_compile compiler) {
               &integer,
               0,
             },
-            TTX_SCHEMA_SYSTEM_V_AMD64,
+            TTX_SCHEMA_NATIVE_CONVENTION,
           },
     },
   };
   static const ttx_schema observation = {
-    8,
-    8,
+    sizeof(void*),
+    _Alignof(void*),
     TTX_SCHEMA_CALLABLE,
     {
       .callable =
@@ -199,7 +203,7 @@ counter_fixture interface_provider_open(interface_compile compiler) {
               &integer,
               0,
             },
-            TTX_SCHEMA_SYSTEM_V_AMD64,
+            TTX_SCHEMA_NATIVE_CONVENTION,
           },
     },
   };

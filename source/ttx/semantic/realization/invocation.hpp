@@ -8,28 +8,33 @@
 
 namespace Ttx::Semantic::Realization {
 
-// Invocation retains the agreed operation record so repeated calls can use its
-// function directly without another UUID lookup, signature walk or table
-// transfer. The provider keeps the context and code available through every
-// invocation.
+// Invocation carries the admitted call record. Its context, frame forms and
+// executable code remain available through the supplying contract. Each call
+// borrows input and output bytes synchronously.
 class Invocation {
  public:
-  auto connect(
-      Negotiation::Query instance,
-      Perimortem::System::Uuid contract,
-      const Data::Form::Representation& inputs,
-      const Data::Form::Representation& outputs)
-      -> Negotiation::Binding::Status;
+  using Api = ttx_invocation;
 
-  auto invoke(const void* inputs, void* outputs) const -> Data::Status {
-    return static_cast<Data::Status>(
-        call.invoke(call.context, inputs, outputs));
+  static auto accept(Api api) -> Bool {
+    return api.invoke && api.inputs && api.outputs;
   }
 
-  auto close() -> void { call = ttx_invocation(); }
+  explicit constexpr Invocation(Api api) : api(api) {}
+
+  constexpr auto get_abi() const -> Api { return api; }
+
+  auto accepts(
+      const Data::Form::Representation& inputs,
+      const Data::Form::Representation& outputs) const -> Bool {
+    return inputs.compatible(*api.inputs) && outputs.compatible(*api.outputs);
+  }
+
+  auto invoke(const void* inputs, void* outputs) const -> Data::Status {
+    return static_cast<Data::Status>(api.invoke(api.context, inputs, outputs));
+  }
 
  private:
-  ttx_invocation call = ttx_invocation();
+  Api api;
 };
 
 }  // namespace Ttx::Semantic::Realization

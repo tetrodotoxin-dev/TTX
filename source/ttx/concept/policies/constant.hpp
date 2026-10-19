@@ -8,16 +8,18 @@
 
 namespace Ttx::Concept::Policies {
 
-// Constant promises the same answer for this provider and semantic question
-// throughout the graph lifetime. A consumer can reuse that answer while its
-// supplying data remains available. Each outgoing question has its own promise.
+// Constant promises that the Abstract and route which supplied this result
+// continue to select the same semantic value. The selected value's outgoing
+// routes and byte observations establish their own promises independently.
 //
-// Borrowing keeps the data available. When an acquired answer also provides
-// Constant, its release obligation remains until that borrow is returned.
+// The governing Abstract preserves this policy through further negotiation.
+// Storage and executable code remain available through the supplying access
+// contract. An acquired Borrowed result carries its separate release
+// obligation.
 class Constant {
  public:
   static constexpr auto contract_id =
-      Perimortem::System::Uuid(TTX_CONSTANT_ID_HIGH, TTX_CONSTANT_ID_LOW);
+      Perimortem::Serialization::Formats::Uuid(TTX_CONSTANT_ID_HIGH, TTX_CONSTANT_ID_LOW);
   using Api = ttx_abstract;
 
   explicit constexpr Constant(Api api) : api(api) {}

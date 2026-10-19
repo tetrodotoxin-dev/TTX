@@ -1,44 +1,59 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "perimortem/core/null_terminated.hpp"
+#include "validation/providers/abstract/provider.h"
+
+#include "perimortem/core/view/null_terminated.hpp"
 
 #include "toolchain/export.h"
 #include "ttx/concept/abstract.hpp"
 #include "ttx/concept/policies/unknown.h"
+#include "ttx/data/transfer.hpp"
 #include "ttx/semantic/negotiation/library.h"
 
+using namespace Perimortem;
+using namespace Ttx;
 using namespace Ttx::Concept;
-using namespace Ttx::Semantic::Negotiation;
+
+TTX_DATA_RECORD(
+    bootstrap_exports,
+    TTX_DATA_MEMBER(bootstrap_exports, context),
+    TTX_DATA_MEMBER(bootstrap_exports, visit));
+TTX_DATA_RECORD(
+    bootstrap_indexed,
+    TTX_DATA_MEMBER(bootstrap_indexed, context),
+    TTX_DATA_MEMBER(bootstrap_indexed, count),
+    TTX_DATA_MEMBER(bootstrap_indexed, get));
 
 namespace {
 
-// This representation stays private to the loaded module. The consumer sees
-// only the record supplied by the entry point.
-struct Provider {
+struct Root {
   static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
-    return Perimortem::System::Uuid(id) == Abstract::contract_id
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_UNKNOWN;
+    return Serialization::Formats::Uuid(id) == Abstract::contract_id ? TTX_BINDING_SATISFIED
+                                                     : TTX_BINDING_UNKNOWN;
   }
 
-  static auto bind(void* context, perimortem_uuid id, ttx_storage output)
+  static auto resolve(void* context) -> ttx_abstract {
+    return {context, &operations};
+  }
+
+  static auto bind(void* context, perimortem_uuid id, ttx_storage target)
       -> ttx_binding_status {
     if (supports(context, id) != TTX_BINDING_SATISFIED) {
       return TTX_BINDING_UNKNOWN;
     }
 
-    return static_cast<ttx_binding_status>(Binding::provide<Abstract>(
-        resolve(context), Ttx::Data::Form::Storage(output)));
+    auto api = resolve(context);
+    return Data::Transfer::copy(
+               Data::Form::Storage::from(api), Data::Form::Storage(target)) ==
+                   Data::Status::Success
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_REJECTED;
   }
 
   static auto data(void*) -> perimortem_view_bytes {
-    const auto bytes = "subject"_view;
+    const auto bytes = "hello"_view;
     return {bytes.get_data(), bytes.get_size()};
-  }
-
-  static auto resolve(void* context) -> ttx_abstract {
-    return {context, &operations};
   }
 
   static auto lookup(void*, perimortem_view_bytes) -> ttx_abstract {
@@ -51,26 +66,88 @@ struct Provider {
                                                   resolve,  lookup, visit};
 };
 
-}  // namespace
+struct Module {
+  U64 requests = 0;
+  Root root;
+};
 
-C_LINKAGE EXPORTED(TTX_TEST)
-ttx_abstract abstract_subject() {
-  static Provider provider;
-  return Provider::resolve(&provider);
+Module module;
+
+void visit(
+    void* context,
+    void* callback_context,
+    void (*callback)(void*, ttx_abstract)) {
+  callback(callback_context, Root::resolve(context));
 }
 
-// The callback borrows this provider for one observation.
-C_LINKAGE EXPORTED(TTX_TEST)
-ttx_binding_status ttx_query(
-    ttx_semantic_query host,
-    ttx_query_callback callback) {
-  const perimortem_uuid admission(0x5ef6275871544cf7ULL, 0xb3ee8d4b319b4b75ULL);
-  const auto status = host.supports(host.context, admission);
-  if (status != TTX_BINDING_SATISFIED) {
-    return status;
+U64 count(void*) {
+  return 1;
+}
+
+ttx_abstract get(void* context, U64 index) {
+  return index == 0 ? Root::resolve(context) : ttx_unknown();
+}
+
+ttx_binding_status supports(void*, perimortem_uuid id) {
+  const Serialization::Formats::Uuid contract(id);
+  return contract == Abstract::contract_id ||
+                 contract ==
+                     Serialization::Formats::Uuid(
+                         BOOTSTRAP_EXPORTS_HIGH, BOOTSTRAP_EXPORTS_LOW) ||
+                 contract ==
+                     Serialization::Formats::Uuid(BOOTSTRAP_QUERY_HIGH, BOOTSTRAP_QUERY_LOW)
+             ? TTX_BINDING_SATISFIED
+             : TTX_BINDING_UNKNOWN;
+}
+
+// Discovery and returned interfaces use different contexts. The returned
+// records stand on their own supplying contracts and carry the actual callable
+// functions, all of which stay private to this library.
+ttx_binding_status bind(void* context, perimortem_uuid id, ttx_storage target) {
+  auto& state = *static_cast<Module*>(context);
+  ++state.requests;
+  const Serialization::Formats::Uuid contract(id);
+  if (contract == Abstract::contract_id) {
+    return Root::bind(&state.root, id, target);
   }
 
-  Provider provider;
-  return callback.callback(
-      callback.context, {&provider, Provider::bind, Provider::supports});
+  if (contract == Serialization::Formats::Uuid(BOOTSTRAP_QUERY_HIGH, BOOTSTRAP_QUERY_LOW)) {
+    ttx_semantic_query api{&state.root, Root::bind, Root::supports};
+    return Data::Transfer::copy(
+               Data::Form::Storage::from(api), Data::Form::Storage(target)) ==
+                   Data::Status::Success
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_REJECTED;
+  }
+
+  if (contract == Serialization::Formats::Uuid(BOOTSTRAP_EXPORTS_HIGH, BOOTSTRAP_EXPORTS_LOW)) {
+    bootstrap_exports api{&state.root, visit};
+    if (Data::Transfer::copy(
+            Data::Form::Storage::from(api), Data::Form::Storage(target)) ==
+        Data::Status::Success) {
+      return TTX_BINDING_SATISFIED;
+    }
+
+    // One export inventory supports callback and indexed consumer formats.
+    // Both select the same root, with independent callable representations.
+    bootstrap_indexed indexed{&state.root, count, get};
+    return Data::Transfer::copy(
+               Data::Form::Storage::from(indexed),
+               Data::Form::Storage(target)) == Data::Status::Success
+               ? TTX_BINDING_SATISFIED
+               : TTX_BINDING_REJECTED;
+  }
+
+  return TTX_BINDING_UNKNOWN;
 }
+
+ttx_semantic_query entry{&module, bind, supports};
+
+}  // namespace
+
+// The symbol is data. Its payload and canonical form remain available while
+// the host keeps this module loaded. No provider function runs during import.
+C_LINKAGE EXPORTED(TTX_TEST) const ttx_storage ttx_entry = {
+  &Data::Form::Compiled<
+      Data::Form::Native<ttx_semantic_query>::reference>::get_representation(),
+  reinterpret_cast<U8*>(&entry), sizeof(entry)};

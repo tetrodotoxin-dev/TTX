@@ -4,7 +4,7 @@
 #ifndef TTX_DATA_STATUS_H
 #define TTX_DATA_STATUS_H
 
-#include "perimortem/core/perimortem.h"
+#include "toolchain/toolchain.h"
 
 // Data operates on completed descriptions. Matching those descriptions or
 // transferring the described values can still fail, so these statuses report
@@ -18,8 +18,6 @@ typedef U8 ttx_data_status;
 #define TTX_DATA_OVERFLOW ((ttx_data_status)3)
 #define TTX_DATA_INCOMPATIBLE ((ttx_data_status)4)
 #define TTX_DATA_UNSUPPORTED ((ttx_data_status)5)
-#define TTX_DATA_BUSY ((ttx_data_status)6)
-#define TTX_DATA_DENIED ((ttx_data_status)7)
-#define TTX_DATA_IO_ERROR ((ttx_data_status)8)
+#define TTX_DATA_DENIED ((ttx_data_status)6)
 
 #endif

@@ -38,5 +38,6 @@ typedef struct ttx_import_ops {
       void (*callback)(void* context, ttx_abstract abstract));
 } ttx_import_ops;
 
-C_LINKAGE const ttx_representation* ttx_import_representation(void);
+C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_import_representation(
+    void);
 #endif
