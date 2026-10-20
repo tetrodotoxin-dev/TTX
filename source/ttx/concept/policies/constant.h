@@ -12,7 +12,7 @@
 //
 // The governing Abstract preserves this policy through further negotiation.
 // Storage and executable code remain available through the supplying access
-// contract. An acquired Borrowed result carries its separate release
+// contract. An acquired Retained result carries its separate release
 // obligation.
 #define TTX_CONSTANT_ID_HIGH 0x84c6c053b3254f7aULL
 #define TTX_CONSTANT_ID_LOW 0xa873409b31bcf606ULL

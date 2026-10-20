@@ -16,13 +16,18 @@ namespace Ttx::Concept {
 
 // Abstract uses the provider's context and operations to traverse a semantic
 // graph. The C++ interface stores the C API record and forwards each call to
-// its supplied function. Binding another capability preserves the policies
-// governing that interface's operations and further negotiation.
+// its supplied function with the context published alongside it.
+//
+// Abstract-to-Abstract graph operations are observations. Binding enters a
+// typed API with its complete contract. Terminal operations use known types,
+// such as a Cursor returning a Token. A typed operation can return an Abstract
+// anywhere in the graph, where observations resume. Each later binding is a
+// separate request. The graph contract and examples are in abstract.h.
 //
 // The supplying contract keeps the context and table accessible through use.
 // Copying an Abstract preserves that access duration. A plain Abstract result
 // requires no release. An operation transferring a release obligation returns
-// Borrowed or a stronger contract that exposes the obligation.
+// Retained or a stronger contract that exposes the obligation.
 class Abstract {
  public:
   static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
@@ -82,17 +87,18 @@ class Abstract {
     return get_query().template bind<Contract>();
   }
 
-  // Gets this Abstract's byte observation without creating another Abstract to
-  // describe it. This makes it useful as a `resolve_concept` side channel, or
-  // for sockets and streams that already have bytes to exchange.
+  // Provides direct byte access under the already established Abstract
+  // contract. This typed read can supply bytes alongside `resolve_concept`,
+  // or exchange bytes for sockets and streams.
   //
   // The bytes have no Abstract contract to inspect and no implied format or
-  // Constant promise. Repeated calls can observe changing data even when a
+  // Constant promise. Repeated calls can read changing data even when a
   // semantic edge on the same Abstract is Constant.
   //
-  // The returned view survives until the next observation on this Abstract or
-  // the end of the supplying lifetime. Consumers needing longer retention can
-  // copy the bytes or negotiate a contract that provides it.
+  // The returned view survives until the next byte read or graph observation
+  // on this Abstract, or the end of the supplying lifetime. Consumers needing
+  // longer retention can copy the bytes or negotiate a contract that provides
+  // it.
   auto get_data() const -> Perimortem::Core::View::Bytes {
     const auto data = api.operations->get_data(api.context);
     return Perimortem::Core::View::Bytes(data);
@@ -104,15 +110,19 @@ class Abstract {
   //
   //   abstract.resolve() == abstract.resolve().resolve()
   //
-  // Equality here identifies the same borrowed view, not equivalent semantic
-  // content or an explicit shared C++ value.
+  // Equality identifies the context and operation table. Semantic equivalence
+  // follows the policies supplied by the provider.
   auto resolve() const -> Abstract {
     return Abstract(api.operations->resolve(api.context));
   }
 
-  // Resolves a binary query through this Abstract's policy. The provider owns
-  // the route format, so names are only one possible spelling. The bytes can
-  // also encode instructions for negotiation between domains.
+  // Traverses a route through the provider's policy. The returned Abstract
+  // supports continued traversal and UUID negotiation. The provider owns the
+  // binary route format. A route can be a name or instructions for negotiation
+  // between domains.
+  //
+  // None and Unknown return themselves for further routes. Chaining resolution
+  // preserves either terminal result regardless of which step reached it.
   //
   // Each call is a separate observation and may return a different result.
   // A value that provides `Constant` promises it only for the particular edge

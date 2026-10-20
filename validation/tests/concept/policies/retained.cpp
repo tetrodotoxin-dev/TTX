@@ -7,8 +7,8 @@
 #include "perimortem/core/data.hpp"
 #include "perimortem/memory/allocator/global.hpp"
 
-#include "ttx/concept/capabilities/borrow.hpp"
 #include "ttx/concept/capabilities/create.hpp"
+#include "ttx/concept/capabilities/retain.hpp"
 #include "ttx/concept/policies/constant.hpp"
 #include "ttx/concept/policies/none.hpp"
 #include "ttx/concept/policies/unknown.h"
@@ -23,10 +23,10 @@ using namespace Ttx::Concept;
 using namespace Ttx::Data;
 using namespace Ttx::Semantic;
 
-static Harness Borrowing = {.name = "TTX::Borrowed"};
+static Harness Retention = {.name = "TTX::Retained"};
 
 struct Observations {
-  Count borrowed = 0, released = 0, created = 0, binds = 0;
+  Count acquisitions = 0, released = 0, created = 0, binds = 0;
 };
 
 // Discovery can end while this separately allocated provider remains available.
@@ -46,8 +46,8 @@ class Retained {
       -> ttx_negotiation_status {
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
-                   contract == Policies::Borrowed::contract_id ||
-                   contract == Capabilities::Borrow::contract_id ||
+                   contract == Policies::Retained::contract_id ||
+                   contract == Capabilities::Retain::contract_id ||
                    contract == Capabilities::Create::contract_id ||
                    contract == Policies::Constant::contract_id
                ? TTX_NEGOTIATION_SATISFIED
@@ -61,15 +61,15 @@ class Retained {
 
     const Formats::Uuid contract(id);
     const Form::Storage target(requested);
-    if (contract == Policies::Borrowed::contract_id) {
-      Policies::Borrowed::Api api = {context, &borrowed_operations};
+    if (contract == Policies::Retained::contract_id) {
+      Policies::Retained::Api api = {context, &retained_operations};
       return Transfer::copy(Form::Storage::from(api), target) == Status::Success
                  ? TTX_NEGOTIATION_SATISFIED
                  : TTX_NEGOTIATION_REJECTED;
     }
 
-    if (contract == Capabilities::Borrow::contract_id) {
-      Capabilities::Borrow::Api api = {context, &borrow_operations};
+    if (contract == Capabilities::Retain::contract_id) {
+      Capabilities::Retain::Api api = {context, &retain_operations};
       return Transfer::copy(Form::Storage::from(api), target) == Status::Success
                  ? TTX_NEGOTIATION_SATISFIED
                  : TTX_NEGOTIATION_REJECTED;
@@ -104,12 +104,12 @@ class Retained {
 
   static auto visit(void* context, ttx_concept_visitor callback) -> void {}
 
-  static auto borrow(void* context, ttx_borrowed* output)
+  static auto retain(void* context, ttx_retained* output)
       -> ttx_negotiation_status {
     auto& subject = *Data::cast<Retained>(context);
     ++subject.references;
-    ++subject.counts.borrowed;
-    *output = {context, &borrowed_operations};
+    ++subject.counts.acquisitions;
+    *output = {context, &retained_operations};
     return TTX_NEGOTIATION_SATISFIED;
   }
 
@@ -137,11 +137,11 @@ class Retained {
   static constexpr ttx_abstract_ops abstract_operations = {
     supports, bind, data, resolve, lookup, visit};
 
-  static constexpr ttx_borrowed_ops borrowed_operations = {
+  static constexpr ttx_retained_ops retained_operations = {
     abstract_operations, release};
 
-  static constexpr ttx_borrow_ops borrow_operations = {
-    abstract_operations, borrow};
+  static constexpr ttx_retain_ops retain_operations = {
+    abstract_operations, retain};
 
   static constexpr ttx_create_ops create_operations = {
     abstract_operations, create};
@@ -164,7 +164,7 @@ class Discovery {
       -> ttx_negotiation_status {
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
-                   contract == Capabilities::Borrow::contract_id
+                   contract == Capabilities::Retain::contract_id
                ? TTX_NEGOTIATION_SATISFIED
                : TTX_NEGOTIATION_UNKNOWN;
   }
@@ -173,8 +173,8 @@ class Discovery {
       -> ttx_negotiation_status {
     const Formats::Uuid contract(id);
     const Form::Storage target(requested);
-    if (contract == Capabilities::Borrow::contract_id) {
-      Capabilities::Borrow::Api api = {context, &operations};
+    if (contract == Capabilities::Retain::contract_id) {
+      Capabilities::Retain::Api api = {context, &operations};
       return Transfer::copy(Form::Storage::from(api), target) == Status::Success
                  ? TTX_NEGOTIATION_SATISFIED
                  : TTX_NEGOTIATION_REJECTED;
@@ -201,44 +201,44 @@ class Discovery {
 
   static auto visit(void* context, ttx_concept_visitor callback) -> void {}
 
-  static auto borrow(void* context, ttx_borrowed* output)
+  static auto retain(void* context, ttx_retained* output)
       -> ttx_negotiation_status {
     auto& subject = *Data::cast<Discovery>(context);
     if (subject.answer != Negotiation::Status::Satisfied) {
       return ttx_negotiation_status(subject.answer);
     }
 
-    ++subject.counts.borrowed;
+    ++subject.counts.acquisitions;
 
     const auto allocation = Allocator::Global::allocate(sizeof(Retained));
     auto& retained = Lifetime::construct<Retained>(allocation.get_data(), [&] {
       return Retained(subject.counts, 1, subject.value);
     });
 
-    *output = {&retained, &Retained::borrowed_operations};
+    *output = {&retained, &Retained::retained_operations};
 
     return TTX_NEGOTIATION_SATISFIED;
   }
 
-  static constexpr ttx_borrow_ops operations = {
+  static constexpr ttx_retain_ops operations = {
     {supports, bind, data, resolve, lookup, visit},
-    borrow};
+    retain};
 };
 
-VALIDATION_TEST(Borrowing, independent_context) {
+VALIDATION_TEST(Retention, independent_context) {
   Observations counts;
-  Storage::Option<Policies::Borrowed> retained;
+  Storage::Option<Policies::Retained> retained;
   {
     Discovery source = Discovery(counts);
     const auto weak = Abstract(Discovery::resolve(&source));
-    weak.bind<Capabilities::Borrow>().visit(
-        [&](Capabilities::Borrow request) {
-          EXPECT_EQ(counts.borrowed, Count(0));
+    weak.bind<Capabilities::Retain>().visit(
+        [&](Capabilities::Retain request) {
+          EXPECT_EQ(counts.acquisitions, Count(0));
           EXPECT(
               request.get_abstract().supports<Abstract>() ==
               Negotiation::Status::Satisfied);
-          request.borrow().visit(
-              [&](Policies::Borrowed answer) { retained = answer; },
+          request.retain().visit(
+              [&](Policies::Retained answer) { retained = answer; },
               [&](Negotiation::Status) { EXPECT(False); });
         },
 
@@ -246,7 +246,7 @@ VALIDATION_TEST(Borrowing, independent_context) {
 
     source.value = 12;
     retained.visit(
-        [&](Policies::Borrowed acquired) {
+        [&](Policies::Retained acquired) {
           EXPECT_EQ(acquired.get_abstract().get_data()[0], U8(7));
         },
 
@@ -256,11 +256,11 @@ VALIDATION_TEST(Borrowing, independent_context) {
   EXPECT_EQ(counts.released, Count(0));
 
   retained.visit(
-      [&](Policies::Borrowed acquired) {
+      [&](Policies::Retained acquired) {
         acquired.get_abstract().bind<Capabilities::Create>().visit(
             [&](Capabilities::Create create) {
               EXPECT(
-                  create.get_abstract().supports<Policies::Borrowed>() ==
+                  create.get_abstract().supports<Policies::Retained>() ==
                   Negotiation::Status::Satisfied);
 
               const auto binds = counts.binds;
@@ -280,13 +280,13 @@ VALIDATION_TEST(Borrowing, independent_context) {
 
             [&](Negotiation::Status) { EXPECT(False); });
         EXPECT_EQ(counts.created, Count(100));
-        EXPECT_EQ(counts.borrowed, Count(1));
+        EXPECT_EQ(counts.acquisitions, Count(1));
         EXPECT_EQ(counts.released, Count(0));
 
-        acquired.get_abstract().bind<Capabilities::Borrow>().visit(
-            [&](Capabilities::Borrow request) {
-              request.borrow().visit(
-                  [&](Policies::Borrowed second) {
+        acquired.get_abstract().bind<Capabilities::Retain>().visit(
+            [&](Capabilities::Retain request) {
+              request.retain().visit(
+                  [&](Policies::Retained second) {
                     EXPECT_EQ(
                         second.get_abstract().get_abi().context,
                         acquired.get_abstract().get_abi().context);
@@ -305,10 +305,10 @@ VALIDATION_TEST(Borrowing, independent_context) {
       },
 
       [&] { EXPECT(False); });
-  EXPECT_EQ(counts.borrowed, counts.released);
+  EXPECT_EQ(counts.acquisitions, counts.released);
 }
 
-VALIDATION_TEST(Borrowing, scoped_and_refused) {
+VALIDATION_TEST(Retention, scoped_and_refused) {
   Observations counts;
   Discovery source = Discovery(counts);
   const auto weak = Abstract(Discovery::resolve(&source));
@@ -317,12 +317,12 @@ VALIDATION_TEST(Borrowing, scoped_and_refused) {
   const Negotiation::Status answers[] = {
     Negotiation::Status::Unknown, Negotiation::Status::Rejected};
 
-  weak.bind<Capabilities::Borrow>().visit(
-      [&](Capabilities::Borrow request) {
+  weak.bind<Capabilities::Retain>().visit(
+      [&](Capabilities::Retain request) {
         for (const auto answer : answers) {
           source.answer = answer;
-          request.borrow().visit(
-              [&](Policies::Borrowed) { EXPECT(False); },
+          request.retain().visit(
+              [&](Policies::Retained) { EXPECT(False); },
               [&](Negotiation::Status failure) {
                 EXPECT(Negotiation::Status(failure) == answer);
               });
@@ -330,14 +330,14 @@ VALIDATION_TEST(Borrowing, scoped_and_refused) {
       },
 
       [&](Negotiation::Status) { EXPECT(False); });
-  EXPECT_EQ(counts.borrowed, Count(0));
+  EXPECT_EQ(counts.acquisitions, Count(0));
   EXPECT_EQ(counts.released, Count(0));
 }
 
-// A provider supplied a return operation but an incomplete Abstract table.
-// Borrow returns the acquired access through that release operation before
-// reporting Rejected to the consumer.
-VALIDATION_TEST(Borrowing, malformed_answer_return) {
+// The provider returns a Retained record with a release function and an
+// incomplete Abstract table. The C++ `retain` method calls that release
+// function with the returned context before reporting Rejected.
+VALIDATION_TEST(Retention, malformed_answer_return) {
   struct Provider {
     Count releases = 0;
 
@@ -345,22 +345,22 @@ VALIDATION_TEST(Borrowing, malformed_answer_return) {
       ++Data::cast<Provider>(context)->releases;
     }
 
-    static auto borrow(void* context, ttx_borrowed* output)
+    static auto retain(void* context, ttx_retained* output)
         -> ttx_negotiation_status {
-      static const ttx_borrowed_ops malformed = {{}, release};
+      static const ttx_retained_ops malformed = {{}, release};
       *output = {context, &malformed};
       return TTX_NEGOTIATION_SATISFIED;
     }
   } provider;
 
-  // None's Abstract functions ignore context, so this Borrow interface can
-  // reuse them with the fixture's Provider pointer. Its borrow function returns
+  // None's Abstract functions ignore context, so this Retain interface can
+  // reuse them with the fixture's Provider pointer. Its retain function returns
   // a different table with missing Abstract operations to exercise cleanup.
-  const ttx_borrow_ops operations = {*ttx_none().operations, Provider::borrow};
-  const Capabilities::Borrow request({&provider, &operations});
-  ASSERT(Capabilities::Borrow::accept(request.get_abi()));
-  request.borrow().visit(
-      [&](Policies::Borrowed) { EXPECT(False); },
+  const ttx_retain_ops operations = {*ttx_none().operations, Provider::retain};
+  const Capabilities::Retain request({&provider, &operations});
+  ASSERT(Capabilities::Retain::accept(request.get_abi()));
+  request.retain().visit(
+      [&](Policies::Retained) { EXPECT(False); },
       [&](Negotiation::Status failure) {
         EXPECT(failure == Negotiation::Status::Rejected);
       });

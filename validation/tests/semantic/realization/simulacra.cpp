@@ -33,7 +33,8 @@ static Harness TtxSimulacra = {
 };
 
 // This API is three words, with the functions themselves in the transferred
-// record. The C++ interface stores those words while borrowing the context.
+// record. The C++ interface stores those words and uses the context supplied
+// with them for each call.
 class Counter {
  public:
   static constexpr auto contract_id =

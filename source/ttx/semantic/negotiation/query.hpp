@@ -18,7 +18,7 @@ namespace Ttx::Semantic::Negotiation {
 // check for the returned record. Representation and semantic agreement remain
 // the same as for a caller that supplies Storage directly.
 //
-// The record borrows its context and functions from the supplying contract.
+// The supplying contract keeps context and functions available through use.
 // Each operation returns Rejected if its required function is absent.
 class Query {
  public:

@@ -26,7 +26,7 @@ class Visitor {
   template <typename Function>
     requires(!__is_same(__remove_cvref(Function), Visitor))
   // Stores a reference to callback, which the caller keeps alive until
-  // visitation returns. Explicit construction makes that borrowed reference
+  // visitation returns. Explicit construction makes that callback reference
   // visible at the call site.
   constexpr explicit Visitor(Function& callback)
       : Visitor(&callback, invoke<Function>) {}

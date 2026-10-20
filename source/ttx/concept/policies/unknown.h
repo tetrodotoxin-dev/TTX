@@ -6,10 +6,10 @@
 
 #include "ttx/concept/abstract.h"
 
-// Unknown means the provider has not determined this route's result for the
-// current observation. Binding the policy returns its Abstract interface.
-// The shared implementation from `ttx_unknown` returns itself for further
-// routes.
+// Unknown marks an undetermined result in graph traversal. Every further route
+// returns the same Unknown result. A chain preserves the outcome independently
+// of which step reached it. Binding this policy supplies its Abstract.
+// `ttx_unknown` provides a shared implementation.
 //
 // To try again, the consumer resolves the same route on the original Abstract.
 // The provider evaluates that new request under its current policy.

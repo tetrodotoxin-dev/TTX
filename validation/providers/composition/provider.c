@@ -13,10 +13,10 @@
 #include "ttx/data/transfer.h"
 
 static const ttx_abstract_ops abstract_operations;
-static const ttx_borrowed_ops borrowed_operations;
-static const ttx_borrow_ops borrow_operations;
+static const ttx_retained_ops retained_operations;
+static const ttx_retain_ops retain_operations;
 static const expression_ops expression_operations;
-static const borrowed_expression_ops qualified_operations;
+static const retained_expression_ops qualified_operations;
 
 // Retained interfaces share one reference count. This assertion catches use
 // after their final release while discovery remains available.
@@ -38,7 +38,7 @@ static ttx_negotiation_status supports(void* context, perimortem_uuid id) {
   composition_subject* source = context;
   const composition_subject* subject = checked(source);
   if (is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW) ||
-      is(id, TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW) ||
+      is(id, TTX_RETAIN_ID_HIGH, TTX_RETAIN_ID_LOW) ||
       is(id, COMPOSITION_ID_HIGH, EXPRESSION_ID_LOW)) {
     return TTX_NEGOTIATION_SATISFIED;
   }
@@ -47,15 +47,15 @@ static ttx_negotiation_status supports(void* context, perimortem_uuid id) {
     return subject->state->additional;
   }
 
-  // Borrowed and Constant apply to the acquired expression. Discovery supports
-  // evaluation and Borrow, while this branch requires an existing acquisition.
+  // Retained and Constant apply to the acquired expression. Discovery supports
+  // evaluation and Retain, while this branch requires an existing acquisition.
   if (subject->acquired) {
-    if (is(id, TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW) ||
+    if (is(id, TTX_RETAINED_ID_HIGH, TTX_RETAINED_ID_LOW) ||
         is(id, TTX_CONSTANT_ID_HIGH, TTX_CONSTANT_ID_LOW)) {
       return TTX_NEGOTIATION_SATISFIED;
     }
 
-    if (is(id, COMPOSITION_ID_HIGH, BORROWED_EXPRESSION_ID_LOW)) {
+    if (is(id, COMPOSITION_ID_HIGH, RETAINED_EXPRESSION_ID_LOW)) {
       return subject->state->qualified ? TTX_NEGOTIATION_SATISFIED
                                        : TTX_NEGOTIATION_REJECTED;
     }
@@ -80,17 +80,17 @@ HIDDEN ttx_negotiation_status
 
   // Each bound record keeps this context and bind function. Further
   // negotiation therefore uses the same governing policy.
-  if (is(id, TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW)) {
-    ttx_borrow api = {source, &borrow_operations};
-    const ttx_storage input = {state->forms.borrow, (U8*)&api, sizeof(api)};
+  if (is(id, TTX_RETAIN_ID_HIGH, TTX_RETAIN_ID_LOW)) {
+    ttx_retain api = {source, &retain_operations};
+    const ttx_storage input = {state->forms.retain, (U8*)&api, sizeof(api)};
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_NEGOTIATION_SATISFIED
                : TTX_NEGOTIATION_REJECTED;
   }
 
-  if (is(id, TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW)) {
-    ttx_borrowed api = {source, &borrowed_operations};
-    const ttx_storage input = {state->forms.borrowed, (U8*)&api, sizeof(api)};
+  if (is(id, TTX_RETAINED_ID_HIGH, TTX_RETAINED_ID_LOW)) {
+    ttx_retained api = {source, &retained_operations};
+    const ttx_storage input = {state->forms.retained, (U8*)&api, sizeof(api)};
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_NEGOTIATION_SATISFIED
                : TTX_NEGOTIATION_REJECTED;
@@ -104,8 +104,8 @@ HIDDEN ttx_negotiation_status
                : TTX_NEGOTIATION_REJECTED;
   }
 
-  if (is(id, COMPOSITION_ID_HIGH, BORROWED_EXPRESSION_ID_LOW)) {
-    borrowed_expression api = {source, &qualified_operations};
+  if (is(id, COMPOSITION_ID_HIGH, RETAINED_EXPRESSION_ID_LOW)) {
+    retained_expression api = {source, &qualified_operations};
     const ttx_storage input = {state->forms.qualified, (U8*)&api, sizeof(api)};
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_NEGOTIATION_SATISFIED
@@ -164,38 +164,38 @@ static void release(void* context) {
   ++subject->state->releases;
 }
 
-static ttx_negotiation_status borrow(void* context, ttx_borrowed* output) {
+static ttx_negotiation_status retain(void* context, ttx_retained* output) {
   composition_subject* source = context;
   composition_state* state = checked(source)->state;
 
-  // Overlapping borrows share one snapshot. Capture again only after every
-  // earlier borrow has been released.
+  // Overlapping retains share one snapshot. Capture again only after every
+  // earlier retain has been released.
   if (!state->references) {
     state->snapshot = state->value;
   }
 
   ++state->references;
   ++state->acquisitions;
-  *output = (ttx_borrowed){&state->retained, &borrowed_operations};
+  *output = (ttx_retained){&state->retained, &retained_operations};
   return TTX_NEGOTIATION_SATISFIED;
 }
 
 static const ttx_abstract_ops abstract_operations = {
   supports, composition_bind, data, resolve, lookup, visit};
 
-static const ttx_borrowed_ops borrowed_operations = {
+static const ttx_retained_ops retained_operations = {
   {supports, composition_bind, data, resolve, lookup, visit},
   release};
 
-static const ttx_borrow_ops borrow_operations = {
+static const ttx_retain_ops retain_operations = {
   {supports, composition_bind, data, resolve, lookup, visit},
-  borrow};
+  retain};
 
 static const expression_ops expression_operations = {
   composition_evaluate,
   {supports, composition_bind, data, resolve, lookup, visit}};
 
-static const borrowed_expression_ops qualified_operations = {
+static const retained_expression_ops qualified_operations = {
   composition_evaluate,
   {{supports, composition_bind, data, resolve, lookup, visit}, release}};
 
@@ -212,13 +212,13 @@ ttx_abstract composition_open(
 C_LINKAGE EXPORTED(TTX_TEST)
 ttx_negotiation_status composition_acquire(
     composition_state* state,
-    borrowed_expression* output) {
+    retained_expression* output) {
   if (!state->qualified) {
     return TTX_NEGOTIATION_REJECTED;
   }
 
-  ttx_borrowed acquired;
-  borrow(&state->weak, &acquired);
-  *output = (borrowed_expression){acquired.context, &qualified_operations};
+  ttx_retained acquired;
+  retain(&state->weak, &acquired);
+  *output = (retained_expression){acquired.context, &qualified_operations};
   return TTX_NEGOTIATION_SATISFIED;
 }

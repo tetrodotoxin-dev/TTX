@@ -4,11 +4,11 @@
 #ifndef VALIDATION_CONCEPT_COMPOSITION_H
 #define VALIDATION_CONCEPT_COMPOSITION_H
 
-#include "ttx/concept/capabilities/borrow.h"
+#include "ttx/concept/capabilities/retain.h"
 
 #define COMPOSITION_ID_HIGH 0x51e5f3f94e93471fULL
 #define EXPRESSION_ID_LOW 0xbb18658950679f12ULL
-#define BORROWED_EXPRESSION_ID_LOW 0xa9dd0343163941d9ULL
+#define RETAINED_EXPRESSION_ID_LOW 0xa9dd0343163941d9ULL
 #define ADDITIONAL_ID_LOW 0xb14106da734161a3ULL
 
 typedef struct expression {
@@ -21,15 +21,15 @@ typedef struct expression_ops {
   ttx_abstract_ops abstract;
 } expression_ops;
 
-typedef struct borrowed_expression {
+typedef struct retained_expression {
   void* context;
-  const struct borrowed_expression_ops* operations;
-} borrowed_expression;
+  const struct retained_expression_ops* operations;
+} retained_expression;
 
-typedef struct borrowed_expression_ops {
+typedef struct retained_expression_ops {
   U64 (*evaluate)(void*);
-  ttx_borrowed_ops borrowed;
-} borrowed_expression_ops;
+  ttx_retained_ops retained;
+} retained_expression_ops;
 
 typedef struct composition_subject {
   struct composition_state* state;
@@ -38,8 +38,8 @@ typedef struct composition_subject {
 
 typedef struct composition_forms {
   const ttx_representation* abstract;
-  const ttx_representation* borrow;
-  const ttx_representation* borrowed;
+  const ttx_representation* retain;
+  const ttx_representation* retained;
   const ttx_representation* expression;
   const ttx_representation* qualified;
 } composition_forms;
@@ -56,5 +56,5 @@ typedef struct composition_state {
 typedef ttx_abstract (
     *composition_open_function)(composition_state*, composition_forms);
 typedef ttx_negotiation_status (
-    *composition_acquire_function)(composition_state*, borrowed_expression*);
+    *composition_acquire_function)(composition_state*, retained_expression*);
 #endif

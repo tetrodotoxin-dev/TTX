@@ -13,8 +13,8 @@
 // Representations describe the buffers passed to `invoke`.
 //
 // The caller supplies accessible, correctly sized and aligned buffers matching
-// those Representations. The provider borrows them until the synchronous call
-// returns. The consumer uses output after TTX_DATA_SUCCESS. The operation's
+// those Representations. The provider uses them only during the synchronous
+// call. The consumer uses output after TTX_DATA_SUCCESS. The operation's
 // contract defines any other effects and any aliasing it permits.
 //
 // The supplying contract keeps context, Representations and executable code

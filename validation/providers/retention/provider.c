@@ -6,8 +6,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "ttx/concept/capabilities/borrow.h"
 #include "ttx/concept/capabilities/callable.h"
+#include "ttx/concept/capabilities/retain.h"
 #include "ttx/concept/policies/none.h"
 #include "ttx/concept/policies/unknown.h"
 #include "ttx/data/transfer.h"
@@ -18,16 +18,16 @@ static const perimortem_uuid increment_id = {
   0x75a9a5de1b164e82ULL, 0x823e42db676680acULL};
 
 static retention_statistics observed;
-static ttx_negotiation_status creation_status, borrowing_status;
+static ttx_negotiation_status creation_status, retention_status;
 static const ttx_representation* integer_form;
-static const ttx_borrow_ops temporary_operations, retained_borrow_operations;
-static const ttx_borrowed_ops retained_operations;
+static const ttx_retain_ops temporary_operations, retained_retain_operations;
+static const ttx_retained_ops retained_operations;
 static const ttx_callable_operations callable_operations;
 static const ttx_create_ops factory_operations;
 
-// The creation callback receives a stack value. Borrow substitutes separately
-// allocated state with a different layout. Its operations interpret that new
-// context through the same requested contract.
+// The creation callback receives a temporary_value on the stack. `retain`
+// copies its value into an allocated retained_value with a reference count.
+// The returned operations use that retained_value as their context.
 typedef struct temporary_value {
   U64 initial;
 } temporary_value;
@@ -66,17 +66,17 @@ static ttx_negotiation_status temporary_supports(
     perimortem_uuid id) {
   (void)context;
   return is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW) ||
-                 is(id, TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW)
+                 is(id, TTX_RETAIN_ID_HIGH, TTX_RETAIN_ID_LOW)
              ? TTX_NEGOTIATION_SATISFIED
              : TTX_NEGOTIATION_UNKNOWN;
 }
 
 static ttx_negotiation_status
     temporary_bind(void* context, perimortem_uuid id, ttx_storage target) {
-  if (is(id, TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW)) {
-    ttx_borrow api = {context, &temporary_operations};
+  if (is(id, TTX_RETAIN_ID_HIGH, TTX_RETAIN_ID_LOW)) {
+    ttx_retain api = {context, &temporary_operations};
     const ttx_storage input = {
-      ttx_borrow_representation(), (U8*)&api, sizeof(api)};
+      ttx_retain_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_NEGOTIATION_SATISFIED
@@ -105,7 +105,7 @@ static ttx_negotiation_status retained_supports(
     perimortem_uuid id) {
   (void)context;
   return temporary_supports(context, id) == TTX_NEGOTIATION_SATISFIED ||
-                 is(id, TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW) ||
+                 is(id, TTX_RETAINED_ID_HIGH, TTX_RETAINED_ID_LOW) ||
                  is(id, TTX_CALLABLE_ID_HIGH, TTX_CALLABLE_ID_LOW) ||
                  is(id, increment_id.high, increment_id.low)
              ? TTX_NEGOTIATION_SATISFIED
@@ -129,20 +129,20 @@ HIDDEN ttx_data_status
 
 static ttx_negotiation_status
     retained_bind(void* context, perimortem_uuid id, ttx_storage target) {
-  if (is(id, TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW)) {
-    ttx_borrow api = {context, &retained_borrow_operations};
+  if (is(id, TTX_RETAIN_ID_HIGH, TTX_RETAIN_ID_LOW)) {
+    ttx_retain api = {context, &retained_retain_operations};
     const ttx_storage input = {
-      ttx_borrow_representation(), (U8*)&api, sizeof(api)};
+      ttx_retain_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_NEGOTIATION_SATISFIED
                : TTX_NEGOTIATION_REJECTED;
   }
 
-  if (is(id, TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW)) {
-    ttx_borrowed api = {context, &retained_operations};
+  if (is(id, TTX_RETAINED_ID_HIGH, TTX_RETAINED_ID_LOW)) {
+    ttx_retained api = {context, &retained_operations};
     const ttx_storage input = {
-      ttx_borrowed_representation(), (U8*)&api, sizeof(api)};
+      ttx_retained_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
                ? TTX_NEGOTIATION_SATISFIED
@@ -184,19 +184,19 @@ static ttx_negotiation_status
   return TTX_NEGOTIATION_UNKNOWN;
 }
 
-static ttx_negotiation_status acquire(void* context, ttx_borrowed* output) {
+static ttx_negotiation_status acquire(void* context, ttx_retained* output) {
   retained_value* value = context;
   ++value->references;
   ++observed.acquisitions;
-  *output = (ttx_borrowed){value, &retained_operations};
+  *output = (ttx_retained){value, &retained_operations};
   return TTX_NEGOTIATION_SATISFIED;
 }
 
-static ttx_negotiation_status borrow_temporary(
+static ttx_negotiation_status retain_temporary(
     void* context,
-    ttx_borrowed* output) {
-  if (borrowing_status != TTX_NEGOTIATION_SATISFIED) {
-    return borrowing_status;
+    ttx_retained* output) {
+  if (retention_status != TTX_NEGOTIATION_SATISFIED) {
+    return retention_status;
   }
 
   const temporary_value* initial = context;
@@ -290,15 +290,15 @@ static ttx_negotiation_status create(
   return TTX_NEGOTIATION_SATISFIED;
 }
 
-static const ttx_borrow_ops temporary_operations = {
+static const ttx_retain_ops temporary_operations = {
   {temporary_supports, temporary_bind, data, temporary_abstract, lookup, visit},
-  borrow_temporary};
+  retain_temporary};
 
-static const ttx_borrowed_ops retained_operations = {
+static const ttx_retained_ops retained_operations = {
   {retained_supports, retained_bind, data, retained_abstract, lookup, visit},
   release};
 
-static const ttx_borrow_ops retained_borrow_operations = {
+static const ttx_retain_ops retained_retain_operations = {
   {retained_supports, retained_bind, data, retained_abstract, lookup, visit},
   acquire};
 
@@ -316,11 +316,11 @@ static retention_statistics statistics(void) {
 
 static void configure(
     ttx_negotiation_status creation,
-    ttx_negotiation_status borrowing) {
+    ttx_negotiation_status retention) {
   assert(observed.live == 0);
   observed = (retention_statistics){0};
   creation_status = creation;
-  borrowing_status = borrowing;
+  retention_status = retention;
 }
 
 retention_fixture retention_provider_open(void) {

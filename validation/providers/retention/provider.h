@@ -22,7 +22,7 @@ typedef struct retention_fixture {
   retention_statistics (*statistics)(void);
   void (*configure)(
       ttx_negotiation_status creation,
-      ttx_negotiation_status borrowing);
+      ttx_negotiation_status retention);
 } retention_fixture;
 
 C_LINKAGE EXPORTED(TTX_TEST)

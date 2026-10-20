@@ -85,7 +85,7 @@ VALIDATION_TEST(TtxCompiled, primitive_bytes) {
           representation.get_bytes().get_data(), expected.get_data(),
           sizeof(expected)));
 
-  // A borrowed canonical form must also be usable for observation. This checks
+  // Navigation also reads canonical bytes supplied by the caller. This checks
   // the literal distance against the current format rather than merely
   // comparing two copies of the same byte array.
   Form::Representation(expected.get_data(), sizeof(expected))

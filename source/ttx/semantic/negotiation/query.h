@@ -43,11 +43,11 @@
 // establishes that member's layout, while using its enclosing record requires
 // agreement on the enclosing representation.
 //
-// The destination is borrowed until `bind` returns. The supplying contracts
-// keep referenced state, descriptions and executable code accessible through
-// every permitted use. Copying an API record preserves that access duration.
-// Retention, release, invalidation and reload belong to the interfaces that
-// explicitly provide those guarantees.
+// The caller keeps the destination writable until `bind` returns. The supplying
+// contracts keep referenced state, descriptions and executable code accessible
+// through every permitted use. Copying an API record preserves that access
+// duration. Retention, release, invalidation and reload belong to the
+// interfaces that explicitly provide those guarantees.
 typedef struct ttx_semantic_query {
   void* context;
   ttx_negotiation_status (

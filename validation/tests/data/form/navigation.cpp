@@ -239,9 +239,9 @@ VALIDATION_TEST(TtxNavigation, shared_body_access) {
   EXPECT_EQ(seen, Count(9));
 }
 
-// The callback is compiled as C and borrows its state only for this call. A
-// failure after two observations prevents a third, while a later call starts
-// a fresh walk over the same borrowed descriptor.
+// The C callback uses state supplied for this call. A failure after two
+// observations prevents a third, while a later call starts a fresh walk over
+// the same descriptor bytes.
 VALIDATION_TEST(TtxNavigation, c_streaming_visit) {
   Preparation prepare;
   const auto& representation =

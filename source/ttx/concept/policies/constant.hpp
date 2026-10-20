@@ -14,7 +14,7 @@ namespace Ttx::Concept::Policies {
 //
 // The governing Abstract preserves this policy through further negotiation.
 // Storage and executable code remain available through the supplying access
-// contract. An acquired Borrowed result carries its separate release
+// contract. An acquired Retained result carries its separate release
 // obligation.
 class Constant {
  public:

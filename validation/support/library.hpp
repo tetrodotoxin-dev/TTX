@@ -9,7 +9,7 @@
 namespace Validation::Support {
 
 // Provider libraries live in validation/providers relative to the runner.
-// Keep each Library alive through every borrowed operation and report fixture
+// Keep each Library alive through every supplied operation and report fixture
 // failures at their source.
 auto library_path(Perimortem::Core::View::Bytes name)
     -> Perimortem::Memory::Thread::Bytes;

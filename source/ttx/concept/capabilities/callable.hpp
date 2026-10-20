@@ -20,8 +20,8 @@ namespace Ttx::Concept::Capabilities {
 // the frame. This lets values sharing a storage format expose different
 // contracts.
 //
-// Description and Frame copy their records while borrowing the referenced
-// Representations, field arrays and Abstracts from the supplying observation.
+// Description and Frame copy their records. Their Representations, field
+// arrays and Abstracts remain accessible for the supplying observation.
 // A consumer keeping those observations copies their data or negotiates the
 // retention it needs. An Unknown failure leaves the description undetermined.
 // Rejected explicitly refuses it.

@@ -20,6 +20,152 @@ static Harness Sentinels = {
   .name = "TTX::Sentinels",
 };
 
+// RouteProvider publishes one route to an independently supplied Abstract.
+// Its UUID requests stay Unknown, allowing the tests to verify that traversal
+// reaches the next provider using only the published Abstract operations.
+struct RouteProvider {
+  View::Bytes route;
+  ttx_abstract selected;
+  Count resolutions = 0;
+  Count negotiations = 0;
+
+  auto get_abi() -> ttx_abstract {
+    static const ttx_abstract_ops operations = {supports, bind,   data,
+                                                resolve,  lookup, visit};
+
+    return ttx_abstract(this, &operations);
+  }
+
+  static auto supports(void* context, perimortem_uuid contract)
+      -> ttx_negotiation_status {
+    ++Data::cast<RouteProvider>(context)->negotiations;
+    return TTX_NEGOTIATION_UNKNOWN;
+  }
+
+  static auto bind(
+      void* context,
+      perimortem_uuid contract,
+      ttx_storage requested) -> ttx_negotiation_status {
+    ++Data::cast<RouteProvider>(context)->negotiations;
+    return TTX_NEGOTIATION_UNKNOWN;
+  }
+
+  static auto data(void* context) -> perimortem_view_bytes { return {}; }
+
+  static auto resolve(void* context) -> ttx_abstract {
+    return Data::cast<RouteProvider>(context)->get_abi();
+  }
+
+  static auto lookup(void* context, perimortem_view_bytes route)
+      -> ttx_abstract {
+    auto& provider = *Data::cast<RouteProvider>(context);
+    ++provider.resolutions;
+
+    return View::Bytes(route) == provider.route ? provider.selected
+                                                : ttx_none();
+  }
+
+  static auto visit(void* context, ttx_concept_visitor callback) -> void {
+    auto& provider = *Data::cast<RouteProvider>(context);
+    callback.callback(callback.context, provider.route, provider.selected);
+  }
+};
+
+// None and Unknown must return themselves for every route. Empty, binary and
+// named routes exercise continued traversal after a terminal is reached.
+// Visitation completes with zero callbacks.
+VALIDATION_TEST(Sentinels, terminal_routes) {
+  const Abstract terminals[] = {Abstract(ttx_none()), Abstract(ttx_unknown())};
+  const U8 binary_route[] = {7, 0, 9};
+
+  for (const auto terminal : terminals) {
+    EXPECT(terminal.resolve() == terminal);
+    EXPECT(
+        terminal.resolve_concept(View::Bytes())
+            .resolve_concept(View::Bytes(binary_route))
+            .resolve_concept("remaining"_view) == terminal);
+
+    Count visits = 0;
+    auto callback = [&](View::Bytes route, Abstract abstract) { ++visits; };
+    terminal.visit_concepts(Abstract::Visitor(callback));
+    EXPECT_EQ(visits, Count(0));
+  }
+}
+
+// The same chain reaches its terminal result when any one of its three routes
+// selects it. Only the final result is bound, so intermediate providers need
+// no knowledge of the UUID requested by the consumer.
+VALIDATION_TEST(Sentinels, terminal_entry_position) {
+  const Abstract terminals[] = {Abstract(ttx_none()), Abstract(ttx_unknown())};
+
+  for (const auto terminal : terminals) {
+    for (Count position = 0; position < 3; ++position) {
+      RouteProvider third{"c"_view, terminal.get_abi()};
+      RouteProvider second{"b"_view, third.get_abi()};
+      RouteProvider first{"a"_view, second.get_abi()};
+
+      if (position == 0) {
+        first.selected = terminal.get_abi();
+      } else if (position == 1) {
+        second.selected = terminal.get_abi();
+      }
+
+      const Abstract root(first.get_abi());
+      const auto abstract = root.resolve_concept("a"_view)
+                                .resolve_concept("b"_view)
+                                .resolve_concept("c"_view);
+      EXPECT(abstract == terminal);
+      EXPECT_EQ(
+          first.resolutions + second.resolutions + third.resolutions,
+          position + 1);
+      EXPECT_EQ(
+          first.negotiations + second.negotiations + third.negotiations,
+          Count(0));
+
+      Bool bound = False;
+      if (terminal == Abstract(ttx_none())) {
+        abstract.bind<Policies::None>().visit(
+            [&](Policies::None policy) {
+              bound = True;
+              EXPECT(Abstract(policy.get_abi()) == terminal);
+            },
+
+            [&](Negotiation::Status status) { EXPECT(False); });
+      } else {
+        abstract.bind<Policies::Unknown>().visit(
+            [&](Policies::Unknown policy) {
+              bound = True;
+              EXPECT(Abstract(policy.get_abi()) == terminal);
+            },
+
+            [&](Negotiation::Status status) { EXPECT(False); });
+      }
+
+      EXPECT(bound);
+    }
+  }
+}
+
+// A fresh request observes the original provider's new selection. The earlier
+// Unknown remains terminal even after the original route becomes available.
+VALIDATION_TEST(Sentinels, retry_original_route) {
+  RouteProvider available{"child"_view, ttx_none()};
+  RouteProvider provider{"selected"_view, ttx_unknown()};
+  const Abstract root(provider.get_abi());
+  const auto first = root.resolve_concept("selected"_view);
+  EXPECT(first == Abstract(ttx_unknown()));
+
+  provider.selected = available.get_abi();
+
+  const auto second = root.resolve_concept("selected"_view);
+  EXPECT(second == Abstract(available.get_abi()));
+  EXPECT(second.resolve_concept("child"_view) == Abstract(ttx_none()));
+  EXPECT(first.resolve_concept("child"_view) == first);
+  EXPECT_EQ(provider.resolutions, Count(2));
+  EXPECT_EQ(provider.negotiations, Count(0));
+  EXPECT_EQ(available.negotiations, Count(0));
+}
+
 // Support queries report policy status without binding an API. Unknown
 // establishes its own contract while leaving Constant undetermined.
 VALIDATION_TEST(Sentinels, support_properties) {

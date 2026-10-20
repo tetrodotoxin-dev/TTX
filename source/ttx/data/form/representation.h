@@ -134,8 +134,9 @@ ttx_data_status ttx_representation_visit(
     const ttx_representation* source,
     ttx_representation_visitor visitor);
 
-// The coordinates are a borrowed, strictly increasing selection of primitive
-// starts. Unselected repetitions consume no callbacks or expanded inventory.
+// Coordinates select primitive starts in strictly increasing order. The caller
+// keeps the coordinate array readable until visitation returns. Unselected
+// repetitions consume no callbacks or expanded inventory.
 C_LINKAGE EXPORTED(TTX)
 ttx_data_status ttx_representation_visit_selected(
     const ttx_representation* source,

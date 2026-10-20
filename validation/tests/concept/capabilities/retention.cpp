@@ -7,9 +7,9 @@
 #include "perimortem/core/view/null_terminated.hpp"
 #include "perimortem/memory/allocator/arena.hpp"
 
-#include "ttx/concept/capabilities/borrow.hpp"
 #include "ttx/concept/capabilities/callable.hpp"
 #include "ttx/concept/capabilities/create.hpp"
+#include "ttx/concept/capabilities/retain.hpp"
 #include "ttx/concept/policies/none.hpp"
 #include "ttx/semantic/realization/invocation.h"
 #include "validation/providers/retention/provider.h"
@@ -35,9 +35,9 @@ class ForeignRetention {
           "retention_provider_open"_view))();
 };
 
-// The creation callback ends before any operation is bound or called. Only
-// the negotiated Borrowed contract carries access across that boundary.
-VALIDATION_TEST(Retention, create_borrow_invoke_release) {
+// The increment operation is bound and called after the creation callback
+// returns. The retained Abstract must still describe and bind that operation.
+VALIDATION_TEST(Retention, create_retain_invoke_release) {
   ForeignRetention foreign;
   Allocator::Arena errors;
   foreign.library.symbol("retention_invoke"_view, errors)
@@ -49,14 +49,14 @@ VALIDATION_TEST(Retention, create_borrow_invoke_release) {
       Negotiation::Status::Satisfied);
   EXPECT_EQ(foreign.api.statistics().callbacks, Count(0));
 
-  Storage::Option<Policies::Borrowed> retained;
+  Storage::Option<Policies::Retained> retained;
   auto callback = [&](Abstract created) {
     EXPECT_EQ(foreign.api.statistics().inside_callback, U8(1));
-    created.bind<Capabilities::Borrow>().visit(
-        [&](Capabilities::Borrow borrow) {
+    created.bind<Capabilities::Retain>().visit(
+        [&](Capabilities::Retain request) {
           EXPECT_EQ(foreign.api.statistics().acquisitions, Count(0));
-          borrow.borrow().visit(
-              [&](Policies::Borrowed outcome) {
+          request.retain().visit(
+              [&](Policies::Retained outcome) {
                 EXPECT(outcome.get_abi().context != created.get_abi().context);
                 retained = outcome;
               },
@@ -82,14 +82,14 @@ VALIDATION_TEST(Retention, create_borrow_invoke_release) {
   EXPECT_EQ(foreign.api.statistics().inside_callback, U8(0));
   EXPECT_EQ(foreign.api.statistics().live, Count(1));
 
-  // After the creation callback ends, the consumer copies the Borrowed record
+  // After the creation callback ends, the consumer copies the Retained record
   // and binds Callable through it. The provider keeps the operation callable
   // through those interfaces until release. They share the original
   // acquisition and its single release obligation.
   retained.visit(
-      [&](Policies::Borrowed copied) {
-        copied.get_abstract().bind<Policies::Borrowed>().visit(
-            [&](Policies::Borrowed view) {
+      [&](Policies::Retained copied) {
+        copied.get_abstract().bind<Policies::Retained>().visit(
+            [&](Policies::Retained view) {
               EXPECT(
                   view.get_abstract().supports<Capabilities::Callable>() ==
                   Negotiation::Status::Satisfied);
@@ -101,7 +101,7 @@ VALIDATION_TEST(Retention, create_borrow_invoke_release) {
         copied.get_abstract().bind<Capabilities::Callable>().visit(
             [&](Capabilities::Callable callable) {
               EXPECT(
-                  callable.get_abstract().supports<Policies::Borrowed>() ==
+                  callable.get_abstract().supports<Policies::Retained>() ==
                   Negotiation::Status::Satisfied);
               callable.describe().visit(
                   [&](Capabilities::Callable::Description description) {
@@ -152,14 +152,14 @@ VALIDATION_TEST(Retention, create_borrow_invoke_release) {
 
             [&](Negotiation::Status) { EXPECT(False); });
 
-        // A second Borrow creates its own obligation even when it returns the
-        // same context. After releasing the first, only the second acquisition
-        // is used.
-        Storage::Option<Policies::Borrowed> second;
-        copied.get_abstract().bind<Capabilities::Borrow>().visit(
-            [&](Capabilities::Borrow borrow) {
-              borrow.borrow().visit(
-                  [&](Policies::Borrowed outcome) { second = outcome; },
+        // A second `retain` call creates its own release obligation even when
+        // both Retained results use the same context. After releasing the first
+        // result, the consumer uses only the second.
+        Storage::Option<Policies::Retained> second;
+        copied.get_abstract().bind<Capabilities::Retain>().visit(
+            [&](Capabilities::Retain request) {
+              request.retain().visit(
+                  [&](Policies::Retained outcome) { second = outcome; },
                   [&](Negotiation::Status) { EXPECT(False); });
             },
 
@@ -169,7 +169,7 @@ VALIDATION_TEST(Retention, create_borrow_invoke_release) {
         copied.release();
 
         second.visit(
-            [&](Policies::Borrowed acquired) {
+            [&](Policies::Retained acquired) {
               EXPECT_EQ(foreign.api.statistics().live, Count(1));
               EXPECT(
                   acquired.get_abstract().supports<Capabilities::Callable>() ==
@@ -211,10 +211,10 @@ VALIDATION_TEST(Retention, refused_creation_and_retention) {
     foreign.api.configure(TTX_NEGOTIATION_SATISFIED, failure);
 
     auto callback = [&](Abstract created) {
-      created.bind<Capabilities::Borrow>().visit(
-          [&](Capabilities::Borrow borrow) {
-            borrow.borrow().visit(
-                [&](Policies::Borrowed outcome) {
+      created.bind<Capabilities::Retain>().visit(
+          [&](Capabilities::Retain request) {
+            request.retain().visit(
+                [&](Policies::Retained outcome) {
                   EXPECT(False);
                   outcome.release();
                 },

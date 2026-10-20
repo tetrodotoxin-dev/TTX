@@ -161,12 +161,10 @@ typedef struct ttx_schema_primitive {
   U8 byte_order;
 } ttx_schema_primitive;
 
-// Providers need to describe their data representation without deciding how
-// every consumer will navigate it. Schema supplies that source vocabulary,
-// including explicit offsets, repetition distances and padding. Compilation
-// establishes the concrete geometry that transports borrow through a
-// Representation. The source can then be discarded independently of that
-// result.
+// Schema describes data layouts and callable signatures for compilation.
+// Field offsets, repetition distances and padding describe where values are
+// stored. Compilation produces a canonical form that Representation can
+// compare and navigate independently of the source Schema.
 //
 // Composite preserves a real object boundary around its physical elements.
 // Range describes repetition with an element, count and distance. A repeated

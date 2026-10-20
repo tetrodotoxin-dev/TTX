@@ -8,9 +8,9 @@
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/concept/capabilities/borrow.hpp"
 #include "ttx/concept/capabilities/export.hpp"
 #include "ttx/concept/capabilities/import.hpp"
+#include "ttx/concept/capabilities/retain.hpp"
 #include "ttx/concept/policies/constant.hpp"
 #include "ttx/concept/policies/none.hpp"
 #include "ttx/concept/policies/unknown.h"
@@ -298,7 +298,7 @@ VALIDATION_TEST(Conversion, scoped_input) {
   auto callback = [&](Abstract graph) {
     EXPECT(provider.observing);
     EXPECT(
-        graph.supports<Capabilities::Borrow>() == Negotiation::Status::Unknown);
+        graph.supports<Capabilities::Retain>() == Negotiation::Status::Unknown);
     copied = graph.get_data()[0];
     ++calls;
   };

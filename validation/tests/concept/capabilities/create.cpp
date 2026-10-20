@@ -7,7 +7,7 @@
 
 #include "perimortem/core/data.hpp"
 
-#include "ttx/concept/capabilities/borrow.hpp"
+#include "ttx/concept/capabilities/retain.hpp"
 #include "ttx/concept/policies/none.hpp"
 #include "ttx/concept/policies/unknown.h"
 #include "ttx/data/transfer.hpp"
@@ -136,7 +136,7 @@ VALIDATION_TEST(Creation, scoped_answer) {
       .visit(
           [&](Capabilities::Create create) {
             EXPECT(
-                create.get_abstract().supports<Capabilities::Borrow>() ==
+                create.get_abstract().supports<Capabilities::Retain>() ==
                 Negotiation::Status::Unknown);
 
             U8 copied = 0;
@@ -144,7 +144,7 @@ VALIDATION_TEST(Creation, scoped_answer) {
             auto callback = [&](Abstract subject) {
               EXPECT(provider.observing);
               EXPECT(
-                  subject.supports<Capabilities::Borrow>() ==
+                  subject.supports<Capabilities::Retain>() ==
                   Negotiation::Status::Unknown);
               copied = subject.get_data()[0];
               ++visits;

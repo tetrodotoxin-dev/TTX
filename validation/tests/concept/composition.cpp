@@ -9,7 +9,7 @@
 #include "perimortem/memory/allocator/arena.hpp"
 #include "perimortem/memory/allocator/bibliotheca.hpp"
 
-#include "ttx/concept/capabilities/borrow.hpp"
+#include "ttx/concept/capabilities/retain.hpp"
 #include "ttx/concept/policies/constant.hpp"
 #include "validation/providers/composition/provider.h"
 #include "validation/support/library.hpp"
@@ -31,13 +31,13 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(expression, context),
     TTX_DATA_MEMBER(expression, operations));
 TTX_DATA_RECORD(
-    borrowed_expression_ops,
-    TTX_DATA_MEMBER(borrowed_expression_ops, evaluate),
-    TTX_DATA_MEMBER(borrowed_expression_ops, borrowed));
+    retained_expression_ops,
+    TTX_DATA_MEMBER(retained_expression_ops, evaluate),
+    TTX_DATA_MEMBER(retained_expression_ops, retained));
 TTX_DATA_RECORD(
-    borrowed_expression,
-    TTX_DATA_MEMBER(borrowed_expression, context),
-    TTX_DATA_MEMBER(borrowed_expression, operations));
+    retained_expression,
+    TTX_DATA_MEMBER(retained_expression, context),
+    TTX_DATA_MEMBER(retained_expression, operations));
 
 // These contracts place evaluation before the embedded Abstract table. Each
 // consumer keeps the complete negotiated record and selects that member
@@ -66,26 +66,26 @@ class Expression {
   Api api;
 };
 
-class BorrowedExpression {
+class RetainedExpression {
  public:
-  using Api = borrowed_expression;
+  using Api = retained_expression;
   static constexpr auto contract_id =
-      Formats::Uuid(COMPOSITION_ID_HIGH, BORROWED_EXPRESSION_ID_LOW);
+      Formats::Uuid(COMPOSITION_ID_HIGH, RETAINED_EXPRESSION_ID_LOW);
   static auto accept(Api api) -> Bool {
     return api.operations && api.operations->evaluate &&
-           Policies::Borrowed::accept({api.context, &api.operations->borrowed});
+           Policies::Retained::accept({api.context, &api.operations->retained});
   }
 
   // Copies an acquired C record under its original release obligation.
   // Explicit construction marks this unchecked conversion from the C record.
-  explicit BorrowedExpression(Api api) : api(api) {}
+  explicit RetainedExpression(Api api) : api(api) {}
 
-  auto get_borrowed() const -> Policies::Borrowed {
-    return Policies::Borrowed({api.context, &api.operations->borrowed});
+  auto get_retained() const -> Policies::Retained {
+    return Policies::Retained({api.context, &api.operations->retained});
   }
 
   auto get_abstract() const -> Abstract {
-    return get_borrowed().get_abstract();
+    return get_retained().get_abstract();
   }
 
   auto evaluate() const -> U64 { return api.operations->evaluate(api.context); }
@@ -126,26 +126,26 @@ VALIDATION_TEST(Composition, foreign_qualified_answer) {
       &Form::Compiled<
            Form::Native<Abstract::Api>::reference>::get_representation()
            .get_abi(),
-      &Form::Compiled<Form::Native<Capabilities::Borrow::Api>::reference>::
+      &Form::Compiled<Form::Native<Capabilities::Retain::Api>::reference>::
            get_representation()
                .get_abi(),
-      &Form::Compiled<Form::Native<Policies::Borrowed::Api>::reference>::
+      &Form::Compiled<Form::Native<Policies::Retained::Api>::reference>::
            get_representation()
                .get_abi(),
       &Form::Compiled<
            Form::Native<Expression::Api>::reference>::get_representation()
            .get_abi(),
-      &Form::Compiled<Form::Native<BorrowedExpression::Api>::reference>::
+      &Form::Compiled<Form::Native<RetainedExpression::Api>::reference>::
            get_representation()
                .get_abi());
   const Abstract weak(open(&state, forms));
   EXPECT(weak.supports<Expression>() == Negotiation::Status::Satisfied);
   EXPECT_EQ(state.acquisitions, U64(0));
 
-  borrowed_expression acquired = borrowed_expression();
+  retained_expression acquired = retained_expression();
   ASSERT(acquire(&state, &acquired) == TTX_NEGOTIATION_SATISFIED);
 
-  const BorrowedExpression answer(acquired);
+  const RetainedExpression answer(acquired);
   const auto count = state.binds;
   EXPECT_EQ(answer.evaluate(), U64(42));
   EXPECT_EQ(state.binds, count);
@@ -157,7 +157,7 @@ VALIDATION_TEST(Composition, foreign_qualified_answer) {
   answer.get_abstract().bind<Expression>().visit(
       [&](Expression expression) {
         EXPECT(
-            expression.get_abstract().supports<Policies::Borrowed>() ==
+            expression.get_abstract().supports<Policies::Retained>() ==
             Negotiation::Status::Satisfied);
         EXPECT(
             expression.get_abstract().supports(additional) ==
@@ -207,25 +207,25 @@ VALIDATION_TEST(Composition, foreign_qualified_answer) {
 
   state.qualified = 0;
   EXPECT(
-      answer.get_abstract().supports<Policies::Borrowed>() ==
+      answer.get_abstract().supports<Policies::Retained>() ==
       Negotiation::Status::Satisfied);
   EXPECT(
       answer.get_abstract().supports<Expression>() ==
       Negotiation::Status::Satisfied);
-  answer.get_abstract().bind<BorrowedExpression>().visit(
-      [&](BorrowedExpression) { EXPECT(False); },
+  answer.get_abstract().bind<RetainedExpression>().visit(
+      [&](RetainedExpression) { EXPECT(False); },
       [&](Negotiation::Status failure) {
         EXPECT(failure == Negotiation::Status::Rejected);
       });
 
-  answer.get_abstract().bind<Capabilities::Borrow>().visit(
-      [&](Capabilities::Borrow request) {
-        request.borrow().visit(
-            [&](Policies::Borrowed second) {
+  answer.get_abstract().bind<Capabilities::Retain>().visit(
+      [&](Capabilities::Retain request) {
+        request.retain().visit(
+            [&](Policies::Retained second) {
               EXPECT_EQ(
                   second.get_abstract().get_abi().context,
                   answer.get_abstract().get_abi().context);
-              answer.get_borrowed().release();
+              answer.get_retained().release();
               EXPECT_EQ(state.references, U64(1));
               EXPECT(
                   second.get_abstract().supports<Expression>() ==

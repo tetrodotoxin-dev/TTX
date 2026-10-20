@@ -14,7 +14,7 @@ namespace Ttx::Data::Form {
 // parameter type, while a variadic signature describes only its fixed prefix.
 // The argument records and their referenced schemas remain available and
 // unchanged through compilation. Copying Callable copies the C record and
-// continues to borrow those arrays.
+// continues to reference those same arrays.
 class Callable {
  public:
   enum class Convention : U32 {

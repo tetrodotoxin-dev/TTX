@@ -510,7 +510,7 @@ class Compiler {
     return choose_depth(limits);
   }
 
-  // The runtime view borrows the actual initialized content. Constant
+  // The runtime View reads the initialized content directly. Constant
   // evaluation cannot reinterpret an object pointer, so only that path copies
   // the same representation into byte storage for the existing byte hasher.
   static constexpr auto hash(ElementsView content) -> U64 {
