@@ -17,7 +17,8 @@ using namespace Ttx::Data;
 // each observation unless they also supply Constant.
 class NoneProvider {
  public:
-  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+  static auto supports(void* context, perimortem_uuid id)
+      -> ttx_negotiation_status {
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Policies::None::contract_id
@@ -38,7 +39,7 @@ class NoneProvider {
                : TTX_NEGOTIATION_REJECTED;
   }
 
-  static auto data(void*) -> perimortem_view_bytes {
+  static auto data(void* context) -> perimortem_view_bytes {
     const auto bytes = "None"_view;
     return perimortem_view_bytes(bytes.get_data(), bytes.get_size());
   }
@@ -47,11 +48,12 @@ class NoneProvider {
     return ttx_abstract(context, &operations);
   }
 
-  static auto route(void* context, perimortem_view_bytes) -> ttx_abstract {
+  static auto route(void* context, perimortem_view_bytes route)
+      -> ttx_abstract {
     return resolve(context);
   }
 
-  static auto visit(void*, ttx_concept_visitor) -> void {}
+  static auto visit(void* context, ttx_concept_visitor callback) -> void {}
 
   static constexpr ttx_abstract_ops operations = {supports, bind,  data,
                                                   resolve,  route, visit};

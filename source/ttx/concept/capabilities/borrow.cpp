@@ -9,8 +9,9 @@ using namespace Ttx::Data;
 using namespace Ttx::Semantic;
 
 C_LINKAGE auto ttx_borrow_representation() -> const ttx_representation* {
-  return &Form::Compiled<
-      Form::Native<Capabilities::Borrow::Api>::reference>::get_representation();
+  return &Form::Compiled<Form::Native<Capabilities::Borrow::Api>::reference>::
+              get_representation()
+                  .get_abi();
 }
 
 auto Capabilities::Borrow::borrow() const

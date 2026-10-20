@@ -55,7 +55,7 @@ VALIDATION_TEST(TtxCompiler, composite_and_range) {
   EXPECT(prepare(flat).compatible(prepare(range)));
   EXPECT(prepare(range).compatible(prepare(flat)));
 
-  auto changed = foreign_integer;
+  auto changed = foreign_integer.get_abi();
   changed.data.value.type = U8(Form::Schema::Value::R32);
 
   const auto incompatible = Form::Schema::range(changed, 4, 4, 16, 4);
@@ -83,7 +83,7 @@ VALIDATION_TEST(TtxCompiler, schema_validation) {
   entries[1].offset = 4;
   EXPECT(prepare.validate(shape) == Status::Success);
 
-  entries[0].reference = &shape;
+  entries[0].reference = {&shape.get_abi(), 0};
   EXPECT(prepare.validate(shape) == Status::Invalid);
 
   const auto huge = Form::Schema::range(integer, Count(-1), 4, Count(-1), 4);
@@ -134,7 +134,7 @@ VALIDATION_TEST(TtxCompiler, wide_composite) {
   EXPECT_EQ(prepared_left.get_bytes().get_size(), Count(513 * 8));
   prepared_right.next(2044).visit(
       [&](const Form::Representation::Position& position) {
-        EXPECT_EQ(position.offset, Count(2044));
+        EXPECT_EQ(position.get_offset(), Count(2044));
       },
 
       [&](Status) { EXPECT(false); });
@@ -154,21 +154,21 @@ VALIDATION_TEST(TtxCompiler, empty_equivalence) {
     },
   };
 
-  Storage::Vector<const Form::Representation*, 3> prepared = {
+  Storage::Vector<Form::Representation, 3> prepared = {
     {
-      &prepare(forms[0]),
-      &prepare(forms[1]),
-      &prepare(forms[2]),
+      prepare(forms[0]),
+      prepare(forms[1]),
+      prepare(forms[2]),
     },
   };
 
   for (Count source_index = 0; source_index < prepared.get_size();
        ++source_index) {
-    const auto* source = prepared[source_index];
+    const auto& source = prepared[source_index];
     for (Count destination_index = 0; destination_index < prepared.get_size();
          ++destination_index) {
-      const auto* destination = prepared[destination_index];
-      EXPECT(source->compatible(*destination));
+      const auto& destination = prepared[destination_index];
+      EXPECT(source.compatible(destination));
     }
   }
 }

@@ -15,10 +15,11 @@ using namespace Ttx::Data;
 
 template <>
 auto Form::Compiler<>::import_body(
-    const Form::Representation& form,
+    const ttx_representation& record,
     Count block,
     Bool callable,
     Indices& indices) -> Count {
+  const Form::Representation form(record);
   if (indices.get_data()[block]) {
     return indices.get_data()[block] - 1;
   }
@@ -62,7 +63,7 @@ auto Form::Compiler<>::import_body(
 
     if (entry.references()) {
       entry.type = import_body(
-          form, entry.type, entry.attributes & Element::Callable, indices);
+          record, entry.type, entry.attributes & Element::Callable, indices);
       if (entry.type == Unseen) {
         return Unseen;
       }
@@ -93,7 +94,7 @@ auto Form::Compiler<>::compose(
       return Status::Invalid;
     }
 
-    const auto& form = *member.representation;
+    const Form::Representation form(*member.representation);
     if (member.offset > size || form.get_extent() > size - member.offset) {
       return Status::Invalid;
     }
@@ -107,7 +108,8 @@ auto Form::Compiler<>::compose(
                   indices.resize(
                       form.get_bytes().get_size() / (4 * form.get_depth()));
 
-                  const Count id = import_body(form, 0, False, indices);
+                  const Count id =
+                      import_body(*member.representation, 0, False, indices);
                   imported.insert(form.get_bytes().get_data(), id);
                   return id;
                 });
@@ -144,7 +146,7 @@ static auto publish(
     ttx_representation_allocator allocator,
     const ttx_representation** result) -> ttx_data_status {
   const Count size = compiler.get_size();
-  if (size > Count(-1) - sizeof(Form::Representation)) {
+  if (size > Count(-1) - sizeof(ttx_representation)) {
     return TTX_DATA_OVERFLOW;
   }
 
@@ -152,23 +154,23 @@ static auto publish(
   // Representation record. Aligning the allocation and keeping the record's
   // size divisible by eight gives both parts eight byte alignment, including
   // on targets with four byte pointers.
-  static_assert(sizeof(Form::Representation) % 8 == 0);
+  static_assert(sizeof(ttx_representation) % 8 == 0);
   const Count alignment =
-      Math::Scalar::max(Count(8), Count(alignof(Form::Representation)));
+      Math::Scalar::max(Count(8), Count(alignof(ttx_representation)));
   auto* allocation = allocator.allocate(
-      allocator.context, sizeof(Form::Representation) + size, alignment);
+      allocator.context, sizeof(ttx_representation) + size, alignment);
   if (!allocation) {
     return TTX_DATA_BOUNDS;
   }
 
-  auto* bytes = Data::cast<U8>(allocation) + sizeof(Form::Representation);
+  auto* bytes = Data::cast<U8>(allocation) + sizeof(ttx_representation);
   const auto written = compiler.write(Access::Bytes(*bytes, size));
   if (written != Status::Success) {
     return ttx_data_status(written);
   }
 
-  *result = &Lifetime::construct<Form::Representation>(
-      allocation, [&] { return Form::Representation(bytes, size); });
+  *result = &Lifetime::construct<ttx_representation>(
+      allocation, [&] { return ttx_representation{bytes, size}; });
   return TTX_DATA_SUCCESS;
 }
 
@@ -180,7 +182,8 @@ auto ttx_representation_compile(
     Count pointer_size,
     ttx_representation_allocator allocator,
     const ttx_representation** result) -> ttx_data_status {
-  if (!schema.is_set() || !allocator.allocate || !result) {
+  if (!Form::Schema::Reference(schema).is_set() || !allocator.allocate ||
+      !result) {
     return TTX_DATA_INVALID;
   }
 

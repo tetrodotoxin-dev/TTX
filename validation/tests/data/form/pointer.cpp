@@ -50,7 +50,7 @@ VALIDATION_TEST(Pointers, reference_modifier) {
   const auto target = Form::Schema::composite({member, 1}, 4, 4);
   const Form::Schema::Reference direct(target);
   const auto indirect = Form::Schema::pointer(&target);
-  EXPECT(direct.schema == indirect.schema);
+  EXPECT(direct.get_abi().schema == indirect.get_abi().schema);
   EXPECT_NOT(direct.is_pointer());
   EXPECT(indirect.is_pointer());
 
@@ -76,7 +76,8 @@ VALIDATION_TEST(Pointers, reference_modifier) {
 
   Form::Compiler compiler;
   EXPECT(
-      compiler.compile(Form::Schema::Reference(&target, 2)) == Status::Invalid);
+      compiler.compile(Form::Schema::Reference(&target.get_abi(), 2)) ==
+      Status::Invalid);
 }
 
 VALIDATION_TEST(Pointers, opaque_spelling) {
@@ -172,9 +173,9 @@ VALIDATION_TEST(Pointers, recursive_callable) {
   Validation::DataTests::Preparation prepare;
   auto node =
       Form::Schema::composite(View::Vector<Form::Schema::Position>(), 8, 8);
-  const Form::Schema::Argument self(node);
-  const auto callback =
-      Form::Schema::callable(Form::Schema::Convention::SystemVAMD64, {self, 1});
+  const Form::Schema::Argument self(node, 1);
+  const auto callback = Form::Schema::callable(
+      Form::Callable::Convention::SystemVAMD64, {self, 1});
   const Form::Schema::Position field(callback, 0);
   node = Form::Schema::composite({field, 1}, 8, 8);
 
@@ -218,7 +219,7 @@ VALIDATION_TEST(Pointers, pointer_run) {
       ranged.visit(
           View::Vector<Count>(coordinate, 1),
           [&](Form::Representation::Position position) {
-            EXPECT_EQ(position.offset, coordinate);
+            EXPECT_EQ(position.get_offset(), coordinate);
             return Status::Success;
           }) == Status::Success);
 }
@@ -351,11 +352,11 @@ VALIDATION_TEST(Pointers, identical_geometry) {
 
 VALIDATION_TEST(Pointers, convention_agreement) {
   const auto function = Form::Schema::callable(
-      Form::Schema::Convention::EmscriptenWasm32, {}, scalar, 4);
+      Form::Callable::Convention::EmscriptenWasm32, {}, scalar, 4);
   Form::Compiler compiler;
   EXPECT(compiler.compile(function, 4) == Status::Success);
 
-  auto wrong = function;
+  auto wrong = function.get_abi();
   wrong.data.callable.convention = TTX_SCHEMA_SYSTEM_V_AMD64;
   EXPECT(compiler.compile(wrong, 4) == Status::Invalid);
 }
@@ -364,9 +365,9 @@ VALIDATION_TEST(Pointers, composed_pointers) {
   Allocator::Arena arena;
   const Storage::Vector<Form::Representation::Member, 2> members = {
     {
-      Form::Representation::Member(narrow_pointer, 0),
+      Form::Representation::Member(&narrow_pointer.get_abi(), 0),
       {
-        narrow_pointer,
+        &narrow_pointer.get_abi(),
         4,
       },
     },
@@ -391,9 +392,9 @@ VALIDATION_TEST(Pointers, composed_pointers) {
 
   const Storage::Vector<Form::Representation::Member, 2> mixed = {
     {
-      Form::Representation::Member(narrow_pointer, 0),
+      Form::Representation::Member(&narrow_pointer.get_abi(), 0),
       {
-        wide_pointer,
+        &wide_pointer.get_abi(),
         8,
       },
     },

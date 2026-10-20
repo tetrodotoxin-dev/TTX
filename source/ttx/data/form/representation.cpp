@@ -55,49 +55,56 @@ static auto next(
 }
 
 auto ttx_representation_compatible(
-    const Form::Representation* source,
-    const Form::Representation* destination) -> U8 {
-  return source && destination && source->compatible(*destination);
+    const ttx_representation* source,
+    const ttx_representation* destination) -> U8 {
+  return source && destination &&
+         Form::Representation(*source).compatible(*destination);
 }
 
 auto ttx_representation_next(
-    const Form::Representation* source,
+    const ttx_representation* source,
     Count offset,
-    Form::Representation::Position* result) -> ttx_data_status {
+    ttx_representation_position* result) -> ttx_data_status {
   if (!source || !result) {
     return TTX_DATA_INVALID;
   }
 
-  return next(*source, 0, 0, offset, *result) ? TTX_DATA_SUCCESS
-                                              : TTX_DATA_BOUNDS;
+  Form::Representation::Position position;
+  if (!next(*source, 0, 0, offset, position)) {
+    return TTX_DATA_BOUNDS;
+  }
+
+  *result = position.get_abi();
+  return TTX_DATA_SUCCESS;
 }
 
-auto ttx_representation::next(Count offset) const
+auto Form::Representation::next(Count offset) const
     -> Storage::Result<Position, Status> {
-  Position result;
-  const auto status = ttx_representation_next(this, offset, &result);
+  ttx_representation_position result;
+  const auto status = ttx_representation_next(&value, offset, &result);
   if (status != TTX_DATA_SUCCESS) {
     return Status(status);
   }
 
-  return result;
+  return Position(result);
 }
 
 auto ttx_representation_visit(
-    const Form::Representation* source,
+    const ttx_representation* source,
     ttx_representation_visitor visitor) -> ttx_data_status {
   if (!source || !visitor.visit) {
     return TTX_DATA_INVALID;
   }
 
   return ttx_data_status(
-      source->visit([&](Form::Representation::Position position) {
-        return Status(visitor.visit(visitor.context, position));
-      }));
+      Form::Representation(*source).visit(
+          [&](Form::Representation::Position position) {
+            return Status(visitor.visit(visitor.context, position.get_abi()));
+          }));
 }
 
 auto ttx_representation_visit_selected(
-    const Form::Representation* source,
+    const ttx_representation* source,
     const Count* coordinates,
     Count count,
     ttx_representation_visitor visitor) -> ttx_data_status {
@@ -108,22 +115,23 @@ auto ttx_representation_visit_selected(
   const auto coordinate_view = count
                                    ? View::Vector<Count>(coordinates[0], count)
                                    : View::Vector<Count>();
-  return ttx_data_status(source->visit(
-      coordinate_view, [&](Form::Representation::Position position) {
-        return Status(visitor.visit(visitor.context, position));
-      }));
+  return ttx_data_status(
+      Form::Representation(*source).visit(
+          coordinate_view, [&](Form::Representation::Position position) {
+            return Status(visitor.visit(visitor.context, position.get_abi()));
+          }));
 }
 
-static auto allocate_representation(void* context, Count bytes, Count)
+static auto allocate_representation(void* context, Count bytes, Count alignment)
     -> void* {
   auto& arena = *Data::cast<Allocator::Arena>(context);
   return arena.allocate(bytes).get_data();
 }
 
-auto ttx_representation::compile(
+auto Form::Representation::compile(
     ttx_schema_reference schema,
     Allocator::Arena& arena,
-    Count pointer_size) -> Storage::Result<const ttx_representation&, Status> {
+    Count pointer_size) -> Storage::Result<Form::Representation, Status> {
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&arena, allocate_representation);
   const ttx_representation* result = nullptr;
@@ -133,15 +141,14 @@ auto ttx_representation::compile(
     return Status(status);
   }
 
-  return *result;
+  return Form::Representation(*result);
 }
 
-auto ttx_representation::compose(
+auto Form::Representation::compose(
     View::Vector<Member> members,
     Count extent,
     Count alignment,
-    Allocator::Arena& arena)
-    -> Storage::Result<const ttx_representation&, Status> {
+    Allocator::Arena& arena) -> Storage::Result<Form::Representation, Status> {
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&arena, allocate_representation);
   const ttx_representation* result = nullptr;
@@ -152,5 +159,5 @@ auto ttx_representation::compose(
     return Status(status);
   }
 
-  return *result;
+  return Form::Representation(*result);
 }

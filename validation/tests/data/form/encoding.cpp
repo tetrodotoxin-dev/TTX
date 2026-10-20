@@ -258,7 +258,8 @@ VALIDATION_TEST(TtxEncoding, reference_promotion) {
   Storage::Vector<Form::Schema, 65> bodies;
   Storage::Vector<Form::Schema::Position, 65> fields;
   for (Count i = 0; i < 65; ++i) {
-    fields[i] = Form::Schema::Position(i ? &bodies[i - 1] : &byte, 0);
+    fields[i] = Form::Schema::Position(
+        {i ? &bodies[i - 1].get_abi() : &byte.get_abi(), 0}, 0);
     bodies[i] = Form::Schema::composite(
         View::Vector<Form::Schema::Position>(fields[i], 1), 1);
   }
@@ -407,7 +408,7 @@ VALIDATION_TEST(TtxEncoding, interleaved_runs) {
   Count seen = 0;
   const auto status =
       representation.visit([&](Form::Representation::Position position) {
-        EXPECT_EQ(position.offset, seen * 2);
+        EXPECT_EQ(position.get_offset(), seen * 2);
         ++seen;
         return Status::Success;
       });
@@ -484,7 +485,7 @@ VALIDATION_TEST(TtxEncoding, native_count_limit) {
   EXPECT_EQ(representation.get_bytes().get_size(), Count(64));
   representation.next(Count(-2)).visit(
       [&](Form::Representation::Position position) {
-        EXPECT_EQ(position.offset, Count(-2));
+        EXPECT_EQ(position.get_offset(), Count(-2));
       },
 
       [&](Status) { EXPECT(false); });
@@ -511,19 +512,22 @@ VALIDATION_TEST(TtxEncoding, final_allocation) {
 
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&allocation, Allocation::allocate);
-  const Form::Representation* output = nullptr;
-  auto invalid = integer;
+  const ttx_representation* output = nullptr;
+  auto invalid = integer.get_abi();
   invalid.data.value.type = 11;
 
   EXPECT(
-      ttx_representation_compile(&invalid, sizeof(void*), allocator, &output) ==
+      ttx_representation_compile(
+          {&invalid, 0}, sizeof(void*), allocator, &output) ==
       TTX_DATA_INVALID);
   EXPECT_EQ(allocation.allocations, Count(0));
   EXPECT(output == nullptr);
 
   ASSERT(
-      ttx_representation_compile(&integer, sizeof(void*), allocator, &output) ==
+      ttx_representation_compile(integer, sizeof(void*), allocator, &output) ==
       TTX_DATA_SUCCESS);
   EXPECT_EQ(allocation.allocations, Count(1));
-  EXPECT(output->compatible(Form::Compiled<integer>::get_representation()));
+  EXPECT(
+      Form::Representation(*output).compatible(
+          Form::Compiled<integer>::get_representation()));
 }

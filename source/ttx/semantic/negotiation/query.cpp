@@ -35,5 +35,6 @@ auto Negotiation::Query::bind(Formats::Uuid contract, Form::Storage requested)
 
 auto ttx_semantic_query_representation() -> const ttx_representation* {
   return &Form::Compiled<
-      Form::Native<ttx_semantic_query>::reference>::get_representation();
+              Form::Native<ttx_semantic_query>::reference>::get_representation()
+              .get_abi();
 }

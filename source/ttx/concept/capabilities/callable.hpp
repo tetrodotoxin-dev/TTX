@@ -64,7 +64,7 @@ class Callable {
     // storage, so conversion from the C record is explicit.
     explicit constexpr Frame(ttx_callable_frame frame) : frame(frame) {}
 
-    auto get_representation() const -> const Data::Form::Representation& {
+    auto get_representation() const -> Data::Form::Representation {
       return *frame.representation;
     }
 
@@ -98,7 +98,7 @@ class Callable {
       return Perimortem::Serialization::Formats::Uuid(description.contract);
     }
 
-    auto get_representation() const -> const Data::Form::Representation& {
+    auto get_representation() const -> Data::Form::Representation {
       return *description.api;
     }
 

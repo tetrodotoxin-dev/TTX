@@ -8,6 +8,7 @@ using namespace Ttx::Data;
 using namespace Ttx::Semantic;
 
 C_LINKAGE auto ttx_import_representation() -> const ttx_representation* {
-  return &Form::Compiled<
-      Form::Native<Capabilities::Import::Api>::reference>::get_representation();
+  return &Form::Compiled<Form::Native<Capabilities::Import::Api>::reference>::
+              get_representation()
+                  .get_abi();
 }

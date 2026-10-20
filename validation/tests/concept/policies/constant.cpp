@@ -27,7 +27,8 @@ struct Changing {
   ttx_abstract child;
   U8 value = 17;
 
-  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+  static auto supports(void* context, perimortem_uuid id)
+      -> ttx_negotiation_status {
     return Formats::Uuid(id) == Abstract::contract_id
                ? TTX_NEGOTIATION_SATISFIED
                : TTX_NEGOTIATION_UNKNOWN;
@@ -54,11 +55,12 @@ struct Changing {
     return {context, &operations};
   }
 
-  static auto lookup(void* context, perimortem_view_bytes) -> ttx_abstract {
+  static auto lookup(void* context, perimortem_view_bytes route)
+      -> ttx_abstract {
     return Data::cast<Changing>(context)->child;
   }
 
-  static auto visit(void*, ttx_concept_visitor) -> void {}
+  static auto visit(void* context, ttx_concept_visitor callback) -> void {}
 
   static constexpr ttx_abstract_ops operations = {supports, bind,   data,
                                                   resolve,  lookup, visit};

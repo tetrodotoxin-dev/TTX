@@ -56,7 +56,9 @@ class ForeignInvocation {
     const auto open = Data::cast<decltype(invocation_provider_open)>(
         Validation::Support::find_symbol(
             module, "invocation_provider_open"_view));
-    api = open(ttx_invocation_representation(), &input_form(), &output_form());
+    api = open(
+        ttx_invocation_representation(), &input_form().get_abi(),
+        &output_form().get_abi());
   }
 
   static auto input_form() -> const Form::Representation& {

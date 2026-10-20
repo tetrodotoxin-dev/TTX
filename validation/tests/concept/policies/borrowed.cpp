@@ -1,9 +1,11 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "toolchain/memory/lifetime.hpp"
 #include "toolchain/validation/test.hpp"
 
 #include "perimortem/core/data.hpp"
+#include "perimortem/memory/allocator/global.hpp"
 
 #include "ttx/concept/capabilities/borrow.hpp"
 #include "ttx/concept/capabilities/create.hpp"
@@ -13,7 +15,9 @@
 #include "ttx/data/transfer.hpp"
 
 using namespace Perimortem::Core;
+using namespace Perimortem::Memory;
 using namespace Perimortem::Serialization;
+using namespace Toolchain::Memory;
 using namespace Toolchain::Validation;
 using namespace Ttx::Concept;
 using namespace Ttx::Data;
@@ -38,7 +42,8 @@ class Retained {
     return {&subject.value, 1};
   }
 
-  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+  static auto supports(void* context, perimortem_uuid id)
+      -> ttx_negotiation_status {
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Policies::Borrowed::contract_id ||
@@ -92,11 +97,12 @@ class Retained {
     return {context, &abstract_operations};
   }
 
-  static auto lookup(void*, perimortem_view_bytes) -> ttx_abstract {
+  static auto lookup(void* context, perimortem_view_bytes route)
+      -> ttx_abstract {
     return ttx_unknown();
   }
 
-  static auto visit(void*, ttx_concept_visitor) -> void {}
+  static auto visit(void* context, ttx_concept_visitor callback) -> void {}
 
   static auto borrow(void* context, ttx_borrowed* output)
       -> ttx_negotiation_status {
@@ -122,7 +128,9 @@ class Retained {
     auto& subject = *Data::cast<Retained>(context);
     ++subject.counts.released;
     if (!--subject.references) {
-      delete &subject;
+      U8* storage = Data::cast<U8>(&subject);
+      subject.~Retained();
+      Allocator::Global::release(storage);
     }
   }
 
@@ -139,6 +147,8 @@ class Retained {
     abstract_operations, create};
 };
 
+static_assert(alignof(Retained) <= Allocator::Global::allocation_alignment);
+
 class Discovery {
  public:
   Observations& counts;
@@ -150,7 +160,8 @@ class Discovery {
     return {&subject.value, 1};
   }
 
-  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+  static auto supports(void* context, perimortem_uuid id)
+      -> ttx_negotiation_status {
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Borrow::contract_id
@@ -183,11 +194,12 @@ class Discovery {
     return {context, &operations.abstract};
   }
 
-  static auto lookup(void*, perimortem_view_bytes) -> ttx_abstract {
+  static auto lookup(void* context, perimortem_view_bytes route)
+      -> ttx_abstract {
     return ttx_unknown();
   }
 
-  static auto visit(void*, ttx_concept_visitor) -> void {}
+  static auto visit(void* context, ttx_concept_visitor callback) -> void {}
 
   static auto borrow(void* context, ttx_borrowed* output)
       -> ttx_negotiation_status {
@@ -197,9 +209,13 @@ class Discovery {
     }
 
     ++subject.counts.borrowed;
-    *output = {
-      new Retained(subject.counts, 1, subject.value),
-      &Retained::borrowed_operations};
+
+    const auto allocation = Allocator::Global::allocate(sizeof(Retained));
+    auto& retained = Lifetime::construct<Retained>(allocation.get_data(), [&] {
+      return Retained(subject.counts, 1, subject.value);
+    });
+
+    *output = {&retained, &Retained::borrowed_operations};
 
     return TTX_NEGOTIATION_SATISFIED;
   }

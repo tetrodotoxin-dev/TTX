@@ -82,7 +82,8 @@ VALIDATION_TEST(TtxCompiled, primitive_bytes) {
   ASSERT_EQ(representation.get_bytes().get_size(), sizeof(expected));
   EXPECT(
       Data::compare(
-          representation.data, expected.get_data(), sizeof(expected)));
+          representation.get_bytes().get_data(), expected.get_data(),
+          sizeof(expected)));
 
   // A borrowed canonical form must also be usable for observation. This checks
   // the literal distance against the current format rather than merely
@@ -91,7 +92,7 @@ VALIDATION_TEST(TtxCompiled, primitive_bytes) {
       .next(0)
       .visit(
           [&](Form::Representation::Position position) {
-            EXPECT_EQ(position.offset, Count(0));
+            EXPECT_EQ(position.get_offset(), Count(0));
             EXPECT(position.get_value() == Form::Schema::Value::U32);
             EXPECT_EQ(position.get_extent(), Count(4));
           },
@@ -106,7 +107,7 @@ VALIDATION_TEST(TtxCompiled, repeated_publication) {
   {
     auto source = integer;
     ASSERT(compiler.compile(source) == Status::Success);
-    source.data.value.type = TTX_SCHEMA_R64;
+    source = Form::Schema::primitive(Form::Schema::Value::R64);
   }
 
   Storage::Vector<U8, 8> first;

@@ -34,7 +34,7 @@ VALIDATION_TEST(TtxNavigation, range_coordinate) {
       .visit(
           [&](const Form::Representation::Position& answer) {
             EXPECT(answer.get_value() == integer.get_value());
-            EXPECT_EQ(answer.offset, Count(3999999996));
+            EXPECT_EQ(answer.get_offset(), Count(3999999996));
           },
 
           [&](Status) { EXPECT(false); });
@@ -74,7 +74,7 @@ VALIDATION_TEST(TtxNavigation, composite_coordinate) {
   prepared.next(24).visit(
       [&](const Form::Representation::Position& answer) {
         EXPECT(answer.get_value() == integer.get_value());
-        EXPECT_EQ(answer.offset, Count(24));
+        EXPECT_EQ(answer.get_offset(), Count(24));
       },
 
       [&](Status) { EXPECT(false); });
@@ -106,7 +106,7 @@ VALIDATION_TEST(TtxNavigation, padded_range_walk) {
         const auto expected =
             seen % 2 ? integer.get_value() : small.get_value();
         EXPECT(position.get_value() == expected);
-        EXPECT_EQ(position.offset, (seen / 2) * 16 + (seen % 2 ? 8 : 0));
+        EXPECT_EQ(position.get_offset(), (seen / 2) * 16 + (seen % 2 ? 8 : 0));
         ++seen;
         return Status::Success;
       });
@@ -136,13 +136,13 @@ VALIDATION_TEST(TtxNavigation, physical_coordinates) {
   const auto records = Form::Schema::range(record, 4, 16, 64, 4);
   const auto& prepared = prepare(records);
 
-  for (Count offset = 0; offset <= records.extent; ++offset) {
+  for (Count offset = 0; offset <= records.get_extent(); ++offset) {
     const Count local = offset % 16;
     const Count expected = offset - local + (!local ? 0 : local <= 8 ? 8 : 16);
     prepared.next(offset).visit(
         [&](const Form::Representation::Position& answer) {
           EXPECT(expected < 64);
-          EXPECT_EQ(answer.offset, expected);
+          EXPECT_EQ(answer.get_offset(), expected);
         },
 
         [&](Status status) {
@@ -164,9 +164,11 @@ VALIDATION_TEST(TtxNavigation, empty_and_invalid) {
       [&](auto) { EXPECT(false); },
       [&](Status status) { EXPECT(status == Status::Bounds); });
 
-  Form::Representation::Position answer;
+  ttx_representation_position answer;
   EXPECT(ttx_representation_next(nullptr, 0, &answer) == TTX_DATA_INVALID);
-  EXPECT(ttx_representation_next(&prepared, 0, nullptr) == TTX_DATA_INVALID);
+  EXPECT(
+      ttx_representation_next(&prepared.get_abi(), 0, nullptr) ==
+      TTX_DATA_INVALID);
 }
 
 // Deep nesting still accumulates each placement along the selected path. No
@@ -177,7 +179,7 @@ VALIDATION_TEST(TtxNavigation, deep_coordinate) {
   Storage::Vector<Form::Schema::Position, 256> entries;
   for (Count i = 0; i < 256; ++i) {
     entries[i] = {
-      i ? &layers[i - 1] : &integer,
+      {i ? &layers[i - 1].get_abi() : &integer.get_abi(), 0},
       4,
     };
 
@@ -189,7 +191,7 @@ VALIDATION_TEST(TtxNavigation, deep_coordinate) {
   prepared.next(0).visit(
       [&](const Form::Representation::Position& answer) {
         EXPECT(answer.get_value() == integer.get_value());
-        EXPECT_EQ(answer.offset, Count(1024));
+        EXPECT_EQ(answer.get_offset(), Count(1024));
       },
 
       [&](Status) { EXPECT(false); });
@@ -219,7 +221,7 @@ VALIDATION_TEST(TtxNavigation, shared_body_access) {
   ASSERT(representation.get_bytes().get_size() < 2048);
   representation.next(last).visit(
       [&](Form::Representation::Position position) {
-        EXPECT_EQ(position.offset, last);
+        EXPECT_EQ(position.get_offset(), last);
         EXPECT(position.get_value() == Form::Schema::Value::U8);
       },
 
@@ -228,7 +230,7 @@ VALIDATION_TEST(TtxNavigation, shared_body_access) {
   Count seen = 0;
   const auto status =
       representation.visit([&](Form::Representation::Position position) {
-        EXPECT_EQ(position.offset, seen);
+        EXPECT_EQ(position.get_offset(), seen);
         ++seen;
         return seen == 9 ? Status::Denied : Status::Success;
       });
@@ -249,7 +251,7 @@ VALIDATION_TEST(TtxNavigation, c_streaming_visit) {
   };
 
   EXPECT(
-      observe_representation(&representation, nullptr, 0, &probe) ==
+      observe_representation(&representation.get_abi(), nullptr, 0, &probe) ==
       TTX_DATA_DENIED);
   EXPECT_EQ(probe.count, Count(2));
   EXPECT_EQ(probe.offsets[1], Count(4));
@@ -257,7 +259,7 @@ VALIDATION_TEST(TtxNavigation, c_streaming_visit) {
   probe.count = 0;
   probe.stop = 8;
   EXPECT(
-      observe_representation(&representation, nullptr, 0, &probe) ==
+      observe_representation(&representation.get_abi(), nullptr, 0, &probe) ==
       TTX_DATA_SUCCESS);
   EXPECT_EQ(probe.count, Count(4));
   EXPECT_EQ(probe.offsets[3], Count(12));
@@ -281,7 +283,8 @@ VALIDATION_TEST(TtxNavigation, c_selected_visit) {
   };
 
   EXPECT(
-      observe_representation(&representation, last.get_data(), 1, &probe) ==
+      observe_representation(
+          &representation.get_abi(), last.get_data(), 1, &probe) ==
       TTX_DATA_SUCCESS);
   EXPECT_EQ(probe.count, Count(1));
   EXPECT_EQ(probe.offsets[0], last[0]);
@@ -294,7 +297,8 @@ VALIDATION_TEST(TtxNavigation, c_selected_visit) {
 
   probe.count = 0;
   EXPECT(
-      observe_representation(&representation, interior.get_data(), 1, &probe) ==
+      observe_representation(
+          &representation.get_abi(), interior.get_data(), 1, &probe) ==
       TTX_DATA_BOUNDS);
   EXPECT_EQ(probe.count, Count(0));
 
@@ -305,7 +309,8 @@ VALIDATION_TEST(TtxNavigation, c_selected_visit) {
   };
 
   EXPECT(
-      observe_representation(&representation, outside.get_data(), 1, &probe) ==
+      observe_representation(
+          &representation.get_abi(), outside.get_data(), 1, &probe) ==
       TTX_DATA_BOUNDS);
   EXPECT_EQ(probe.count, Count(0));
 }
@@ -332,7 +337,8 @@ VALIDATION_TEST(TtxNavigation, selected_composites) {
   };
 
   EXPECT(
-      observe_representation(&representation, selected.get_data(), 2, &probe) ==
+      observe_representation(
+          &representation.get_abi(), selected.get_data(), 2, &probe) ==
       TTX_DATA_SUCCESS);
   EXPECT_EQ(probe.offsets[0], Count(4));
   EXPECT_EQ(probe.offsets[1], Count(36));
@@ -345,7 +351,8 @@ VALIDATION_TEST(TtxNavigation, selected_composites) {
 
   probe.count = 0;
   EXPECT(
-      observe_representation(&representation, padding.get_data(), 1, &probe) ==
+      observe_representation(
+          &representation.get_abi(), padding.get_data(), 1, &probe) ==
       TTX_DATA_BOUNDS);
   EXPECT_EQ(probe.count, Count(0));
 }

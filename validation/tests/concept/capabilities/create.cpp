@@ -26,7 +26,8 @@ class ScopedCreate {
   Negotiation::Status status = Negotiation::Status::Satisfied;
   bool observing = false;
 
-  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+  static auto supports(void* context, perimortem_uuid id)
+      -> ttx_negotiation_status {
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Create::contract_id
@@ -55,22 +56,24 @@ class ScopedCreate {
     return TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto data(void*) -> perimortem_view_bytes { return {}; }
+  static auto data(void* context) -> perimortem_view_bytes { return {}; }
 
   static auto resolve(void* context) -> ttx_abstract {
     return {context, &operations.abstract};
   }
 
-  static auto lookup(void*, perimortem_view_bytes) -> ttx_abstract {
+  static auto lookup(void* context, perimortem_view_bytes route)
+      -> ttx_abstract {
     return ttx_unknown();
   }
 
-  static auto visit(void*, ttx_concept_visitor) -> void {}
+  static auto visit(void* context, ttx_concept_visitor callback) -> void {}
 
   struct Created {
     U8 value = 42;
 
-    static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+    static auto supports(void* context, perimortem_uuid id)
+        -> ttx_negotiation_status {
       return Formats::Uuid(id) == Abstract::contract_id
                  ? TTX_NEGOTIATION_SATISFIED
                  : TTX_NEGOTIATION_UNKNOWN;

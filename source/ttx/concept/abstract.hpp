@@ -202,23 +202,23 @@ class Ttx::Data::Form::Native<ttx_abstract> {
     // storage, including the edges that point back to the root.
     constexpr Definition()
         : callback_arguments({
-            Schema::pointer(),
-            Native<perimortem_view_bytes>::reference,
-            Schema::Argument(root),
+            Schema::Argument{Schema::pointer(), 1},
+            Schema::Argument{Native<perimortem_view_bytes>::reference, 1},
+            Schema::Argument{root, 1},
           }),
 
           resolve_arguments({
-            Schema::pointer(),
+            Schema::Argument{Schema::pointer(), 1},
           }),
 
           lookup_arguments({
-            Schema::pointer(),
-            Native<perimortem_view_bytes>::reference,
+            Schema::Argument{Schema::pointer(), 1},
+            Schema::Argument{Native<perimortem_view_bytes>::reference, 1},
           }),
 
           visit_arguments({
-            Schema::pointer(),
-            Schema::Argument(visitor),
+            Schema::Argument{Schema::pointer(), 1},
+            Schema::Argument{visitor, 1},
           }),
 
           root_fields({
@@ -270,13 +270,13 @@ class Ttx::Data::Form::Native<ttx_abstract> {
           visitor_fields.get_view(), sizeof(ttx_concept_visitor),
           alignof(ttx_concept_visitor));
       callback = Schema::callable(
-          Schema::Convention::Native, callback_arguments.get_view());
+          Callable::Convention::Native, callback_arguments.get_view());
       resolve = Schema::callable(
-          Schema::Convention::Native, resolve_arguments.get_view(), root);
+          Callable::Convention::Native, resolve_arguments.get_view(), root);
       lookup = Schema::callable(
-          Schema::Convention::Native, lookup_arguments.get_view(), root);
+          Callable::Convention::Native, lookup_arguments.get_view(), root);
       visit = Schema::callable(
-          Schema::Convention::Native, visit_arguments.get_view());
+          Callable::Convention::Native, visit_arguments.get_view());
     }
   };
 

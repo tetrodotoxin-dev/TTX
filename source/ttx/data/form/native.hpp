@@ -151,14 +151,14 @@ class Native<Result (*)(Arguments...)> {
       Vector<Schema::Argument, sizeof...(Arguments) + 1>
           arguments = {
             {
-              Native<Arguments>::reference...,
+              Schema::Argument{Native<Arguments>::reference, 1}...,
               Schema::Argument(),
             },
           };
 
  public:
   static constexpr Schema schema = Schema::callable(
-      Schema::Convention::Native,
+      Callable::Convention::Native,
       arguments.get_view().slice(0, sizeof...(Arguments)),
       Native<Result>::reference);
 
@@ -196,14 +196,14 @@ class Native<Result (*)(Arguments..., ...)> {
       Vector<Schema::Argument, sizeof...(Arguments) + 1>
           arguments = {
             {
-              Native<Arguments>::reference...,
+              Schema::Argument{Native<Arguments>::reference, 1}...,
               Schema::Argument(),
             },
           };
 
  public:
   static constexpr Schema schema = Schema::callable(
-      Schema::Convention::NativeVariadic,
+      Callable::Convention::NativeVariadic,
       arguments.get_view().slice(0, sizeof...(Arguments)),
       Native<Result>::reference);
   static constexpr Schema::Reference reference = schema;

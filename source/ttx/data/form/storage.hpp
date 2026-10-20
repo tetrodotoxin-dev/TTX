@@ -20,14 +20,15 @@ namespace Ttx::Data::Form {
 class Storage {
  public:
   // Uses a canonical Representation and the writable range supplied by Access.
-  // Returns the geometry check's status on failure. The caller keeps both the
-  // representation and region accessible for every use of the returned Storage.
+  // Returns the geometry check's status on failure. The caller keeps the
+  // Representation object, its descriptor bytes and the region accessible for
+  // every use of the returned Storage.
   static auto create(
       const Representation& representation,
       Perimortem::Core::Access::Bytes bytes)
       -> Perimortem::Core::Storage::Result<Storage, Status> {
-    const ttx_storage value =
-        ttx_storage(&representation, bytes.get_data(), bytes.get_size());
+    const ttx_storage value = ttx_storage(
+        &representation.get_abi(), bytes.get_data(), bytes.get_size());
 
     const auto status = ttx_storage_check(value);
     if (status) {
@@ -47,11 +48,11 @@ class Storage {
   template <typename Value>
   static auto from(Value& data) -> Storage {
     return Storage(ttx_storage(
-        &Compiled<Native<Value>::reference>::get_representation(),
+        &Compiled<Native<Value>::reference>::get_representation().get_abi(),
         Perimortem::Core::Data::cast<U8>(&data), sizeof(Value)));
   }
 
-  constexpr auto get_representation() const -> const Representation& {
+  constexpr auto get_representation() const -> Representation {
     return *value.representation;
   }
 

@@ -65,17 +65,18 @@ class Report {
                : TTX_NEGOTIATION_REJECTED;
   }
 
-  static auto data(void*) -> perimortem_view_bytes { return {}; }
+  static auto data(void* context) -> perimortem_view_bytes { return {}; }
 
   static auto resolve(void* context) -> ttx_abstract {
     return {context, &operations.abstract};
   }
 
-  static auto lookup(void*, perimortem_view_bytes) -> ttx_abstract {
+  static auto lookup(void* context, perimortem_view_bytes route)
+      -> ttx_abstract {
     return ttx_none();
   }
 
-  static auto visit(void*, ttx_concept_visitor) -> void {}
+  static auto visit(void* context, ttx_concept_visitor callback) -> void {}
 
   static auto expose(void* context, ttx_abstract subject)
       -> ttx_negotiation_status {
@@ -145,7 +146,7 @@ class ImportedByte {
                : ttx_none();
   }
 
-  static auto visit(void*, ttx_concept_visitor) -> void {}
+  static auto visit(void* context, ttx_concept_visitor callback) -> void {}
 
   static constexpr ttx_abstract_ops operations = {supports, bind,   data,
                                                   resolve,  lookup, visit};
@@ -159,7 +160,8 @@ class ByteImport {
   Count reads = 0;
   bool observing = false;
 
-  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+  static auto supports(void* context, perimortem_uuid id)
+      -> ttx_negotiation_status {
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Import::contract_id
@@ -188,17 +190,19 @@ class ByteImport {
     return TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto data(void*) -> perimortem_view_bytes { return {}; }
+  static auto data(void* context) -> perimortem_view_bytes { return {}; }
 
   static auto resolve(void* context) -> ttx_abstract {
     return {context, &operations.abstract};
   }
 
-  static auto lookup(void*, perimortem_view_bytes) -> ttx_abstract {
+  static auto lookup(void* context, perimortem_view_bytes route)
+      -> ttx_abstract {
     return ttx_unknown();
   }
 
-  static auto visit_concepts(void*, ttx_concept_visitor) -> void {}
+  static auto visit_concepts(void* context, ttx_concept_visitor callback)
+      -> void {}
 
   static auto visit(
       void* context,
@@ -211,9 +215,10 @@ class ByteImport {
       return ttx_negotiation_status(subject.status);
     }
 
-    if (!representation->compatible(
-            Form::Compiled<
-                Form::Native<U8>::reference>::get_representation())) {
+    if (!Form::Representation(*representation)
+             .compatible(
+                 Form::Compiled<
+                     Form::Native<U8>::reference>::get_representation())) {
       return TTX_NEGOTIATION_REJECTED;
     }
 
@@ -236,7 +241,8 @@ class ByteExport {
  public:
   conversion_output output = {0, 0, 0, TTX_NEGOTIATION_SATISFIED};
 
-  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+  static auto supports(void* context, perimortem_uuid id)
+      -> ttx_negotiation_status {
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Export::contract_id
@@ -341,7 +347,8 @@ VALIDATION_TEST(Conversion, foreign_pipeline) {
   auto run = [&] {
     return conversion_run(
         importer.get_abi(), &input,
-        &Form::Compiled<Form::Native<U8>::reference>::get_representation(),
+        &Form::Compiled<Form::Native<U8>::reference>::get_representation()
+             .get_abi(),
         exporter.get_abi());
   };
 

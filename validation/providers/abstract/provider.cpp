@@ -29,7 +29,8 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(bootstrap_indexed, get));
 
 struct Root {
-  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+  static auto supports(void* context, perimortem_uuid id)
+      -> ttx_negotiation_status {
     return Formats::Uuid(id) == Abstract::contract_id
                ? TTX_NEGOTIATION_SATISFIED
                : TTX_NEGOTIATION_UNKNOWN;
@@ -52,16 +53,17 @@ struct Root {
                : TTX_NEGOTIATION_REJECTED;
   }
 
-  static auto data(void*) -> perimortem_view_bytes {
+  static auto data(void* context) -> perimortem_view_bytes {
     const auto bytes = "hello"_view;
     return {bytes.get_data(), bytes.get_size()};
   }
 
-  static auto lookup(void*, perimortem_view_bytes) -> ttx_abstract {
+  static auto lookup(void* context, perimortem_view_bytes route)
+      -> ttx_abstract {
     return ttx_unknown();
   }
 
-  static auto visit(void*, ttx_concept_visitor) -> void {}
+  static auto visit(void* context, ttx_concept_visitor callback) -> void {}
 
   static constexpr ttx_abstract_ops operations = {supports, bind,   data,
                                                   resolve,  lookup, visit};
@@ -81,7 +83,7 @@ auto visit(
   callback(callback_context, Root::resolve(context));
 }
 
-auto count(void*) -> U64 {
+auto count(void* context) -> U64 {
   return 1;
 }
 
@@ -89,7 +91,7 @@ auto get(void* context, U64 index) -> ttx_abstract {
   return index == 0 ? Root::resolve(context) : ttx_unknown();
 }
 
-auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+auto supports(void* context, perimortem_uuid id) -> ttx_negotiation_status {
   const Formats::Uuid contract(id);
   return contract == Abstract::contract_id ||
                  contract ==
@@ -150,5 +152,6 @@ ttx_semantic_query entry{&module, bind, supports};
 // the host keeps this module loaded. No provider function runs during import.
 C_LINKAGE EXPORTED(TTX_TEST) const ttx_storage ttx_entry = {
   &Form::Compiled<
-      Form::Native<ttx_semantic_query>::reference>::get_representation(),
+       Form::Native<ttx_semantic_query>::reference>::get_representation()
+       .get_abi(),
   Data::cast<U8>(&entry), sizeof(entry)};

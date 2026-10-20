@@ -3,49 +3,203 @@
 
 #pragma once
 
+#include "perimortem/core/storage/result.hpp"
+#include "perimortem/memory/allocator/arena.hpp"
+
 #include "ttx/data/encoding/element.hpp"
 #include "ttx/data/encoding/struct.hpp"
 #include "ttx/data/form/native.hpp"
 #include "ttx/data/form/representation.h"
+#include "ttx/data/status.hpp"
 
 namespace Ttx::Data::Form {
 
-// C++ navigation uses the C record directly, so either language can borrow a
-// compiled Representation without copying its descriptors. Both establish
-// agreement by comparing those canonical bytes.
-using Representation = ttx_representation;
+// Representation compares data descriptions and locates primitives by their
+// byte offsets. Compiler serializes equivalent layouts and callable signatures
+// to the same canonical bytes. Equality is therefore a byte for byte comparison
+// without reconstructing a Schema graph. The encoding is specified in
+// compiler.hpp, including its indices and zero padding to a multiple of eight
+// bytes.
+//
+// Construction copies the supplied pointer and size without validating the
+// contents. Geometry and navigation require canonical descriptor bytes.
+// Decoding a noncanonical form is undefined behavior. The provider keeps the
+// referenced bytes readable and unchanged through each use. Copying a
+// Representation shares that storage without allocating or retaining it.
+// Descriptor bytes support any byte alignment. The alignment described by
+// those bytes applies to the payload being represented.
+//
+// Comparison reads both descriptor ranges without decoding their contents.
+// Transfer can therefore compare a foreign source against an established
+// canonical destination before using the source's encoded geometry.
+class Representation {
+ public:
+  // Navigation returns a primitive occurrence by value. Its byte coordinates
+  // belong to the containing object, while type and byte order describe the
+  // observation at that coordinate. No pointer to a reconstructed child object
+  // needs to survive the lookup.
+  // Pointer and callable slots both produce a Pointer observation whose extent
+  // comes from the representation's pointer width, including when the reader
+  // runs on another target. Navigation reports the pointer slot's coordinates.
+  // It reads the encoded descriptions rather than dereferencing addresses in
+  // the payload. Target descriptions participate in comparison of the complete
+  // form.
+  class Position {
+   public:
+    using Value = Schema::Value;
+    using ByteOrder = Schema::ByteOrder;
 
-}  // namespace Ttx::Data::Form
+    constexpr Position(
+        Count offset = 0,
+        Value type = Value::U8,
+        ByteOrder byte_order = ByteOrder::Little,
+        U32 extent = 0)
+        : value{
+            offset, U8(type), U8(byte_order),
+            extent ? extent : U32(Schema::get_width(type))} {}
 
-constexpr auto ttx_representation_position::get_extent() const -> Count {
-  return extent;
-}
+    constexpr auto get_value() const -> Value { return Value(value.type); }
 
-constexpr auto ttx_representation::get_extent() const -> Count {
+    constexpr auto get_byte_order() const -> ByteOrder {
+      return ByteOrder(value.byte_order);
+    }
+
+    constexpr auto get_extent() const -> Count { return value.extent; }
+
+    constexpr auto compatible(const Position& other) const -> Bool {
+      return value.type == other.value.type &&
+             value.byte_order == other.value.byte_order &&
+             value.extent == other.value.extent;
+    }
+
+    constexpr Position(ttx_representation_position value) : value(value) {}
+    constexpr auto get_offset() const -> Count { return value.offset; }
+    constexpr auto get_abi() const -> ttx_representation_position {
+      return value;
+    }
+
+   private:
+    ttx_representation_position value;
+  };
+
+  constexpr Representation(ttx_representation value) : value(value) {}
+  using Member = ttx_representation_member;
+  using Value = Schema::Value;
+  using ByteOrder = Schema::ByteOrder;
+
+  // Stores the descriptor address and byte count without validating the form.
+  // The default null record can receive a later description. Geometry and
+  // navigation require canonical descriptor bytes before use.
+  constexpr Representation(const U8* data = nullptr, Count size = 0)
+      : value{data, size} {}
+
+  constexpr auto get_bytes() const -> Perimortem::Core::View::Bytes {
+    return Perimortem::Core::View::Bytes(
+        perimortem_view_bytes{value.data, value.size});
+  }
+
+  constexpr auto get_blocks() const -> Perimortem::Core::View::Bytes {
+    const Count prefix = (value.data[0] & 15) ? 0 : 8;
+    return get_bytes().slice(prefix, value.size - prefix);
+  }
+
+  constexpr auto get_pointer_size() const -> Count {
+    return (value.data[0] & 15) ? 8 : 4;
+  }
+
+  // Canonical encoding supplies a complete root after any pointer width prefix.
+  constexpr auto get_depth() const -> U8 {
+    return get_blocks().get_data()[0] & 15;
+  }
+
+  constexpr auto get_extent() const -> Count;
+
+  constexpr auto get_alignment() const -> Count;
+
+  constexpr auto get_abi() const -> const ttx_representation& { return value; }
+
+  // Compares descriptor size and bytes without decoding. For canonical forms,
+  // equality establishes the same layout and calling convention. The caller
+  // keeps both byte ranges readable. Meanings and payload values follow their
+  // own contracts.
+  constexpr auto compatible(const Representation& other) const -> Bool;
+
+  // Compiles a stable Schema graph into canonical bytes allocated in arena.
+  // The returned value borrows those bytes until the arena is reset or
+  // destroyed. Source descriptions are needed only through this call.
+  static EXPORTED(TTX) auto compile(
+      ttx_schema_reference schema,
+      Perimortem::Memory::Allocator::Arena& arena,
+      Count pointer_size = sizeof(void*))
+      -> Perimortem::Core::Storage::Result<Representation, Ttx::Data::Status>;
+
+  // Builds a canonical struct from complete canonical child forms. Members
+  // retain their extents and padding at the requested offsets. The children
+  // remain readable through this call. The returned value borrows independent
+  // descriptor storage in arena until that arena is reset or destroyed.
+  static EXPORTED(TTX) auto compose(
+      Perimortem::Core::View::Vector<Member> members,
+      Count extent,
+      Count alignment,
+      Perimortem::Memory::Allocator::Arena& arena)
+      -> Perimortem::Core::Storage::Result<Representation, Ttx::Data::Status>;
+
+  // A byte coordinate selects the first primitive whose start is at or after
+  // it. Padding is skipped, and a coordinate inside a primitive advances to
+  // the following primitive rather than returning a partial value. Bounds
+  // means there is no such start. Use visit when consuming a whole record so
+  // each successive observation does not repeat this search from the root.
+  EXPORTED(TTX) auto next(Count offset) const
+      -> Perimortem::Core::Storage::Result<Position, Ttx::Data::Status>;
+
+  // Whole operations consume primitive occurrences in byte order. Repeated
+  // composites revisit their shared body for each instance, but successive
+  // observations never restart the search at the root. Returning a failure
+  // stops the walk immediately. Only the active composite path occupies stack
+  // space, even when the descriptor represents a very large repeated object.
+  template <typename Consumer>
+  constexpr auto visit(Consumer consumer) const -> Ttx::Data::Status;
+
+  // Prepared selections can ask for a sorted set of exact byte coordinates.
+  // This walk skips the unrequested instances of a range arithmetically, so
+  // selecting its final element does not observe all preceding elements.
+  // Coordinates must be unique and increasing. A coordinate in padding or
+  // inside a primitive returns Bounds rather than rounding to another value.
+  template <typename Consumer>
+  constexpr auto visit(
+      Perimortem::Core::View::Vector<Count> coordinates,
+      Consumer consumer) const -> Ttx::Data::Status;
+
+ private:
+  ttx_representation value;
+};
+
+constexpr auto Representation::get_extent() const -> Count {
   const U8 depth = get_depth();
   return Ttx::Data::Encoding::Struct::decode(get_blocks(), 0, depth).extent;
 }
 
-constexpr auto ttx_representation::get_alignment() const -> Count {
+constexpr auto Representation::get_alignment() const -> Count {
   const U8 depth = get_depth();
   return Ttx::Data::Encoding::Struct::decode(get_blocks(), 0, depth).alignment;
 }
 
-constexpr auto ttx_representation::compatible(
-    const ttx_representation& other) const -> Bool {
-  if (size != other.size) {
+constexpr auto Representation::compatible(const Representation& other) const
+    -> Bool {
+  if (value.size != other.value.size) {
     return False;
   }
 
-  if (data == other.data) {
+  if (value.data == other.value.data) {
     return True;
   }
 
-  return Perimortem::Core::Data::compare(data, other.data, size);
+  return Perimortem::Core::Data::compare(
+      value.data, other.value.data, value.size);
 }
 
 template <typename Consumer>
-constexpr auto ttx_representation::visit(Consumer consumer) const
+constexpr auto Representation::visit(Consumer consumer) const
     -> Ttx::Data::Status {
   using Ttx::Data::Status;
   const U8 depth = get_depth();
@@ -79,7 +233,9 @@ constexpr auto ttx_representation::visit(Consumer consumer) const
             return status;
           }
 
-          position.offset += entry.distance;
+          position = Position(
+              position.get_offset() + entry.distance, position.get_value(),
+              position.get_byte_order(), U32(position.get_extent()));
         }
       }
     }
@@ -91,7 +247,7 @@ constexpr auto ttx_representation::visit(Consumer consumer) const
 }
 
 template <typename Consumer>
-constexpr auto ttx_representation::visit(
+constexpr auto Representation::visit(
     Perimortem::Core::View::Vector<Count> coordinates,
     Consumer consumer) const -> Ttx::Data::Status {
   using Ttx::Data::Status;
@@ -167,6 +323,8 @@ constexpr auto ttx_representation::visit(
 
   return selected == coordinates.get_size() ? Status::Success : Status::Bounds;
 }
+
+}  // namespace Ttx::Data::Form
 
 TTX_DATA_RECORD(
     ttx_representation,

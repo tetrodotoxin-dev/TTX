@@ -7,5 +7,6 @@ using namespace Ttx::Data;
 
 C_LINKAGE auto ttx_invocation_representation() -> const ttx_representation* {
   return &Form::Compiled<
-      Form::Native<ttx_invocation>::reference>::get_representation();
+              Form::Native<ttx_invocation>::reference>::get_representation()
+              .get_abi();
 }

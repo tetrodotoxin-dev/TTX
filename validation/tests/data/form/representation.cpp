@@ -31,7 +31,7 @@ static auto allocate_representation(void* context, Count size, Count) -> void* {
 
 VALIDATION_TEST(TtxRepresentation, independent_lifetime) {
   Allocator::Arena arena;
-  const Form::Representation* prepared = nullptr;
+  Form::Representation prepared;
   {
     auto value = u32;
     const Storage::Vector<Form::Schema::Position, 2> entries = {
@@ -48,15 +48,15 @@ VALIDATION_TEST(TtxRepresentation, independent_lifetime) {
         Form::Schema::composite(entries.get_view().slice(0, 2), 12, 4);
     Form::Representation::compile(schema, arena)
         .visit(
-            [&](const Form::Representation& result) { prepared = &result; },
+            [&](const Form::Representation& result) { prepared = result; },
             [&](Status) { EXPECT(false); });
-    value.data.value.type = TTX_SCHEMA_R32;
+    value = Form::Schema::primitive(Form::Schema::Value::R32);
   }
 
-  ASSERT(prepared);
-  prepared->next(8).visit(
+  ASSERT(prepared.get_bytes().get_size());
+  prepared.next(8).visit(
       [&](Form::Representation::Position entry) {
-        EXPECT_EQ(entry.offset, Count(8));
+        EXPECT_EQ(entry.get_offset(), Count(8));
         EXPECT(entry.get_value() == Form::Schema::Value::U32);
       },
 
@@ -93,7 +93,7 @@ VALIDATION_TEST(TtxRepresentation, heterogeneous_index) {
           [&](const Form::Representation& value) {
             value.next(8).visit(
                 [&](Form::Representation::Position entry) {
-                  EXPECT_EQ(entry.offset, Count(8));
+                  EXPECT_EQ(entry.get_offset(), Count(8));
                   EXPECT(entry.get_value() == Form::Schema::Value::R32);
                 },
 
@@ -107,10 +107,10 @@ VALIDATION_TEST(TtxRepresentation, heterogeneous_index) {
 // preparation arena without having lent an incomplete result to consumers.
 VALIDATION_TEST(TtxRepresentation, invalid_publication) {
   Allocator::Arena arena;
-  auto truncated = u32;
+  auto truncated = u32.get_abi();
   truncated.extent = 1;
 
-  auto misaligned = u32;
+  auto misaligned = u32.get_abi();
   misaligned.alignment = 1;
 
   const auto padding =
@@ -156,7 +156,7 @@ VALIDATION_TEST(TtxRepresentation, singleton_range) {
           [&](const Form::Representation& value) {
             value.next(0).visit(
                 [&](Form::Representation::Position entry) {
-                  EXPECT_EQ(entry.offset, Count(0));
+                  EXPECT_EQ(entry.get_offset(), Count(0));
                   EXPECT(entry.get_value() == Form::Schema::Value::U32);
                 },
 
@@ -174,16 +174,16 @@ VALIDATION_TEST(TtxRepresentation, singleton_range) {
 // retain.
 VALIDATION_TEST(TtxRepresentation, publication_on_error) {
   Allocator::Arena arena;
-  const Form::Representation sentinel = Form::Representation();
-  const Form::Representation* output = &sentinel;
-  auto source = u32;
+  const ttx_representation sentinel = {};
+  const ttx_representation* output = &sentinel;
+  auto source = u32.get_abi();
   source.extent = 1;
 
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&arena, allocate_representation);
   EXPECT(
-      ttx_representation_compile(&source, sizeof(void*), allocator, &output) ==
-      TTX_DATA_INVALID);
+      ttx_representation_compile(
+          {&source, 0}, sizeof(void*), allocator, &output) == TTX_DATA_INVALID);
   EXPECT(output == &sentinel);
 }
 
@@ -241,7 +241,7 @@ VALIDATION_TEST(TtxRepresentation, adjacent_ranges) {
             EXPECT_EQ(prepared.get_bytes().get_size(), Count(8));
             prepared.next(12).visit(
                 [&](Form::Representation::Position position) {
-                  EXPECT_EQ(position.offset, Count(12));
+                  EXPECT_EQ(position.get_offset(), Count(12));
                 },
 
                 [&](Status) { EXPECT(false); });
@@ -284,7 +284,7 @@ VALIDATION_TEST(TtxRepresentation, repeated_records) {
             prepared.next(15999999992ULL)
                 .visit(
                     [&](Form::Representation::Position position) {
-                      EXPECT_EQ(position.offset, Count(15999999992ULL));
+                      EXPECT_EQ(position.get_offset(), Count(15999999992ULL));
                     },
 
                     [&](Status) { EXPECT(false); });

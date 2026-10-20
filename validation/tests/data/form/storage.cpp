@@ -51,7 +51,7 @@ VALIDATION_TEST(TtxStorage, empty_observation) {
   static constexpr auto empty =
       Form::Schema::composite(View::Vector<Form::Schema::Position>(), 0);
   const auto& form = Form::Compiled<empty>::get_representation();
-  const Form::Storage absent({&form, nullptr, 0});
+  const Form::Storage absent({&form.get_abi(), nullptr, 0});
   EXPECT(absent.get_bytes().is_empty());
   EXPECT(absent.get_bytes().get_data() == nullptr);
 

@@ -28,7 +28,7 @@ VALIDATION_TEST(Transfers, unaligned_descriptors) {
     &Form::Compiled<spaced>::get_representation()};
 
   constexpr Count descriptor_size =
-      Form::Compiled<spaced>::get_representation().size;
+      Form::Compiled<spaced>::get_representation().get_bytes().get_size();
   alignas(8) U8 source_bytes[descriptor_size + 7] = {};
   alignas(8) U8 target_bytes[descriptor_size + 7] = {};
   alignas(U32) U8 input[260] = {};
@@ -40,30 +40,38 @@ VALIDATION_TEST(Transfers, unaligned_descriptors) {
     const Count extent = index ? 260 : 16;
     const Count distance = index ? 256 : 4;
     const Count count = index ? 2 : 4;
-    ASSERT(canonical.size <= descriptor_size);
+    ASSERT(canonical.get_bytes().get_size() <= descriptor_size);
     EXPECT_EQ(canonical.get_depth(), U8(index + 1));
 
     for (Count offset = 1; offset != 8; ++offset) {
-      memcpy(source_bytes + offset, canonical.data, canonical.size);
-      memcpy(target_bytes + 8 - offset, canonical.data, canonical.size);
+      memcpy(
+          source_bytes + offset, canonical.get_bytes().get_data(),
+          canonical.get_bytes().get_size());
+      memcpy(
+          target_bytes + 8 - offset, canonical.get_bytes().get_data(),
+          canonical.get_bytes().get_size());
 
-      const Form::Representation source(source_bytes + offset, canonical.size);
+      const Form::Representation source(
+          source_bytes + offset, canonical.get_bytes().get_size());
       const Form::Representation target(
-          target_bytes + 8 - offset, canonical.size);
-      EXPECT(ttx_representation_compatible(&canonical, &source));
-      EXPECT(ttx_representation_compatible(&source, &target));
+          target_bytes + 8 - offset, canonical.get_bytes().get_size());
+      EXPECT(ttx_representation_compatible(
+          &canonical.get_abi(), &source.get_abi()));
+      EXPECT(
+          ttx_representation_compatible(&source.get_abi(), &target.get_abi()));
       EXPECT_EQ(source.get_extent(), extent);
       EXPECT_EQ(source.get_alignment(), Count(4));
 
       ttx_representation_position position;
       ASSERT_EQ(
-          ttx_representation_next(&source, 1, &position), TTX_DATA_SUCCESS);
+          ttx_representation_next(&source.get_abi(), 1, &position),
+          TTX_DATA_SUCCESS);
       EXPECT_EQ(position.offset, distance);
-      EXPECT(position.get_value() == Form::Schema::Value::U32);
+      EXPECT(position.type == TTX_SCHEMA_U32);
 
       Count visited = 0;
       EXPECT(source.visit([&](Form::Representation::Position current) {
-        EXPECT_EQ(current.offset, visited * distance);
+        EXPECT_EQ(current.get_offset(), visited * distance);
         EXPECT_EQ(current.get_extent(), Count(4));
         ++visited;
         return Status::Success;
@@ -77,7 +85,7 @@ VALIDATION_TEST(Transfers, unaligned_descriptors) {
           source.visit(
               View::Vector<Count>(last, 1),
               [&](Form::Representation::Position current) {
-                EXPECT_EQ(current.offset, last);
+                EXPECT_EQ(current.get_offset(), last);
                 ++visited;
                 return Status::Success;
               }) == Status::Success);
@@ -86,15 +94,17 @@ VALIDATION_TEST(Transfers, unaligned_descriptors) {
 
       memset(output, 0xa5, sizeof(output));
 
-      const ttx_storage from{&source, input, sizeof(input)};
-      const ttx_storage to{&target, output, sizeof(output)};
+      const ttx_storage from{&source.get_abi(), input, sizeof(input)};
+      const ttx_storage to{&target.get_abi(), output, sizeof(output)};
       ASSERT_EQ(ttx_transfer(&from, &to), TTX_DATA_SUCCESS);
       EXPECT_EQ(memcmp(input, output, extent), 0);
       EXPECT_EQ(output[extent], U8(0xa5));
 
       memset(output, 0xa5, sizeof(output));
 
-      const ttx_storage misaligned{&target, output + 1, sizeof(output) - 1};
+      const ttx_storage misaligned{
+        &target.get_abi(), output + 1, sizeof(output) - 1};
+
       EXPECT_EQ(ttx_transfer(&from, &misaligned), TTX_DATA_INVALID);
       for (const U8 byte : output) {
         EXPECT_EQ(byte, U8(0xa5));
@@ -106,8 +116,10 @@ VALIDATION_TEST(Transfers, unaligned_descriptors) {
 VALIDATION_TEST(Transfers, complete_extent_and_overlap) {
   const auto& form = Form::Compiled<four>::get_representation();
   U32 values[] = {1, 2, 3, 4, 5};
-  const ttx_storage input{&form, Data::cast<U8>(values), sizeof(values)};
-  const ttx_storage output{&form, Data::cast<U8>(values + 1), 16};
+  const ttx_storage input{
+    &form.get_abi(), Data::cast<U8>(values), sizeof(values)};
+
+  const ttx_storage output{&form.get_abi(), Data::cast<U8>(values + 1), 16};
   ASSERT_EQ(ttx_transfer(&input, &output), TTX_DATA_SUCCESS);
 
   const U32 expected[] = {1, 1, 2, 3, 4};
@@ -118,7 +130,7 @@ VALIDATION_TEST(Transfers, complete_extent_and_overlap) {
   EXPECT_EQ(ttx_transfer(&output, &output), TTX_DATA_SUCCESS);
 
   U32 destination[] = {90, 90, 90, 90, 90, 90};
-  const ttx_storage spare{&form, Data::cast<U8>(destination + 1), 20};
+  const ttx_storage spare{&form.get_abi(), Data::cast<U8>(destination + 1), 20};
   ASSERT_EQ(ttx_transfer(&output, &spare), TTX_DATA_SUCCESS);
   EXPECT_EQ(destination[0], U32(90));
   EXPECT_EQ(destination[5], U32(90));
@@ -168,8 +180,8 @@ VALIDATION_TEST(Transfers, empty_value) {
   static constexpr auto empty =
       Form::Schema::composite(View::Vector<Form::Schema::Position>(), 0);
   const auto& form = Form::Compiled<empty>::get_representation();
-  const ttx_storage input{&form, nullptr, 0};
-  const ttx_storage output{&form, nullptr, 0};
+  const ttx_storage input{&form.get_abi(), nullptr, 0};
+  const ttx_storage output{&form.get_abi(), nullptr, 0};
   EXPECT_EQ(ttx_transfer(&input, &output), TTX_DATA_SUCCESS);
 }
 

@@ -8,5 +8,6 @@ using namespace Ttx::Data;
 
 auto ttx_abstract_representation() -> const ttx_representation* {
   return &Form::Compiled<
-      Form::Native<Abstract::Api>::reference>::get_representation();
+              Form::Native<Abstract::Api>::reference>::get_representation()
+              .get_abi();
 }

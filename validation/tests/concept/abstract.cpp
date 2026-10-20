@@ -27,9 +27,11 @@ static Harness Abstracts = {
 VALIDATION_TEST(Abstracts, c_observations) {
   observation_subject provider = observation_subject(
       &Form::Compiled<
-          Form::Native<Abstract::Api>::reference>::get_representation(),
+           Form::Native<Abstract::Api>::reference>::get_representation()
+           .get_abi(),
       &Form::Compiled<Form::Native<Policies::Constant::Api>::reference>::
-          get_representation(),
+           get_representation()
+               .get_abi(),
       0);
   const Abstract subject(observation_abstract(&provider));
   subject.get_query().bind<Abstract>().visit(
@@ -67,9 +69,11 @@ VALIDATION_TEST(Abstracts, c_observations) {
 VALIDATION_TEST(Abstracts, copied_view) {
   observation_subject provider = observation_subject(
       &Form::Compiled<
-          Form::Native<Abstract::Api>::reference>::get_representation(),
+           Form::Native<Abstract::Api>::reference>::get_representation()
+           .get_abi(),
       &Form::Compiled<Form::Native<Policies::Constant::Api>::reference>::
-          get_representation(),
+           get_representation()
+               .get_abi(),
       0);
   const Abstract subject(observation_abstract(&provider));
   const auto copy = subject;
@@ -84,9 +88,11 @@ VALIDATION_TEST(Abstracts, copied_view) {
 VALIDATION_TEST(Abstracts, fresh_abstract_binding) {
   observation_subject provider = observation_subject(
       &Form::Compiled<
-          Form::Native<Abstract::Api>::reference>::get_representation(),
+           Form::Native<Abstract::Api>::reference>::get_representation()
+           .get_abi(),
       &Form::Compiled<Form::Native<Policies::Constant::Api>::reference>::
-          get_representation(),
+           get_representation()
+               .get_abi(),
       0);
   const Abstract subject(observation_abstract(&provider));
   const auto check = [&](Abstract expected) {
@@ -125,7 +131,7 @@ VALIDATION_TEST(Abstracts, encountered_policy) {
     ttx_negotiation_status answer;
     Count binds = 0;
 
-    static auto supports(void* context, perimortem_uuid)
+    static auto supports(void* context, perimortem_uuid id)
         -> ttx_negotiation_status {
       return Data::cast<Policy>(context)->answer;
     }
@@ -136,17 +142,18 @@ VALIDATION_TEST(Abstracts, encountered_policy) {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    static auto data(void*) -> perimortem_view_bytes { return {}; }
+    static auto data(void* context) -> perimortem_view_bytes { return {}; }
 
     static auto resolve(void* context) -> ttx_abstract {
       return Data::cast<Policy>(context)->target;
     }
 
-    static auto lookup(void*, perimortem_view_bytes) -> ttx_abstract {
+    static auto lookup(void* context, perimortem_view_bytes route)
+        -> ttx_abstract {
       return ttx_unknown();
     }
 
-    static auto visit(void*, ttx_concept_visitor) -> void {}
+    static auto visit(void* context, ttx_concept_visitor callback) -> void {}
   } policy{ttx_none(), TTX_NEGOTIATION_REJECTED};
 
   const ttx_abstract_ops operations = {Policy::supports, Policy::bind,
@@ -187,7 +194,7 @@ VALIDATION_TEST(Abstracts, qualified_question) {
                                              : TTX_NEGOTIATION_UNKNOWN;
     }
 
-    static auto bind(void*, perimortem_uuid id, ttx_storage target)
+    static auto bind(void* context, perimortem_uuid id, ttx_storage target)
         -> ttx_negotiation_status {
       if (Formats::Uuid(id) != contract()) {
         return TTX_NEGOTIATION_UNKNOWN;

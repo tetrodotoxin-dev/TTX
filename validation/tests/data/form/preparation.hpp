@@ -21,12 +21,12 @@ namespace Validation::DataTests {
 class Preparation {
  public:
   auto operator()(Ttx::Data::Form::Schema::Reference source)
-      -> const Ttx::Data::Form::Representation& {
+      -> Ttx::Data::Form::Representation {
     return Ttx::Data::Form::Representation::compile(source, arena)
         .visit(
             [](const Ttx::Data::Form::Representation& result)
-                -> const Ttx::Data::Form::Representation& { return result; },
-            [](Ttx::Data::Status) -> const Ttx::Data::Form::Representation& {
+                -> Ttx::Data::Form::Representation { return result; },
+            [](Ttx::Data::Status status) -> Ttx::Data::Form::Representation {
               fputs("Invalid fixture Representation.", stderr);
               abort();
             });

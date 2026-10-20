@@ -63,7 +63,7 @@ class Import {
       Function& callback) const -> Semantic::Negotiation::Status {
     const auto api = get_abi();
     return Semantic::Negotiation::Status(api.operations->visit(
-        api.context, input, &representation, &callback,
+        api.context, input, &representation.get_abi(), &callback,
         Import::callback<Function>));
   }
 

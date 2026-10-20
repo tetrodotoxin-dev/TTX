@@ -7,6 +7,8 @@
 
 #include "ttx/data/form/representation.hpp"
 
+using namespace Ttx::Data;
+
 auto ttx_transfer(const ttx_storage* input, const ttx_storage* output)
     -> ttx_data_status {
   if (!input || !output || !input->representation || !output->representation ||
@@ -17,7 +19,8 @@ auto ttx_transfer(const ttx_storage* input, const ttx_storage* output)
   // Compare the readable descriptor bytes with the canonical destination form
   // before decoding source geometry. A bootstrap can therefore reject a
   // foreign form without following its encoded references.
-  if (!input->representation->compatible(*output->representation)) {
+  if (!Form::Representation(*input->representation)
+           .compatible(*output->representation)) {
     return TTX_DATA_INCOMPATIBLE;
   }
 
@@ -31,7 +34,7 @@ auto ttx_transfer(const ttx_storage* input, const ttx_storage* output)
     return target;
   }
 
-  const Count size = output->representation->get_extent();
+  const Count size = Form::Representation(*output->representation).get_extent();
   if (size) {
     memmove(output->data, input->data, size);
   }

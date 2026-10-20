@@ -6,8 +6,10 @@
 #include "toolchain/validation/test.hpp"
 
 #include "perimortem/core/storage/vector.hpp"
+#include "perimortem/memory/allocator/global.hpp"
 
 using namespace Perimortem::Core;
+using namespace Perimortem::Memory;
 using namespace Toolchain::Validation;
 using namespace Ttx::Data;
 
@@ -86,7 +88,10 @@ VALIDATION_TEST(EncodingBlock, field_boundaries) {
       // at odd depths. The one byte prefix misaligns native memory, while each
       // U64 read must still use coordinates from the beginning of the buffer.
       // The exact allocation lets ASan catch a read past its padded end.
-      U8* storage = new U8[size + 1]{};
+      const auto allocation = Allocator::Global::allocate(size + 1);
+      U8* storage = allocation.get_data();
+      Data::set(storage, 0, size + 1);
+
       for (Count i = 0; i < raw_size; ++i) {
         storage[i + 1] = U8(i * 37 + 11);
       }
@@ -104,7 +109,7 @@ VALIDATION_TEST(EncodingBlock, field_boundaries) {
         }
       }
 
-      delete[] storage;
+      Allocator::Global::release(storage);
     }
   }
 }

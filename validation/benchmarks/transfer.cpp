@@ -26,8 +26,11 @@ alignas(64) static U32 destination[516] = {};
 // four bytes changes its cache alignment while preserving its declared form.
 // Each sample repeats the complete checked transfer of 2048 bytes 1024 times.
 static auto transfer(U32* destination) -> void {
-  const ttx_storage input{&form, Data::cast<U8>(source), sizeof(source)};
-  const ttx_storage output{&form, Data::cast<U8>(destination), sizeof(source)};
+  const ttx_storage input{
+    &form.get_abi(), Data::cast<U8>(source), sizeof(source)};
+
+  const ttx_storage output{
+    &form.get_abi(), Data::cast<U8>(destination), sizeof(source)};
 
   for (Count index = 0; index != 1024; ++index) {
     if (ttx_transfer(&input, &output) != TTX_DATA_SUCCESS) {

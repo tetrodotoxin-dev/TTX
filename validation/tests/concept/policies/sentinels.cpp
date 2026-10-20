@@ -72,7 +72,7 @@ VALIDATION_TEST(Sentinels, nested_table_abi) {
       Form::Native<WrongAbstract>::reference>::get_representation();
   WrongAbstract output = WrongAbstract();
   const Form::Storage target(
-      ttx_storage(&form, Data::cast<U8>(&output), sizeof(output)));
+      ttx_storage(&form.get_abi(), Data::cast<U8>(&output), sizeof(output)));
   const auto query = Policies::None::get_none().get_abstract().get_query();
   EXPECT(
       query.bind(Abstract::contract_id, target) ==
@@ -94,7 +94,7 @@ VALIDATION_TEST(Sentinels, concept_carrier) {
   const auto& form = Form::Compiled<
       Form::Native<Policies::None::Api>::reference>::get_representation();
   const ttx_storage output =
-      ttx_storage(&form, Data::cast<U8>(&answer), sizeof(answer));
+      ttx_storage(&form.get_abi(), Data::cast<U8>(&answer), sizeof(answer));
   EXPECT_EQ(
       none.operations->bind(none.context, Policies::None::contract_id, output),
       TTX_NEGOTIATION_SATISFIED);
@@ -102,8 +102,8 @@ VALIDATION_TEST(Sentinels, concept_carrier) {
   U32 untouched = 42;
   const auto& operational =
       Form::Compiled<Form::Native<U32>::reference>::get_representation();
-  const ttx_storage wrong =
-      ttx_storage(&operational, Data::cast<U8>(&untouched), sizeof(untouched));
+  const ttx_storage wrong = ttx_storage(
+      &operational.get_abi(), Data::cast<U8>(&untouched), sizeof(untouched));
   EXPECT_EQ(
       none.operations->bind(none.context, Policies::None::contract_id, wrong),
       TTX_NEGOTIATION_REJECTED);

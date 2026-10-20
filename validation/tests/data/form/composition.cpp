@@ -46,9 +46,9 @@ static auto check_pair(const Form::Schema& child, Test::TestResult& result)
           positions.get_view().slice(0, 2), width * 2, child.get_alignment()));
   const Storage::Vector<Form::Representation::Member, 2> members = {
     {
-      Form::Representation::Member(form, width),
+      Form::Representation::Member(&form.get_abi(), width),
       {
-        form,
+        &form.get_abi(),
         0,
       },
     },
@@ -66,11 +66,12 @@ static auto check_pair(const Form::Schema& child, Test::TestResult& result)
 
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&arena, allocate_representation);
-  const Form::Representation* output = nullptr;
+  const ttx_representation* output = nullptr;
   ASSERT(
-      compose_pair(&form, width, child.get_alignment(), allocator, &output) ==
+      compose_pair(
+          &form.get_abi(), width, child.get_alignment(), allocator, &output) ==
       TTX_DATA_SUCCESS);
-  EXPECT(output->compatible(expected));
+  EXPECT(Form::Representation(*output).compatible(expected));
 }
 
 VALIDATION_TEST(Composition, records_and_cycles) {
@@ -98,16 +99,16 @@ VALIDATION_TEST(Composition, records_and_cycles) {
   // navigation nor composition may mistake their descriptions for payload.
   const Storage::Vector<Form::Schema::Argument, 2> args = {
     {
-      Form::Schema::pointer(&recursive),
-      Form::Schema::Argument(integer),
+      Form::Schema::Argument{Form::Schema::pointer(&recursive), 1},
+      Form::Schema::Argument(integer, 1),
     },
   };
 
   const auto function = Form::Schema::callable(
-      Form::Schema::Convention::SystemVAMD64, args.get_view().slice(0, 2),
+      Form::Callable::Convention::SystemVAMD64, args.get_view().slice(0, 2),
       Form::Schema::pointer(&recursive));
   const auto no_arguments =
-      Form::Schema::callable(Form::Schema::Convention::SystemVAMD64, {});
+      Form::Schema::callable(Form::Callable::Convention::SystemVAMD64, {});
   const Storage::Vector<Form::Schema::Position, 2> calls = {
     {
       Form::Schema::Position(function, 0),
@@ -141,9 +142,9 @@ VALIDATION_TEST(Composition, invalid_placements) {
   const auto& form = prepare(integer);
   const Storage::Vector<Form::Representation::Member, 2> members = {
     {
-      Form::Representation::Member(form, 0),
+      Form::Representation::Member(&form.get_abi(), 0),
       {
-        form,
+        &form.get_abi(),
         2,
       },
     },

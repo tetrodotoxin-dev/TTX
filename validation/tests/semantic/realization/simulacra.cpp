@@ -93,7 +93,7 @@ VALIDATION_TEST(TtxSimulacra, support_without_abi) {
   const auto& form =
       Form::Compiled<Form::Native<U64>::reference>::get_representation();
   const Form::Storage target(
-      ttx_storage(&form, Data::cast<U8>(&output), sizeof(output)));
+      ttx_storage(&form.get_abi(), Data::cast<U8>(&output), sizeof(output)));
   EXPECT(
       query.bind(Counter::contract_id, target) ==
       Negotiation::Status::Rejected);
@@ -121,7 +121,8 @@ VALIDATION_TEST(TtxSimulacra, different_meaning_same_representation) {
           other,
           Form::Storage(ttx_storage(
               &Form::Compiled<
-                  Form::Native<Counter::Api>::reference>::get_representation(),
+                   Form::Native<Counter::Api>::reference>::get_representation()
+                   .get_abi(),
               Data::cast<U8>(&api), sizeof(api)))) ==
       Negotiation::Status::Unknown);
   EXPECT_EQ(foreign.api.statistics().calls, U64(0));
@@ -312,11 +313,12 @@ VALIDATION_TEST(TtxSimulacra, mismatched_callables) {
     const auto* form = forms[form_index];
     memcpy(output.get_data(), expected.get_data(), sizeof(output));
 
-    const auto status = Negotiation::Query(foreign.api.query)
-                            .bind(
-                                Counter::contract_id,
-                                Form::Storage(ttx_storage(
-                                    form, output.get_data(), sizeof(output))));
+    const auto status =
+        Negotiation::Query(foreign.api.query)
+            .bind(
+                Counter::contract_id,
+                Form::Storage(ttx_storage(
+                    &form->get_abi(), output.get_data(), sizeof(output))));
     EXPECT(status == Negotiation::Status::Rejected);
     EXPECT(memcmp(output.get_data(), expected.get_data(), sizeof(output)) == 0);
   }

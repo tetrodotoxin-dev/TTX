@@ -28,10 +28,6 @@ _Static_assert(
 
 #endif
 
-#ifdef __cplusplus
-#include "perimortem/core/view/vector.hpp"
-#endif
-
 #define TTX_SCHEMA_VALUE ((U8)1)
 #define TTX_SCHEMA_COMPOSITE ((U8)2)
 #define TTX_SCHEMA_RANGE ((U8)4)
@@ -95,28 +91,6 @@ typedef struct ttx_schema_reference {
   const struct ttx_schema* schema;
   U8 flags;
 
-#ifdef __cplusplus
-
-  constexpr ttx_schema_reference(
-      const ttx_schema* schema = nullptr,
-      U8 flags = 0)
-      : schema(schema), flags(flags) {}
-
-  constexpr ttx_schema_reference(const ttx_schema& schema)
-      : schema(&schema), flags(0) {}
-
-  constexpr auto is_pointer() const -> Bool {
-    return flags & TTX_SCHEMA_REFERENCE_POINTER;
-  }
-
-  constexpr auto is_set() const -> Bool { return schema || is_pointer(); }
-
-  constexpr auto get_extent(Count pointer_size = sizeof(void*)) const -> Count;
-
-  constexpr auto get_alignment(Count pointer_size = sizeof(void*)) const
-      -> Count;
-
-#endif
 } ttx_schema_reference;
 
 typedef U32 ttx_schema_convention;
@@ -146,20 +120,6 @@ typedef struct ttx_schema_argument {
   ttx_schema_reference reference;
   Count count;
 
-#ifdef __cplusplus
-
-  constexpr ttx_schema_argument() : reference(), count(0) {}
-
-  constexpr ttx_schema_argument(ttx_schema_reference reference, Count count = 1)
-      : reference(reference), count(count) {}
-
-  constexpr auto get_reference() const -> ttx_schema_reference {
-    return reference;
-  }
-
-  constexpr auto get_count() const -> Count { return count; }
-
-#endif
 } ttx_schema_argument;
 
 // An unset result reference denotes void. A context passed to the function is
@@ -172,23 +132,6 @@ typedef struct ttx_schema_callable {
   ttx_schema_reference result;
   ttx_schema_convention convention;
 
-#ifdef __cplusplus
-
-  constexpr auto get_arguments() const
-      -> Perimortem::Core::View::Vector<ttx_schema_argument> {
-    if (!arguments || count == 0) {
-      return Perimortem::Core::View::Vector<ttx_schema_argument>();
-    }
-
-    return Perimortem::Core::View::Vector<ttx_schema_argument>(
-        arguments[0], count);
-  }
-
-  constexpr auto get_result() const -> ttx_schema_reference { return result; }
-
-  constexpr auto get_convention() const;
-
-#endif
 } ttx_schema_callable;
 
 // Red and green can use the same U32 schema but occupy different positions in
@@ -199,20 +142,6 @@ typedef struct ttx_schema_position {
   ttx_schema_reference reference;
   Count offset;
 
-#ifdef __cplusplus
-
-  constexpr ttx_schema_position(
-      ttx_schema_reference reference = ttx_schema_reference(),
-      Count offset = 0)
-      : reference(reference), offset(offset) {}
-
-  constexpr auto get_reference() const -> ttx_schema_reference {
-    return reference;
-  }
-
-  constexpr auto get_offset() const -> Count { return offset; }
-
-#endif
 } ttx_schema_position;
 
 typedef struct ttx_schema_composite {
@@ -225,15 +154,6 @@ typedef struct ttx_schema_range {
   Count count;
   Count distance;
 
-#ifdef __cplusplus
-
-  constexpr auto get_element() const -> ttx_schema_reference { return element; }
-
-  constexpr auto get_count() const -> Count { return count; }
-
-  constexpr auto get_distance() const -> Count { return distance; }
-
-#endif
 } ttx_schema_range;
 
 typedef struct ttx_schema_primitive {
@@ -263,141 +183,13 @@ typedef struct ttx_schema {
   U8 kind;
   union {
 
-#ifdef __cplusplus
-
-    ttx_schema_primitive value = {
-      0,
-      0,
-    };
-
-#else
-
     ttx_schema_primitive value;
-
-#endif
 
     ttx_schema_composite composite;
     ttx_schema_range range;
     ttx_schema_callable callable;
   } data;
 
-#ifdef __cplusplus
-
-  // Kind selects the target's description. Reference flags independently
-  // choose pointer storage, so a struct definition can serve both uses.
-  enum class Kind : U8 {
-    Value = TTX_SCHEMA_VALUE,
-    Composite = TTX_SCHEMA_COMPOSITE,
-    Range = TTX_SCHEMA_RANGE,
-    Callable = TTX_SCHEMA_CALLABLE,
-  };
-
-  enum class Value : U8 {
-    U8 = TTX_SCHEMA_U8,
-    U16 = TTX_SCHEMA_U16,
-    U32 = TTX_SCHEMA_U32,
-    U64 = TTX_SCHEMA_U64,
-    S8 = TTX_SCHEMA_S8,
-    S16 = TTX_SCHEMA_S16,
-    S32 = TTX_SCHEMA_S32,
-    S64 = TTX_SCHEMA_S64,
-    R32 = TTX_SCHEMA_R32,
-    R64 = TTX_SCHEMA_R64,
-    Pointer = TTX_SCHEMA_POINTER,
-    V64 = TTX_SCHEMA_V64,
-    V128 = TTX_SCHEMA_V128,
-    V256 = TTX_SCHEMA_V256,
-    V512 = TTX_SCHEMA_V512,
-  };
-
-  enum class Convention : U32 {
-    SystemVAMD64 = TTX_SCHEMA_SYSTEM_V_AMD64,
-    SystemVAMD64Variadic = TTX_SCHEMA_SYSTEM_V_AMD64_VARIADIC,
-    EmscriptenWasm32 = TTX_SCHEMA_EMSCRIPTEN_WASM32,
-    EmscriptenWasm32Variadic = TTX_SCHEMA_EMSCRIPTEN_WASM32_VARIADIC,
-    WindowsX64 = TTX_SCHEMA_WINDOWS_X64,
-    WindowsX64Variadic = TTX_SCHEMA_WINDOWS_X64_VARIADIC,
-    Native = TTX_SCHEMA_NATIVE_CONVENTION,
-    NativeVariadic = TTX_SCHEMA_NATIVE_VARIADIC,
-  };
-
-  enum class ByteOrder : U8 {
-    Little = TTX_SCHEMA_LITTLE_ENDIAN,
-    Big = TTX_SCHEMA_BIG_ENDIAN
-  };
-
-  using Reference = ttx_schema_reference;
-  using Position = ttx_schema_position;
-  using Composite = ttx_schema_composite;
-  using Range = ttx_schema_range;
-  using Argument = ttx_schema_argument;
-  using Callable = ttx_schema_callable;
-  using V64 = ttx_vector64;
-  using V128 = ttx_vector128;
-  using V256 = ttx_vector256;
-  using V512 = ttx_vector512;
-
-  static constexpr auto get_width(
-      Value type,
-      Count pointer_size = sizeof(void*)) -> Count;
-
-  static constexpr auto primitive(
-      Value type,
-      ByteOrder order = ByteOrder::Little,
-      Count pointer_size = sizeof(void*)) -> ttx_schema;
-  static constexpr auto pointer(const ttx_schema* target = nullptr)
-      -> Reference;
-  static constexpr auto callable(
-      Convention convention,
-      Perimortem::Core::View::Vector<Argument> arguments,
-      Reference result = Reference(),
-      Count pointer_size = sizeof(void*)) -> ttx_schema;
-  static constexpr auto composite(
-      Perimortem::Core::View::Vector<Position> positions,
-      Count extent,
-      Count alignment = 1) -> ttx_schema;
-  static constexpr auto range(
-      Reference element,
-      Count repeats,
-      Count distance,
-      Count extent,
-      Count alignment = 1) -> ttx_schema;
-
-  constexpr auto get_extent() const -> Count { return extent; }
-
-  constexpr auto get_alignment() const -> Count { return alignment; }
-
-  constexpr auto get_kind() const -> Kind { return Kind(kind); }
-
-  // The caller reads the union member selected by Kind. These accessors use
-  // the stored fields directly. `get_positions` returns an empty View for a
-  // null pointer or zero count. Compilation checks the original pointer and
-  // count before using that View so malformed arrays remain distinguishable.
-  constexpr auto get_value() const -> Value { return Value(data.value.type); }
-
-  constexpr auto get_byte_order() const -> ByteOrder {
-    return ByteOrder(data.value.byte_order);
-  }
-
-  constexpr auto get_positions() const
-      -> Perimortem::Core::View::Vector<Position> {
-    if (!data.composite.positions || data.composite.count == 0) {
-      return Perimortem::Core::View::Vector<Position>();
-    }
-
-    return Perimortem::Core::View::Vector<Position>(
-        data.composite.positions[0], data.composite.count);
-  }
-
-  constexpr auto get_range() const -> const Range& { return data.range; }
-
-  constexpr auto get_callable() const -> const Callable& {
-    return data.callable;
-  }
-
-  constexpr auto get_abi() const -> const ttx_schema& { return *this; }
-
-#endif
 } ttx_schema;
 
 #endif

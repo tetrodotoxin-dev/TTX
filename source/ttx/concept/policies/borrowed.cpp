@@ -7,6 +7,7 @@ using namespace Ttx::Concept;
 using namespace Ttx::Data;
 
 C_LINKAGE auto ttx_borrowed_representation() -> const ttx_representation* {
-  return &Form::Compiled<
-      Form::Native<Policies::Borrowed::Api>::reference>::get_representation();
+  return &Form::Compiled<Form::Native<Policies::Borrowed::Api>::reference>::
+              get_representation()
+                  .get_abi();
 }

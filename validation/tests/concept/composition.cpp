@@ -124,15 +124,20 @@ VALIDATION_TEST(Composition, foreign_qualified_answer) {
 
   const composition_forms forms = composition_forms(
       &Form::Compiled<
-          Form::Native<Abstract::Api>::reference>::get_representation(),
+           Form::Native<Abstract::Api>::reference>::get_representation()
+           .get_abi(),
       &Form::Compiled<Form::Native<Capabilities::Borrow::Api>::reference>::
-          get_representation(),
+           get_representation()
+               .get_abi(),
       &Form::Compiled<Form::Native<Policies::Borrowed::Api>::reference>::
-          get_representation(),
+           get_representation()
+               .get_abi(),
       &Form::Compiled<
-          Form::Native<Expression::Api>::reference>::get_representation(),
+           Form::Native<Expression::Api>::reference>::get_representation()
+           .get_abi(),
       &Form::Compiled<Form::Native<BorrowedExpression::Api>::reference>::
-          get_representation());
+           get_representation()
+               .get_abi());
   const Abstract weak(open(&state, forms));
   EXPECT(weak.supports<Expression>() == Negotiation::Status::Satisfied);
   EXPECT_EQ(state.acquisitions, U64(0));

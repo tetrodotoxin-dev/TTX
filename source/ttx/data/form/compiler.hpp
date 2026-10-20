@@ -329,18 +329,20 @@ class Compiler {
     pointer_size = selected;
 
     Count root = 0;
-    if ((source.flags & ~TTX_SCHEMA_REFERENCE_POINTER) || !source.is_set()) {
+    if ((source.get_abi().flags & ~TTX_SCHEMA_REFERENCE_POINTER) ||
+        !source.is_set()) {
       return Status::Invalid;
     }
 
     auto status = source.is_pointer() ? prepare_reference(source)
-                                      : prepare(*source.schema, root);
+                                      : prepare(*source.get_abi().schema, root);
     if (status != Status::Success) {
       return status;
     }
 
-    if (source.is_pointer() || (source.schema && source.schema->get_kind() ==
-                                                     Schema::Kind::Callable)) {
+    if (source.is_pointer() ||
+        (source.get_abi().schema &&
+         source.get_abi().schema->kind == TTX_SCHEMA_CALLABLE)) {
       const Count first = begin(
           source.get_extent(pointer_size), source.get_alignment(pointer_size));
       records.insert(describe(source));
@@ -443,7 +445,7 @@ class Compiler {
   // replaces those temporary IDs with absolute output indices. Hash lookup
   // has then finished, allowing next to hold the emission order.
   struct Body {
-    const Schema* schema = nullptr;
+    const ttx_schema* schema = nullptr;
     Count first = 0;
     Count size = Unseen;
     U64 hash = 0;
@@ -451,7 +453,7 @@ class Compiler {
     Count block = Unseen;
 
     constexpr Body() = default;
-    constexpr Body(const Schema* schema, U64 hash)
+    constexpr Body(const ttx_schema* schema, U64 hash)
         : schema(schema), hash(hash) {}
 
     constexpr Body(Count first, Count size, U64 hash)
@@ -640,7 +642,7 @@ class Compiler {
     }
   }
 
-  static constexpr auto source_hash(const Schema* schema) -> U64 {
+  static constexpr auto source_hash(const ttx_schema* schema) -> U64 {
     if consteval {
       // Constant evaluation permits pointer equality but cannot convert an
       // address into a hash. A zero hash leaves find_source to compare the
@@ -652,13 +654,13 @@ class Compiler {
     }
   }
 
-  constexpr auto find_source(const Schema* schema) const -> Count {
+  constexpr auto find_source(const ttx_schema* schema) const -> Count {
     return find(bodies, buckets, source_hash(schema), [&](Count i) {
       return bodies.get_data()[i].schema == schema;
     });
   }
 
-  constexpr auto source_slot(const Schema* schema) -> Count {
+  constexpr auto source_slot(const ttx_schema* schema) -> Count {
     const Count found = find_source(schema);
     if (found != Unseen) {
       return found;
@@ -694,73 +696,76 @@ class Compiler {
   constexpr auto prepare_reference(
       Schema::Reference reference,
       Bool argument = False) -> Status {
-    if ((reference.flags & ~TTX_SCHEMA_REFERENCE_POINTER) ||
+    if ((reference.get_abi().flags & ~TTX_SCHEMA_REFERENCE_POINTER) ||
         !reference.is_set()) {
       return Status::Invalid;
     }
 
-    const auto* source = reference.schema;
-    if (!source) {
+    const auto* record = reference.get_abi().schema;
+    if (!record) {
       return Status::Success;
     }
 
+    const Schema source(*record);
     if (argument && !reference.is_pointer() &&
-        (source->get_kind() == Schema::Kind::Range || !source->get_extent())) {
+        (source.get_kind() == Schema::Kind::Range || !source.get_extent())) {
       return Status::Invalid;
     }
 
-    if (source->get_kind() == Schema::Kind::Value &&
+    if (source.get_kind() == Schema::Kind::Value &&
         !(reference.is_pointer() &&
-          source->get_value() == Schema::Value::Pointer)) {
-      return validate_value(*source);
+          source.get_value() == Schema::Value::Pointer)) {
+      return validate_value(source);
     }
 
     // Arguments describe a call boundary rather than inline containment.
     // Like pointer targets, their bodies can be completed after the caller.
     if (reference.is_pointer() || argument) {
-      source_slot(source);
+      source_slot(record);
       return Status::Success;
     }
 
     Count body = 0;
-    return prepare(*source, body);
+    return prepare(*record, body);
   }
 
   // References already passed preparation. Describing one cannot append a
   // child body while its parent is emitting contiguous content.
   constexpr auto describe(Schema::Reference reference) -> Element {
-    const auto* source = reference.schema;
-    if (!source) {
+    const auto* record = reference.get_abi().schema;
+    if (!record) {
       return Element(1, 0, pointer_size, 0, Element::Pointer);
     }
 
-    if (source->get_kind() == Schema::Kind::Value &&
+    const Schema source(*record);
+    if (source.get_kind() == Schema::Kind::Value &&
         !(reference.is_pointer() &&
-          source->get_value() == Schema::Value::Pointer)) {
-      const auto type = source->get_value();
+          source.get_value() == Schema::Value::Pointer)) {
+      const auto type = source.get_value();
       const Bool pointer =
           reference.is_pointer() || type == Schema::Value::Pointer;
-      const Count size = pointer ? pointer_size : source->get_extent();
+      const Count size = pointer ? pointer_size : source.get_extent();
       const Count code =
           type == Schema::Value::Pointer
               ? 0
-              : U8(type) | ((source->get_extent() > 1 &&
-                             source->get_byte_order() == Schema::ByteOrder::Big)
+              : U8(type) | ((source.get_extent() > 1 &&
+                             source.get_byte_order() == Schema::ByteOrder::Big)
                                 ? 64
                                 : 0);
       return Element(1, 0, size, code, pointer ? Element::Pointer : 0);
     }
 
-    const Count slot = find_source(source);
-    const Bool callable = source->get_kind() == Schema::Kind::Callable;
+    const Count slot = find_source(record);
+    const Bool callable = source.get_kind() == Schema::Kind::Callable;
     return Element(
         1, 0, reference.get_extent(pointer_size), slot,
         (callable ? Element::Callable | Element::Pointer : Element::Struct) |
             (reference.is_pointer() ? Element::Pointer : 0));
   }
 
-  constexpr auto prepare(const Schema& source, Count& result) -> Status {
-    const Count slot = source_slot(&source);
+  constexpr auto prepare(const ttx_schema& record, Count& result) -> Status {
+    const Schema source(record);
+    const Count slot = source_slot(&record);
     if (bodies.get_data()[slot].size == Active) {
       return Status::Invalid;
     }
@@ -783,7 +788,7 @@ class Compiler {
       status = validate_value(source);
       if (status == Status::Success) {
         const Count first = begin(source.get_extent(), source.get_alignment());
-        records.insert(describe(source));
+        records.insert(describe(Schema::Reference(record)));
         seal(first, result);
       }
 
@@ -878,8 +883,9 @@ class Compiler {
 
     const auto emit = [&](Element entry) { records.insert(entry); };
     if (!reference.is_pointer() &&
-        reference.schema->get_kind() == Schema::Kind::Range) {
-      const auto child = bodies.get_data()[find_source(reference.schema)];
+        reference.get_abi().schema->kind == TTX_SCHEMA_RANGE) {
+      const auto child =
+          bodies.get_data()[find_source(reference.get_abi().schema)];
       const auto first = records.get_data()[child.first + 1];
       const Bool joins =
           first.count == 1 || distance == first.count * first.distance;
@@ -914,14 +920,15 @@ class Compiler {
   }
 
   constexpr auto composite(const Schema& source, Count& result) -> Status {
-    if (source.data.composite.count && !source.data.composite.positions) {
+    if (source.get_abi().data.composite.count &&
+        !source.get_abi().data.composite.positions) {
       return Status::Invalid;
     }
 
     const auto positions = source.get_positions();
     for (Count i = 0; i < positions.get_size(); ++i) {
       const auto position = positions[i];
-      const auto reference = position.get_reference();
+      const Schema::Reference reference(position.reference);
       if (position.offset > source.get_extent() ||
           reference.get_extent(pointer_size) >
               source.get_extent() - position.offset) {
@@ -938,7 +945,7 @@ class Compiler {
     Run run;
     for (Count i = 0; i < positions.get_size(); ++i) {
       const auto position = positions[i];
-      append(position.get_reference(), position.offset, 1, 0, run);
+      append(position.reference, position.offset, 1, 0, run);
     }
 
     return finish(first, run, result);
@@ -946,15 +953,15 @@ class Compiler {
 
   constexpr auto range(const Schema& source, Count& result) -> Status {
     const auto& value = source.get_range();
-    const auto reference = value.get_element();
+    const Schema::Reference reference(value.element);
     const auto status = prepare_reference(reference);
     if (status != Status::Success) {
       return status;
     }
 
-    const Count count = value.get_count();
+    const Count count = value.count;
     const Count size = reference.get_extent(pointer_size);
-    const Count distance = value.get_distance();
+    const Count distance = value.distance;
     if ((!count || !size) && source.get_extent()) {
       return Status::Invalid;
     }
@@ -990,30 +997,32 @@ class Compiler {
     const auto convention = value.get_convention();
     const bool narrow = pointer_size == 4;
     const bool accepted =
-        narrow ? convention == Schema::Convention::EmscriptenWasm32 ||
-                     convention == Schema::Convention::EmscriptenWasm32Variadic
-               : convention == Schema::Convention::SystemVAMD64 ||
-                     convention == Schema::Convention::SystemVAMD64Variadic ||
-                     convention == Schema::Convention::WindowsX64 ||
-                     convention == Schema::Convention::WindowsX64Variadic;
+        narrow
+            ? convention == Callable::Convention::EmscriptenWasm32 ||
+                  convention == Callable::Convention::EmscriptenWasm32Variadic
+            : convention == Callable::Convention::SystemVAMD64 ||
+                  convention == Callable::Convention::SystemVAMD64Variadic ||
+                  convention == Callable::Convention::WindowsX64 ||
+                  convention == Callable::Convention::WindowsX64Variadic;
     if (!accepted) {
       return Status::Invalid;
     }
 
     const auto arguments = value.get_arguments();
-    if (value.count && !value.arguments) {
+    if (value.get_abi().count && !value.get_abi().arguments) {
       return Status::Invalid;
     }
 
-    if (value.get_result().is_set()) {
+    if (Schema::Reference(value.get_result()).is_set()) {
       const auto status = prepare_reference(value.get_result(), True);
       if (status != Status::Success) {
         return status;
       }
     }
 
-    Element head = value.get_result().is_set() ? describe(value.get_result())
-                                               : Element(0, 0, 0, 0, Void);
+    Element head = Schema::Reference(value.get_result()).is_set()
+                       ? describe(value.get_result())
+                       : Element(0, 0, 0, 0, Void);
     head.count = 0;
     head.offset = U32(convention);
     head.distance = 0;
@@ -1033,14 +1042,14 @@ class Compiler {
         return Status::Overflow;
       }
 
-      const auto status = prepare_reference(argument.get_reference(), True);
+      const auto status = prepare_reference(argument.reference, True);
       if (status != Status::Success) {
         return status;
       }
 
       records.get_data()[first].count += argument.count;
 
-      auto entry = describe(argument.get_reference());
+      auto entry = describe(argument.reference);
       entry.count = argument.count;
       entry.offset = entry.distance = 0;
       run.push(entry, 0, emit);
