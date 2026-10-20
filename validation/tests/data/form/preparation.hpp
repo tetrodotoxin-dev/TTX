@@ -9,7 +9,6 @@
 #include "toolchain/validation/test.hpp"
 
 #include "perimortem/core/view/null_terminated.hpp"
-#include "perimortem/memory/thread/vector.hpp"
 
 #include "ttx/data/form/representation.hpp"
 #include "ttx/data/form/schema.hpp"
@@ -24,11 +23,9 @@ class Preparation {
   auto operator()(Ttx::Data::Form::Schema::Reference source)
       -> Ttx::Data::Form::Representation {
     return Ttx::Data::Form::Representation::compile(source).visit(
-        [&](Perimortem::Memory::Global::Bytes& bytes)
+        [](Ttx::Data::Form::Representation& representation)
             -> Ttx::Data::Form::Representation {
-          const auto& stored =
-              buffers.insert(Perimortem::Core::Data::take(bytes));
-          return {stored.get_data(), stored.get_size()};
+          return Perimortem::Core::Data::take(representation);
         },
 
         [](Ttx::Data::Status status) -> Ttx::Data::Form::Representation {
@@ -40,15 +37,12 @@ class Preparation {
   auto validate(Ttx::Data::Form::Schema::Reference source)
       -> Ttx::Data::Status {
     return Ttx::Data::Form::Representation::compile(source).visit(
-        [](const Perimortem::Memory::Global::Bytes& bytes) {
+        [](const Ttx::Data::Form::Representation& representation) {
           return Ttx::Data::Status::Success;
         },
 
         [](Ttx::Data::Status status) { return status; });
   }
-
- private:
-  Perimortem::Memory::Thread::Vector<Perimortem::Memory::Global::Bytes> buffers;
 };
 
 }  // namespace Validation::DataTests

@@ -21,11 +21,15 @@ namespace Ttx::Data::Form {
 // compiler.hpp, including its indices and zero padding to a multiple of eight
 // bytes.
 //
-// Construction copies the supplied pointer and size without validating the
-// contents. Geometry and navigation require canonical descriptor bytes.
-// Decoding a noncanonical form is undefined behavior. The provider keeps the
-// referenced bytes readable and unchanged through each use. Copying a
-// Representation shares that storage without allocating or retaining it.
+// Compilation and composition keep their descriptor Bytes in the returned
+// Representation. Copying that Representation copies its Bytes into an
+// independent allocation. Moving transfers the allocation.
+//
+// Construction from a C record or View stores its address and size. The caller
+// keeps those bytes readable and unchanged through every use, including uses
+// of copies. This path allocates nothing and supports embedded canonical forms.
+// Geometry and navigation require canonical descriptor bytes. Decoding a
+// noncanonical form is undefined behavior.
 // Descriptor bytes support any byte alignment. The alignment described by
 // those bytes applies to the payload being represented.
 //
@@ -93,6 +97,44 @@ class Representation {
   constexpr Representation(const U8* data = nullptr, Count size = 0)
       : value{data, size} {}
 
+  constexpr Representation(Perimortem::Core::View::Bytes view)
+      : value{view.get_data(), view.get_size()} {}
+
+  constexpr Representation(Perimortem::Memory::Global::Bytes&& bytes)
+      : value{bytes.get_data(), bytes.get_size()},
+        bytes(Perimortem::Core::Data::take(bytes)) {}
+
+  constexpr Representation(const Representation& source) : value(source.value) {
+    if (!source.bytes.is_empty()) {
+      bytes = source.bytes;
+      value = {bytes.get_data(), bytes.get_size()};
+    }
+  }
+
+  constexpr Representation(Representation&& source)
+      : value(source.value), bytes(Perimortem::Core::Data::take(source.bytes)) {
+    source.value = {};
+  }
+
+  constexpr auto operator=(const Representation& source) -> Representation& {
+    if (this != &source) {
+      Representation copy(source);
+      *this = Perimortem::Core::Data::take(copy);
+    }
+
+    return *this;
+  }
+
+  auto operator=(Representation&& source) -> Representation& {
+    if (this != &source) {
+      bytes = Perimortem::Core::Data::take(source.bytes);
+      value = source.value;
+      source.value = {};
+    }
+
+    return *this;
+  }
+
   constexpr auto get_bytes() const -> Perimortem::Core::View::Bytes {
     return Perimortem::Core::View::Bytes(
         perimortem_view_bytes{value.data, value.size});
@@ -116,6 +158,9 @@ class Representation {
 
   constexpr auto get_alignment() const -> Count;
 
+  // C operations observe this record and its descriptor bytes. The caller
+  // keeps the Representation at the same address and unchanged while an
+  // operation or Storage holds a pointer to the record.
   constexpr auto get_abi() const -> const ttx_representation& { return value; }
 
   // Compares descriptor size and bytes without decoding. For canonical forms,
@@ -124,26 +169,26 @@ class Representation {
   // own contracts.
   constexpr auto compatible(const Representation& other) const -> Bool;
 
-  // Compiles a stable Schema graph into canonical descriptor bytes owned by
-  // the returned Global Bytes. Source descriptions are needed only through
+  // Compiles a stable Schema graph into a Representation that owns its
+  // canonical descriptor Bytes. Source descriptions are needed only through
   // this call. Preparation failures return their status before allocating the
-  // output buffer. A Representation can borrow the result while its allocation
-  // remains accessible and its bytes remain unchanged.
+  // output buffer. The result keeps the complete form available independently
+  // of the source graph.
   static EXPORTED(TTX) auto compile(
       ttx_schema_reference schema,
-      Count pointer_size = sizeof(void*)) -> Perimortem::Core::Storage::
-      Result<Perimortem::Memory::Global::Bytes, Ttx::Data::Status>;
+      Count pointer_size = sizeof(void*))
+      -> Perimortem::Core::Storage::Result<Representation, Ttx::Data::Status>;
 
   // Builds a canonical struct from complete canonical child forms. Members
   // retain their extents and padding at the requested offsets. The children
-  // remain readable through this call. The returned Global Bytes owns the new
-  // descriptor buffer independently of those children. Preparation failures
-  // return their status before allocating that buffer.
+  // remain readable through this call. The returned Representation owns its
+  // descriptor Bytes independently of those children. Preparation failures
+  // return their status before allocating the output buffer.
   static EXPORTED(TTX) auto compose(
       Perimortem::Core::View::Vector<Member> members,
       Count extent,
-      Count alignment) -> Perimortem::Core::Storage::
-      Result<Perimortem::Memory::Global::Bytes, Ttx::Data::Status>;
+      Count alignment)
+      -> Perimortem::Core::Storage::Result<Representation, Ttx::Data::Status>;
 
   // A byte coordinate selects the first primitive whose start is at or after
   // it. Padding is skipped, and a coordinate inside a primitive advances to
@@ -173,6 +218,7 @@ class Representation {
 
  private:
   ttx_representation value;
+  Perimortem::Memory::Global::Bytes bytes;
 };
 
 constexpr auto Representation::get_extent() const -> Count {

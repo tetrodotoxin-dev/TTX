@@ -125,7 +125,7 @@ auto ttx_representation_visit_selected(
 }
 
 static auto write(const Form::Compiler<>& compiler)
-    -> Storage::Result<Global::Bytes, Status> {
+    -> Storage::Result<Form::Representation, Status> {
   Global::Bytes bytes;
   bytes.forgetful_resize(compiler.get_size());
 
@@ -134,12 +134,12 @@ static auto write(const Form::Compiler<>& compiler)
     return status;
   }
 
-  return Data::take(bytes);
+  return Form::Representation(Data::take(bytes));
 }
 
 auto Form::Representation::compile(
     ttx_schema_reference schema,
-    Count pointer_size) -> Storage::Result<Global::Bytes, Status> {
+    Count pointer_size) -> Storage::Result<Representation, Status> {
   Form::Compiler compiler;
   const auto status = compiler.compile(schema, pointer_size);
   if (status != Status::Success) {
@@ -152,7 +152,7 @@ auto Form::Representation::compile(
 auto Form::Representation::compose(
     View::Vector<Member> members,
     Count extent,
-    Count alignment) -> Storage::Result<Global::Bytes, Status> {
+    Count alignment) -> Storage::Result<Representation, Status> {
   Form::Compiler compiler;
   const auto status = compiler.compose(members, extent, alignment);
   if (status != Status::Success) {

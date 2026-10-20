@@ -9,6 +9,7 @@
 #include "perimortem/core/storage/vector.hpp"
 #include "perimortem/memory/allocator/arena.hpp"
 
+#include "ttx/data/form/compiled.hpp"
 #include "ttx/data/form/schema.hpp"
 
 using namespace Perimortem::Core;
@@ -32,7 +33,7 @@ static auto allocate_representation(void* context, Count size, Count alignment)
 // source structure. Mutating the original leaf cannot change that canonical
 // form.
 VALIDATION_TEST(TtxRepresentation, independent_lifetime) {
-  Global::Bytes bytes;
+  Form::Representation prepared;
   {
     auto value = u32;
     const Storage::Vector<Form::Schema::Position, 2> entries = {
@@ -48,14 +49,12 @@ VALIDATION_TEST(TtxRepresentation, independent_lifetime) {
     const auto schema =
         Form::Schema::composite(entries.get_view().slice(0, 2), 12, 4);
     Form::Representation::compile(schema).visit(
-        [&](Global::Bytes& output) { bytes = Data::take(output); },
+        [&](Form::Representation& output) { prepared = Data::take(output); },
         [&](Status) { EXPECT(false); });
     value = Form::Schema::primitive(Form::Schema::Value::R32);
   }
 
-  ASSERT(bytes.get_size());
-
-  const Form::Representation prepared(bytes.get_data(), bytes.get_size());
+  ASSERT(prepared.get_bytes().get_size());
   prepared.next(8).visit(
       [&](Form::Representation::Position entry) {
         EXPECT_EQ(entry.get_offset(), Count(8));
@@ -63,6 +62,59 @@ VALIDATION_TEST(TtxRepresentation, independent_lifetime) {
       },
 
       [&](Status) { EXPECT(false); });
+}
+
+// Copies of an owned form remain usable after the original is released.
+// Moves preserve the descriptor address, including when replacing an existing
+// allocation. A copy's C record must describe its own allocation.
+VALIDATION_TEST(TtxRepresentation, owned_copy_and_move) {
+  Form::Representation copied;
+  Form::Representation moved;
+  Form::Representation::compile(u32).visit(
+      [&](Form::Representation& source) {
+        Form::Representation copy(source);
+        EXPECT(copy.compatible(source));
+        EXPECT(copy.get_bytes().get_data() != source.get_bytes().get_data());
+
+        copied = copy;
+        EXPECT(copied.compatible(copy));
+        EXPECT(copied.get_abi().data == copied.get_bytes().get_data());
+        EXPECT(copied.get_bytes().get_data() != copy.get_bytes().get_data());
+
+        const auto* address = source.get_bytes().get_data();
+        Form::Representation transferred(Data::take(source));
+        EXPECT(transferred.get_bytes().get_data() == address);
+
+        moved = copy;
+        moved = Data::take(transferred);
+        EXPECT(moved.get_bytes().get_data() == address);
+      },
+
+      [&](Status status) { EXPECT(False); });
+
+  ASSERT(copied.get_bytes().get_size());
+  ASSERT(moved.get_bytes().get_size());
+  EXPECT(copied.compatible(moved));
+  EXPECT_EQ(copied.get_extent(), Count(4));
+  EXPECT_EQ(moved.get_extent(), Count(4));
+
+  moved = Form::Representation();
+  EXPECT_EQ(copied.get_alignment(), Count(4));
+}
+
+// Embedded forms retain their module's static bytes. Constructing and copying
+// Views remains available in constant evaluation and preserves that address.
+VALIDATION_TEST(TtxRepresentation, embedded_view) {
+  static constexpr auto& compiled = Form::Compiled<u32>::get_representation();
+  static constexpr Form::Representation view(compiled.get_bytes());
+  static constexpr Form::Representation copy(view);
+  static_assert(copy.get_abi().data == compiled.get_abi().data);
+  static_assert(copy.compatible(compiled));
+
+  Form::Representation assigned;
+  assigned = view;
+  EXPECT(assigned.get_bytes().get_data() == compiled.get_bytes().get_data());
+  EXPECT_EQ(assigned.get_extent(), Count(4));
 }
 
 // Alternating types retain separate descriptors. Logical lookup crosses the
@@ -90,8 +142,7 @@ VALIDATION_TEST(TtxRepresentation, heterogeneous_index) {
   const auto outer =
       Form::Schema::composite(wrapper.get_view().slice(0, 1), 12, 4);
   Form::Representation::compile(outer).visit(
-      [&](const Global::Bytes& bytes) {
-        const Form::Representation value(bytes.get_data(), bytes.get_size());
+      [&](const Form::Representation& value) {
         value.next(8).visit(
             [&](Form::Representation::Position entry) {
               EXPECT_EQ(entry.get_offset(), Count(8));
@@ -127,7 +178,7 @@ VALIDATION_TEST(TtxRepresentation, invalid_publication) {
        ++source_index) {
     const auto& source = failures[source_index];
     Form::Representation::compile(source).visit(
-        [&](const Global::Bytes& bytes) { EXPECT(false); },
+        [&](const Form::Representation& representation) { EXPECT(false); },
         [&](Status status) { EXPECT(status == Status::Invalid); });
   }
 
@@ -140,7 +191,7 @@ VALIDATION_TEST(TtxRepresentation, invalid_publication) {
 
   cyclic = Form::Schema::composite(entry.get_view().slice(0, 1), 4, 4);
   Form::Representation::compile(cyclic).visit(
-      [&](const Global::Bytes& bytes) { EXPECT(false); },
+      [&](const Form::Representation& representation) { EXPECT(false); },
       [&](Status status) { EXPECT(status == Status::Invalid); });
 }
 
@@ -149,8 +200,7 @@ VALIDATION_TEST(TtxRepresentation, invalid_publication) {
 VALIDATION_TEST(TtxRepresentation, singleton_range) {
   const auto source = Form::Schema::range(u32, 1, 0, 4, 4);
   Form::Representation::compile(source).visit(
-      [&](const Global::Bytes& bytes) {
-        const Form::Representation value(bytes.get_data(), bytes.get_size());
+      [&](const Form::Representation& value) {
         value.next(0).visit(
             [&](Form::Representation::Position entry) {
               EXPECT_EQ(entry.get_offset(), Count(0));
@@ -204,8 +254,7 @@ VALIDATION_TEST(TtxRepresentation, nested_units) {
   const auto grouped =
       Form::Schema::composite(children.get_view().slice(0, 2), 0, 8);
   Form::Representation::compile(grouped).visit(
-      [&](const Global::Bytes& bytes) {
-        const Form::Representation value(bytes.get_data(), bytes.get_size());
+      [&](const Form::Representation& value) {
         EXPECT_EQ(value.get_bytes().get_size(), Count(8));
         EXPECT_EQ(value.get_extent(), Count(0));
         EXPECT_EQ(value.get_alignment(), Count(1));
@@ -231,8 +280,7 @@ VALIDATION_TEST(TtxRepresentation, adjacent_ranges) {
       View::Vector<Form::Schema::Position>(pieces[0], 2), 32, 4);
 
   Form::Representation::compile(source).visit(
-      [&](const Global::Bytes& bytes) {
-        const Form::Representation prepared(bytes.get_data(), bytes.get_size());
+      [&](const Form::Representation& prepared) {
         EXPECT_EQ(prepared.get_bytes().get_size(), Count(8));
         prepared.next(12).visit(
             [&](Form::Representation::Position position) {
@@ -264,13 +312,10 @@ VALIDATION_TEST(TtxRepresentation, repeated_records) {
       Form::Schema::range(record, 1000000000, 16, 16000000000ULL, 4);
 
   Form::Representation::compile(source).visit(
-      [&](const Global::Bytes& bytes) {
-        const Form::Representation prepared(bytes.get_data(), bytes.get_size());
+      [&](const Form::Representation& prepared) {
         EXPECT_EQ(prepared.get_bytes().get_size(), Count(80));
         Form::Representation::compile(source).visit(
-            [&](const Global::Bytes& bytes) {
-              const Form::Representation other(
-                  bytes.get_data(), bytes.get_size());
+            [&](const Form::Representation& other) {
               EXPECT(prepared.compatible(other));
             },
 
@@ -349,12 +394,9 @@ VALIDATION_TEST(TtxRepresentation, boundary_mismatch) {
       View::Vector<Form::Schema::Position>(one_three[0], 2), 16, 4);
 
   Form::Representation::compile(a).visit(
-      [&](const Global::Bytes& bytes) {
-        const Form::Representation left(bytes.get_data(), bytes.get_size());
+      [&](const Form::Representation& left) {
         Form::Representation::compile(b).visit(
-            [&](const Global::Bytes& bytes) {
-              const Form::Representation right(
-                  bytes.get_data(), bytes.get_size());
+            [&](const Form::Representation& right) {
               EXPECT_NOT(left.compatible(right));
               EXPECT_NOT(right.compatible(left));
             },
@@ -418,13 +460,10 @@ VALIDATION_TEST(TtxRepresentation, boundary_patterns) {
       View::Vector<Form::Schema::Position>(listed[0], 4), 64, 4);
 
   Form::Representation::compile(repeated).visit(
-      [&](const Global::Bytes& bytes) {
-        const Form::Representation left(bytes.get_data(), bytes.get_size());
+      [&](const Form::Representation& left) {
         Form::Representation::compile(explicit_record)
             .visit(
-                [&](const Global::Bytes& bytes) {
-                  const Form::Representation right(
-                      bytes.get_data(), bytes.get_size());
+                [&](const Form::Representation& right) {
                   EXPECT(left.compatible(right));
                   EXPECT(right.compatible(left));
                 },

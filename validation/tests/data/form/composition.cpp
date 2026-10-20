@@ -59,9 +59,7 @@ static auto check_pair(const Form::Schema& child, Test::TestResult& result)
   Form::Representation::compose(
       members.get_view().slice(0, 2), width * 2, child.get_alignment())
       .visit(
-          [&](const Global::Bytes& bytes) {
-            const Form::Representation actual(
-                bytes.get_data(), bytes.get_size());
+          [&](const Form::Representation& actual) {
             EXPECT(actual.compatible(expected));
           },
 
@@ -78,41 +76,36 @@ static auto check_pair(const Form::Schema& child, Test::TestResult& result)
   EXPECT(Form::Representation(*output).compatible(expected));
 }
 
-// The composed buffer survives changes to its children and the end of their
-// storage lifetimes. Moving it out of the Result keeps it available after the
-// temporary member records and both compilation Results have been destroyed.
+// The composed form survives replacement and destruction of its children.
+// Moving it out of the Result keeps it available after the temporary member
+// records and both compilation Results have been destroyed.
 VALIDATION_TEST(Composition, independent_lifetime) {
-  Global::Bytes composed;
+  Form::Representation composed;
   {
     const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
-    Global::Bytes child;
+    Form::Representation child;
     Form::Representation::compile(integer).visit(
-        [&](Global::Bytes& bytes) { child = Data::take(bytes); },
+        [&](Form::Representation& value) { child = Data::take(value); },
         [&](Status status) { EXPECT(False); });
-    ASSERT(child.get_size());
-
-    const Form::Representation representation(
-        child.get_data(), child.get_size());
+    ASSERT(child.get_bytes().get_size());
     const Form::Representation::Member members[] = {
-      {&representation.get_abi(), 0}, {&representation.get_abi(), 8}};
+      {&child.get_abi(), 0}, {&child.get_abi(), 8}};
 
     Form::Representation::compose({members[0], 2}, 12, 4)
         .visit(
-            [&](Global::Bytes& bytes) { composed = Data::take(bytes); },
+            [&](Form::Representation& value) { composed = Data::take(value); },
             [&](Status status) { EXPECT(False); });
-    ASSERT(composed.get_size());
-    EXPECT(composed.get_data() != child.get_data());
+    ASSERT(composed.get_bytes().get_size());
+    EXPECT(composed.get_bytes().get_data() != child.get_bytes().get_data());
 
-    child.set(0xa5);
+    child = Form::Representation();
   }
 
-  const Form::Representation representation(
-      composed.get_data(), composed.get_size());
-  EXPECT_EQ(representation.get_extent(), Count(12));
-  EXPECT_EQ(representation.get_alignment(), Count(4));
+  EXPECT_EQ(composed.get_extent(), Count(12));
+  EXPECT_EQ(composed.get_alignment(), Count(4));
 
   Count visited = 0;
-  EXPECT(representation.visit([&](Form::Representation::Position position) {
+  EXPECT(composed.visit([&](Form::Representation::Position position) {
     EXPECT_EQ(position.get_offset(), visited * 8);
     EXPECT(position.get_value() == Form::Schema::Value::U32);
     ++visited;
@@ -172,7 +165,6 @@ VALIDATION_TEST(Composition, records_and_cycles) {
 }
 
 VALIDATION_TEST(Composition, compact_ranges) {
-  Validation::DataTests::Preparation prepare;
   const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
   const auto range =
       Form::Schema::range(integer, 1000000000, 4, 4000000000ULL, 4);
@@ -210,21 +202,19 @@ VALIDATION_TEST(Composition, invalid_placements) {
     const Count extent = extents[extent_index];
     Form::Representation::compose(members.get_view().slice(0, 2), extent, 4)
         .visit(
-            [&](const Global::Bytes& bytes) { EXPECT(False); },
+            [&](const Form::Representation& representation) { EXPECT(False); },
             [&](Status status) { EXPECT(status == Status::Invalid); });
   }
 
   Form::Representation::compose(
       View::Vector<Form::Representation::Member>(), 8, 8)
       .visit(
-          [&](const Global::Bytes& bytes) { EXPECT(False); },
+          [&](const Form::Representation& representation) { EXPECT(False); },
           [&](Status status) { EXPECT(status == Status::Invalid); });
   Form::Representation::compose(
       View::Vector<Form::Representation::Member>(), 0, 1)
       .visit(
-          [&](const Global::Bytes& bytes) {
-            const Form::Representation empty(
-                bytes.get_data(), bytes.get_size());
+          [&](const Form::Representation& empty) {
             EXPECT_EQ(empty.get_extent(), Count(0));
           },
 

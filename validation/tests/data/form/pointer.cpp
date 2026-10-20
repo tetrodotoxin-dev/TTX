@@ -298,8 +298,7 @@ VALIDATION_TEST(Pointers, pointer_width) {
 
   Form::Representation::compile(pointer, 4)
       .visit(
-          [&](const Global::Bytes& bytes) {
-            const Form::Representation form(bytes.get_data(), bytes.get_size());
+          [&](const Form::Representation& form) {
             EXPECT(form.compatible(narrow_pointer));
           },
 
@@ -334,7 +333,7 @@ VALIDATION_TEST(Pointers, unsupported_width) {
 
   Form::Representation::compile(pointer, 3)
       .visit(
-          [&](const Global::Bytes& bytes) { EXPECT(false); },
+          [&](const Form::Representation& representation) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Unsupported); });
 }
 
@@ -373,8 +372,7 @@ VALIDATION_TEST(Pointers, composed_pointers) {
 
   Form::Representation::compose(members, 8, 4)
       .visit(
-          [&](const Global::Bytes& bytes) {
-            const Form::Representation form(bytes.get_data(), bytes.get_size());
+          [&](const Form::Representation& form) {
             EXPECT(form.get_pointer_size() == 4);
 
             Count count = 0;
@@ -401,6 +399,6 @@ VALIDATION_TEST(Pointers, composed_pointers) {
 
   Form::Representation::compose(mixed, 16, 8)
       .visit(
-          [&](const Global::Bytes& bytes) { EXPECT(false); },
+          [&](const Form::Representation& representation) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Incompatible); });
 }

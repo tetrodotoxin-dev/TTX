@@ -9,7 +9,6 @@
 #error The Data component exposed a higher layer.
 #endif
 
-using namespace Perimortem::Memory;
 using namespace Ttx::Data;
 
 S32 main() {
@@ -22,9 +21,7 @@ S32 main() {
   const Bool compiled =
       Form::Representation::compile(Form::Native<U32>::reference)
           .visit(
-              [](const Global::Bytes& bytes) {
-                const Form::Representation form(
-                    bytes.get_data(), bytes.get_size());
+              [](const Form::Representation& form) {
                 return form.compatible(
                     Form::Compiled<
                         Form::Native<U32>::reference>::get_representation());
