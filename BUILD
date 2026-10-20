@@ -10,6 +10,14 @@ load(
 )
 
 package(
+    components = {
+        "data": [],
+        "semantic": ["data"],
+        "concept": [
+            "data",
+            "semantic",
+        ],
+    },
     linkage = "shared",
     module = "ttx",
     shared = "//source:ttx_shared",

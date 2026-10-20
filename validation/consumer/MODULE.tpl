@@ -6,4 +6,14 @@ sdks.release(
     project = "TTX",
     version = "{version}",
 )
+sdks.component(
+    release = "ttx",
+    name = "data",
+    deps = ["@perimortem//:core", "@perimortem//:memory"],
+)
+sdks.component(
+    release = "ttx",
+    name = "semantic",
+    deps = ["@perimortem//:serialization"],
+)
 use_repo(sdks, "ttx")

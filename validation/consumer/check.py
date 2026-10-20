@@ -42,8 +42,7 @@ def check():
         workspace.mkdir()
         for name in [".bazelversion", ".bazelrc"]:
             shutil.copyfile(repository / name, workspace / name)
-        for name in ["consumer.c", "consumer.cpp"]:
-            shutil.copyfile(templates / name, workspace / name)
+        shutil.copytree(templates, workspace / "validation/consumer")
         shutil.copyfile(templates / "BUILD.tpl", workspace / "BUILD")
 
         # Use the same adversarial providers and assertions in the source build
@@ -64,13 +63,21 @@ def check():
                                "version": version}.items():
                 module = module.replace("{" + key + "}", value)
             (workspace / "MODULE.bazel").write_text(module)
-            for target in ["c_consumer", "cpp_consumer", "tests"]:
+            for target in [
+                "//validation/consumer:c_consumer",
+                "//validation/consumer:data_consumer",
+                "//validation/consumer:semantic_consumer",
+                "//validation/consumer:cpp_consumer",
+                "//:tests",
+            ]:
                 subprocess.run([
                     "bazel", "--batch", "--output_base=" + str(Path(temporary) / "bazel"),
-                    "run", ":" + target, "--config=release",
+                    "run", target, "--config=release",
                     "--distdir=" + str(directory),
                 ], cwd=workspace, check=True)
-            print(linkage + " candidate SDK: C, C++ and contract tests passed.", flush=True)
+            print(
+                linkage + " candidate SDK: Data, Semantic, Concept consumers "
+                "and contract tests passed.", flush=True)
 
 
 if __name__ == "__main__":

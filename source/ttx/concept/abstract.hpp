@@ -175,126 +175,20 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(perimortem_view_bytes, data),
     TTX_DATA_MEMBER(perimortem_view_bytes, size));
 
-// Abstract navigation returns Abstracts and passes them to its visitor. These
-// are recursive native declarations, so their Schema nodes share one constant
-// Definition instead of expanding the recursion through C++ template
-// instantiation.
+// Declare the root schema first so recursive signatures can refer back to it.
+// Native reads argument and result types from the C fields and supplies their
+// calling convention. The root's fields are defined after the operation and
+// visitor schemas, once their references are available.
 template <>
 class Ttx::Data::Form::Native<ttx_abstract> {
-  struct Definition {
-    Schema root;
-    Schema operations;
-    Schema visitor;
-    Schema callback;
-    Schema resolve;
-    Schema lookup;
-    Schema visit;
-    Perimortem::Core::Storage::Vector<Schema::Argument, 3> callback_arguments;
-    Perimortem::Core::Storage::Vector<Schema::Argument, 1> resolve_arguments;
-    Perimortem::Core::Storage::Vector<Schema::Argument, 2> lookup_arguments;
-    Perimortem::Core::Storage::Vector<Schema::Argument, 2> visit_arguments;
-    Perimortem::Core::Storage::Vector<Schema::Position, 2> root_fields;
-    Perimortem::Core::Storage::Vector<Schema::Position, 6> operation_fields;
-    Perimortem::Core::Storage::Vector<Schema::Position, 2> visitor_fields;
-
-    // The lists retain schema addresses while construction is in progress.
-    // Populate each shape after the vectors exist so every view borrows live
-    // storage, including the edges that point back to the root.
-    constexpr Definition()
-        : callback_arguments({
-            Schema::Argument{Schema::pointer(), 1},
-            Schema::Argument{Native<perimortem_view_bytes>::reference, 1},
-            Schema::Argument{root, 1},
-          }),
-
-          resolve_arguments({
-            Schema::Argument{Schema::pointer(), 1},
-          }),
-
-          lookup_arguments({
-            Schema::Argument{Schema::pointer(), 1},
-            Schema::Argument{Native<perimortem_view_bytes>::reference, 1},
-          }),
-
-          visit_arguments({
-            Schema::Argument{Schema::pointer(), 1},
-            Schema::Argument{visitor, 1},
-          }),
-
-          root_fields({
-            Schema::Position(
-                Schema::pointer(),
-                offsetof(ttx_abstract, context)),
-            {
-              Schema::pointer(&operations),
-              offsetof(ttx_abstract, operations),
-            },
-          }),
-
-          operation_fields({
-            TTX_DATA_MEMBER(ttx_abstract_ops, supports),
-            TTX_DATA_MEMBER(ttx_abstract_ops, bind),
-            TTX_DATA_MEMBER(ttx_abstract_ops, get_data),
-            {
-              resolve,
-              offsetof(ttx_abstract_ops, resolve),
-            },
-
-            {
-              lookup,
-              offsetof(ttx_abstract_ops, resolve_concept),
-            },
-
-            {
-              visit,
-              offsetof(ttx_abstract_ops, visit_concepts),
-            },
-          }),
-
-          visitor_fields({
-            Schema::Position(
-                Schema::pointer(),
-                offsetof(ttx_concept_visitor, context)),
-            {
-              callback,
-              offsetof(ttx_concept_visitor, callback),
-            },
-          }) {
-
-      root = Schema::composite(
-          root_fields.get_view(), sizeof(ttx_abstract), alignof(ttx_abstract));
-      operations = Schema::composite(
-          operation_fields.get_view(), sizeof(ttx_abstract_ops),
-          alignof(ttx_abstract_ops));
-      visitor = Schema::composite(
-          visitor_fields.get_view(), sizeof(ttx_concept_visitor),
-          alignof(ttx_concept_visitor));
-      callback = Schema::callable(
-          Callable::Convention::Native, callback_arguments.get_view());
-      resolve = Schema::callable(
-          Callable::Convention::Native, resolve_arguments.get_view(), root);
-      lookup = Schema::callable(
-          Callable::Convention::Native, lookup_arguments.get_view(), root);
-      visit = Schema::callable(
-          Callable::Convention::Native, visit_arguments.get_view());
-    }
-  };
-
-  static const Definition definition;
+  static_assert(
+      __is_standard_layout(ttx_abstract) &&
+          __is_trivially_constructible(ttx_abstract, const ttx_abstract&) &&
+          __is_trivially_destructible(ttx_abstract),
+      "Native API records require a trivial C-compatible call boundary");
 
  public:
-  static constexpr const Schema& schema = definition.root;
-  static constexpr const Schema& operations = definition.operations;
-  static constexpr Schema::Reference reference = schema;
-};
-
-inline constexpr Ttx::Data::Form::Native<ttx_abstract>::Definition
-    Ttx::Data::Form::Native<ttx_abstract>::definition;
-
-template <>
-class Ttx::Data::Form::Native<ttx_abstract_ops> {
- public:
-  static constexpr const Schema& schema = Native<ttx_abstract>::operations;
+  static const Schema schema;
   static constexpr Schema::Reference reference = schema;
 };
 
@@ -302,3 +196,24 @@ TTX_DATA_RECORD(
     ttx_concept_visitor,
     TTX_DATA_MEMBER(ttx_concept_visitor, context),
     TTX_DATA_MEMBER(ttx_concept_visitor, callback));
+
+TTX_DATA_RECORD(
+    ttx_abstract_ops,
+    TTX_DATA_MEMBER(ttx_abstract_ops, supports),
+    TTX_DATA_MEMBER(ttx_abstract_ops, bind),
+    TTX_DATA_MEMBER(ttx_abstract_ops, get_data),
+    TTX_DATA_MEMBER(ttx_abstract_ops, resolve),
+    TTX_DATA_MEMBER(ttx_abstract_ops, resolve_concept),
+    TTX_DATA_MEMBER(ttx_abstract_ops, visit_concepts));
+
+inline constexpr Ttx::Data::Form::Schema
+    Ttx::Data::Form::Native<ttx_abstract>::schema = [] {
+      static constexpr Perimortem::Core::Storage::Vector<Schema::Position, 2>
+          fields = {{
+            TTX_DATA_MEMBER(ttx_abstract, context),
+            TTX_DATA_MEMBER(ttx_abstract, operations),
+          }};
+
+      return Schema::composite(
+          fields.get_view(), sizeof(ttx_abstract), alignof(ttx_abstract));
+    }();

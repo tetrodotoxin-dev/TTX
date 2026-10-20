@@ -4,6 +4,23 @@ load("@tetro_toolchain//:defs.bzl", "WINDOWS", "library")
 
 package(default_visibility = ["//visibility:public"])
 
+_COMPONENTS = {
+    "data": [],
+    "semantic": ["data"],
+    "concept": [
+        "data",
+        "semantic",
+    ],
+}
+
+_COMPONENT_DEPS = {
+    "data": [
+        "@perimortem//:core",
+        "@perimortem//:memory",
+    ],
+    "semantic": ["@perimortem//:serialization"],
+}
+
 _LIBRARY = dict(
     srcs = glob(["ttx/**/*.cpp"]),
     hdrs = glob([
@@ -23,6 +40,8 @@ library(
     name = "ttx_static",
     srcs = _LIBRARY["srcs"],
     hdrs = _LIBRARY["hdrs"],
+    component_deps = _COMPONENT_DEPS,
+    components = _COMPONENTS,
     includes = _LIBRARY["includes"],
     module = "ttx",
     deps = _LIBRARY["deps"],

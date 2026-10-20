@@ -5,6 +5,12 @@
 
 #include "ttx/data/transfer.h"
 
+#if __has_include(                         \
+    "ttx/semantic/negotiation/query.h") || \
+    __has_include("ttx/concept/abstract.h")
+#error The Data component exposed a higher layer.
+#endif
+
 typedef struct output_storage {
   _Alignas(8) U8 bytes[256];
 } output_storage;
