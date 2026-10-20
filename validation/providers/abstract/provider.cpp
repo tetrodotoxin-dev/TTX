@@ -100,9 +100,10 @@ ttx_binding_status supports(void*, perimortem_uuid id) {
              : TTX_BINDING_UNKNOWN;
 }
 
-// Discovery and returned interfaces use different contexts. The returned
-// records stand on their own supplying contracts and carry the actual callable
-// functions, all of which stay private to this library.
+// Discovery uses the Module context, while each returned API uses its Root.
+// Consumers call the returned functions with that Root context rather than
+// reusing the discovery context. The functions remain hidden from symbol
+// lookup and callable through their API records while the library is loaded.
 ttx_binding_status bind(void* context, perimortem_uuid id, ttx_storage target) {
   auto& state = *static_cast<Module*>(context);
   ++state.requests;

@@ -144,7 +144,7 @@ static counter_statistics statistics(void) {
 counter_fixture interface_provider_open(interface_compile compiler) {
   // These are independently authored C declarations. The host supplies only
   // the compiler, not the expected interface descriptor or native operation
-  // identities. sizeof/offsetof retain the actual C record's geometry.
+  // identities. `sizeof` and `offsetof` retain the actual C record's geometry.
   static const ttx_schema integer = {
     8,
     8,

@@ -184,8 +184,9 @@ VALIDATION_TEST(TtxRepresentation, publication_on_error) {
   EXPECT(output == &sentinel);
 }
 
-// Repeating or grouping unit does not manufacture hidden data positions.
-// With no payload, no consumer can distinguish those source spellings.
+// Empty members and repetitions normalize to the unit form: extent zero,
+// alignment one and eight descriptor bytes. Even a billion repetitions with
+// source alignment eight produce that form because they contain no values.
 VALIDATION_TEST(TtxRepresentation, nested_units) {
   Arena arena;
   const auto empty =

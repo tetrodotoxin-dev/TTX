@@ -362,9 +362,11 @@ class Compiler {
     return publish(root);
   }
 
-  // Assembles canonical child forms at checked offsets within the new extent
-  // and alignment. Imported bodies use the same interning and numbering as
-  // source compilation, including cycles. Their source Schemas are unnecessary.
+  // Combines compiled child forms into a new struct, checking their positions
+  // against its extent and alignment. The child forms supply all the required
+  // descriptions. Their original Schemas are no longer needed. Composition
+  // merges and numbers bodies using the same algorithm as Schema compilation,
+  // including when those bodies contain recursive references.
   EXPORTED(TTX) auto compose(
       Perimortem::Core::View::Vector<ttx_representation_member> members,
       Count extent,
@@ -468,9 +470,9 @@ class Compiler {
     Count extent = 0;
   };
 
-  // Runtime composition remaps a canonical body's absolute block references
-  // into this compiler's temporary inventory. These helpers share the same
-  // records and normalization algorithm as source compilation.
+  // Converts references from block positions in the input buffer to indices
+  // in the compiler's preparation records. Composition can then use the same
+  // normalization and numbering as compilation from a Schema.
   auto import_body(
       const ttx_representation& form,
       Count block,
@@ -570,9 +572,9 @@ class Compiler {
     return entry;
   }
 
-  // Source memoization, body interning and recursive refinement all index
-  // existing inventory entries. Sharing lookup and growth lets each phase use
-  // those stored keys and hashes directly.
+  // Each compilation stage stores hashes and chain links in its own records.
+  // This lookup searches by hash, then lets the caller check equality. Small
+  // sets use a linear search before bucket storage is allocated.
   static constexpr auto find(
       const auto& entries,
       const Indices& buckets,
@@ -639,8 +641,10 @@ class Compiler {
 
   static constexpr auto source_hash(const Schema* schema) -> U64 {
     if consteval {
-      // Constant evaluation can compare source pointers, but cannot hash
-      // their addresses. Only source memoization uses this common bucket.
+      // Constant evaluation permits pointer equality but cannot convert an
+      // address into a hash. A zero hash leaves find_source to compare the
+      // Schema pointers directly. Runtime compilation hashes their addresses
+      // to narrow that search.
       return 0;
     } else {
       return Perimortem::Core::Algorithm::Hash(schema).get_value();

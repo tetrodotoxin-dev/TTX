@@ -42,8 +42,9 @@ class Abstract {
            api.operations->visit_concepts;
   }
 
-  // Uses context and a complete table supplied under the Abstract contract.
-  // Construction stores their addresses and relies on their existing access.
+  // Stores the context pointer and the address of the operation table. The
+  // caller supplies a complete Abstract interface and keeps its context and
+  // table available for every use of this record.
   constexpr Abstract(void* context, const Operations& operations)
       : api(context, &operations) {}
 

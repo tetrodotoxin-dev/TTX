@@ -30,9 +30,9 @@ class Borrowed {
                ttx_abstract(api.context, &api.operations->abstract));
   }
 
-  // Copies an existing acquisition's record. Explicit construction makes the
-  // caller's interpretation as Borrowed visible. Construction performs no
-  // acquisition, validation or release.
+  // Copies an existing Borrowed record without acquiring again. Explicit
+  // construction leaves validation of the record with the caller. The
+  // original release obligation remains unchanged.
   explicit constexpr Borrowed(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }

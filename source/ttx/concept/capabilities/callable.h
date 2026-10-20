@@ -19,10 +19,10 @@ typedef struct ttx_callable_field {
   Count offset;
 } ttx_callable_field;
 
-// Describes the storage of an argument or result frame and the meaning of its
-// fields. The provider supplies a readable canonical Representation and count
-// field entries in argument order. A zero count leaves fields unused. Each
-// field's offset locates its value within the represented frame.
+// A frame describes the layout of an operation's arguments or results. The
+// provider supplies a readable canonical Representation and an array of `count`
+// fields in argument order. Each field gives the meaning and byte offset of
+// one value in that layout. With a zero count, the fields pointer is unused.
 typedef struct ttx_callable_frame {
   const ttx_representation* representation;
   const ttx_callable_field* fields;

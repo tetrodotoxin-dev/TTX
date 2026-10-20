@@ -59,9 +59,9 @@ class Callable {
   // directly and requires an index below get_size().
   class Frame {
    public:
-    // Copies the provider's frame record under its existing access contract.
-    // Explicit construction marks the caller's responsibility for valid
-    // description and field storage, which construction leaves unchecked.
+    // The caller supplies a valid description and field array before creating
+    // a Frame. This constructor copies the record without checking that
+    // storage, so conversion from the C record is explicit.
     explicit constexpr Frame(ttx_callable_frame frame) : frame(frame) {}
 
     auto get_representation() const -> const Data::Form::Representation& {
@@ -88,8 +88,9 @@ class Callable {
   // Binding the operation's UUID and API form establishes the callable record.
   class Description {
    public:
-    // Copies the description record. Explicit construction marks unchecked
-    // use of the provider's canonical forms, field arrays and Abstracts.
+    // The caller ensures the canonical forms, field arrays and Abstracts are
+    // usable before creating a Description. This constructor copies the record
+    // without checking them, so conversion from the C record is explicit.
     explicit constexpr Description(ttx_callable_description description)
         : description(description) {}
 

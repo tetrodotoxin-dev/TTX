@@ -248,8 +248,8 @@ VALIDATION_TEST(TtxCompiler, repeated_padding) {
   EXPECT_NOT(prepare(a).compatible(prepare(b)));
 }
 
-// A surrounding Composite is an additional body. Neither its member count
-// nor a matching extent allows comparison to discard that boundary.
+// Wrapping a Composite in another struct changes its canonical form even when
+// the wrapper adds no bytes. Comparison preserves that extra struct boundary.
 VALIDATION_TEST(TtxCompiler, nested_group_match) {
   Preparation prepare;
   const Perimortem::Core::Storage::Vector<Schema::Position, 2> pair = {

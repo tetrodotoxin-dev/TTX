@@ -16,16 +16,16 @@ class Invocation {
  public:
   using Api = ttx_invocation;
 
-  // Checks that the call and both description pointers are present. The
-  // supplying contract establishes readable canonical descriptions, callable
-  // code and any context required by that code.
+  // Checks only that invoke, inputs and outputs are nonnull. The provider
+  // must supply readable canonical descriptions, a callable function and any
+  // context that function requires.
   static auto accept(Api api) -> Bool {
     return api.invoke && api.inputs && api.outputs;
   }
 
-  // Copies a record whose representation and required pointers the caller has
-  // established. Construction performs no validation. Explicit construction
-  // marks that unchecked conversion from the C record.
+  // The caller establishes the record's representation and required pointers
+  // before construction. This constructor only copies the record, so
+  // conversion from the C record is explicit.
   explicit constexpr Invocation(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }

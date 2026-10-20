@@ -77,9 +77,10 @@ VALIDATION_TEST(Retention, create_borrow_invoke_release) {
   EXPECT_EQ(foreign.api.statistics().inside_callback, U8(0));
   EXPECT_EQ(foreign.api.statistics().live, Count(1));
 
-  // Copying and binding carry the existing release obligation. Both continue
-  // through the retained Abstract, including when another capability supplies
-  // its own Abstract operations.
+  // After the creation callback ends, the consumer copies the Borrowed record
+  // and binds Callable through it. The provider keeps the operation callable
+  // through those interfaces until release. They share the original
+  // acquisition and its single release obligation.
   retained.visit(
       [&](Policies::Borrowed copied) {
         copied.get_abstract().bind<Policies::Borrowed>().visit(

@@ -76,8 +76,9 @@ class ForeignInvocation {
   Library module;
 };
 
-// The negotiated record carries both its call and payload forms. Keeping the
-// record for repeated calls uses the provider's existing access contract.
+// The consumer negotiates once, checks the buffer layouts and calls the same
+// operation sixteen times while the provider library remains loaded. The
+// bind, transfer and allocation counters must stay unchanged across the calls.
 VALIDATION_TEST(InvocationTests, generated_results) {
   ForeignInvocation foreign;
   ASSERT(foreign.api.query.bind);

@@ -6,10 +6,10 @@
 
 #include "toolchain/toolchain.h"
 
-// Data operations report compilation, representation checks, traversal and
-// transfer outcomes with these values. Each operation defines the failure
-// conditions it can report and when its output becomes usable. Semantic
-// negotiation reports its own Satisfied, Unknown and Rejected outcomes.
+// Data operations return these status codes to report success or explain why
+// they stopped. Each operation documents its possible failures and whether
+// its output can be used after a failure. Semantic negotiation uses its own
+// Satisfied, Unknown and Rejected results.
 typedef U8 ttx_data_status;
 
 #define TTX_DATA_SUCCESS ((ttx_data_status)0)

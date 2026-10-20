@@ -117,8 +117,8 @@ class Native<void*> {
   static constexpr Schema::Reference reference = Schema::pointer();
 };
 
-// A const opaque pointer has the same address representation. Its supplying
-// operation establishes which observations that address permits.
+// Const qualification leaves the pointer's encoded layout unchanged. The
+// operation using the pointer defines the allowed access to its target.
 template <>
 class Native<const void*> : public Native<void*> {};
 
@@ -165,9 +165,11 @@ class Native<Result (*)(Arguments...)> {
   static constexpr Schema::Reference reference = schema;
 };
 
-// A variadic function pointer describes the fixed argument prefix and the
-// host's variadic C convention. Each invocation supplies the types and values
-// following that prefix under the operation's semantic contract.
+// A variadic function pointer describes its return value, fixed argument
+// prefix and the host's variadic C convention. Those declarations determine
+// the canonical signature. The argument types following the prefix belong to
+// each invocation under the operation's semantic contract, so they are supplied
+// by the caller rather than encoded in this form.
 template <typename Result, typename... Arguments>
 class Native<Result (*)(Arguments..., ...)> {
 

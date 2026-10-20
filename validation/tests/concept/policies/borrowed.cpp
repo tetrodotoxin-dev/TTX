@@ -345,8 +345,9 @@ VALIDATION_TEST(Borrowing, malformed_answer_return) {
     }
   } provider;
 
-  // These Abstract operations use no private state, so the fixture can reuse
-  // them with its own context. The acquired API deliberately omits them.
+  // None's Abstract functions ignore context, so this Borrow interface can
+  // reuse them with the fixture's Provider pointer. Its borrow function returns
+  // a different table with missing Abstract operations to exercise cleanup.
   const ttx_borrow_ops operations = {*ttx_none().operations, Provider::borrow};
   const Capabilities::Borrow request({&provider, &operations});
   ASSERT(Capabilities::Borrow::accept(request.get_abi()));

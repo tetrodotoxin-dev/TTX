@@ -34,8 +34,9 @@ VALIDATION_TEST(Abstracts, c_observations) {
   subject.bind<Policies::Constant>().visit(
       [](Policies::Constant) {}, [&](Binding::Status) { EXPECT(False); });
 
-  // Save the byte itself, since a new observation ends the first view's
-  // retention promise. A Constant marker does not change that rule.
+  // Copy the first byte before asking for another observation, which can
+  // replace the provider's buffer. Constant keeps the selection stable while
+  // these byte observations can still change.
   const U8 first = subject.get_data().get_data()[0];
   const U8 second = subject.get_data().get_data()[0];
   EXPECT_EQ(first, U8(1));

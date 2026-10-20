@@ -95,8 +95,7 @@ VALIDATION_TEST(Pointers, opaque_spelling) {
   const auto& pointer = prepare(Schema::pointer());
   EXPECT(pointer.compatible(
       Representation(expected.get_data(), sizeof(expected))));
-  // The native observation name does not introduce a second encoded primitive
-  // code.
+  // Both ways of describing an opaque pointer compile to the same bytes.
   EXPECT(
       pointer.compatible(prepare(Schema::primitive(Schema::Value::Pointer))));
 
@@ -185,8 +184,9 @@ VALIDATION_TEST(Pointers, recursive_callable) {
   }) == Status::Success);
 }
 
-// Equal independent pointees allow adjacent pointer occurrences to compact
-// after references are reconciled. Explicitly spaced pointer slots keep D.
+// These pointers name separately authored structs with the same layout. Once
+// the compiler recognizes that shared layout, it can describe both pointers
+// as one run while preserving their sixteen byte spacing.
 VALIDATION_TEST(Pointers, pointer_run) {
   Validation::DataTests::Preparation prepare;
   const auto integer = Schema::primitive(Schema::Value::U32);

@@ -316,9 +316,10 @@ VALIDATION_TEST(TtxSimulacra, mismatched_callables) {
   EXPECT_EQ(foreign.api.statistics().calls, U64(0));
 }
 
-// One contract can use a direct word, an enclosing private C structure, or a
-// synchronous temporary. Every returned record remains callable after another
-// binding selects a different context and pair of functions.
+// Counter operations can use a U64 directly, find it inside a private C struct,
+// or construct a temporary value for each call. Every API record supplies the
+// context its functions expect. A later bind may select different functions
+// and context while the earlier records remain callable.
 VALIDATION_TEST(TtxSimulacra, composed_contexts) {
   Foreign foreign;
   const Query query(foreign.api.query);

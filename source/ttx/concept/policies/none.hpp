@@ -23,8 +23,9 @@ class None {
   // performs a record copy, with the policy guaranteed by its provider.
   explicit constexpr None(Api api) : api(api) {}
 
-  // Uses Abstract's pointer presence check on a readable, correctly represented
-  // table. The supplying contract establishes the policy's semantic guarantee.
+  // Checks the required pointers through `Abstract::accept`. The caller must
+  // supply a readable table with the agreed representation. The provider
+  // guarantees the None policy itself.
   static auto accept(Api api) -> Bool { return Abstract::accept(api); }
 
   constexpr auto get_abi() const -> Api { return api; }

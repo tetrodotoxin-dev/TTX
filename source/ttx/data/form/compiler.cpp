@@ -146,8 +146,10 @@ static auto publish(
     return TTX_DATA_OVERFLOW;
   }
 
-  // Canonical bytes retain eight byte alignment on targets whose pointer
-  // alignment is smaller. The record's size keeps its following bytes aligned.
+  // This allocation places the descriptor bytes immediately after the
+  // Representation record. Aligning the allocation and keeping the record's
+  // size divisible by eight gives both parts eight byte alignment, including
+  // on targets with four byte pointers.
   static_assert(sizeof(Representation) % 8 == 0);
   const Count alignment = Perimortem::Core::Math::Scalar::max(
       Count(8), Count(alignof(Representation)));

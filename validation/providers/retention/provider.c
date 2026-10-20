@@ -110,8 +110,10 @@ static ttx_binding_status retained_supports(void* context, perimortem_uuid id) {
              : TTX_BINDING_UNKNOWN;
 }
 
-// This symbol is hidden from lookup. The consumer obtains it only as part of
-// a negotiated API record, and repeated calls observe changing provider state.
+// The consumer obtains this function through a negotiated API, even though
+// symbol lookup cannot find it. Each call increments the retained value, so
+// the test also checks that a bound operation observes changes in provider
+// state.
 HIDDEN ttx_data_status
     retention_invoke(void* context, const void* input, void* output) {
   retained_value* value = context;

@@ -6,14 +6,16 @@
 
 #include "ttx/data/form/representation.h"
 
-// Storage supplies a described data region for copying values or receiving a
-// negotiated API. Representation supplies the value's extent and alignment,
-// while size is the capacity of the region at data.
-// The receiving operation determines whether that region is read or written.
+// Storage describes a buffer used to send or receive a value. Its
+// Representation gives the value's layout and required alignment. `size` is
+// the number of available bytes at `data`, which can exceed the value's extent.
+// Transfer can then check that two buffers describe compatible values and have
+// enough space before copying. The operation receiving Storage determines
+// whether it reads or writes the buffer.
 //
-// The caller keeps the representation, descriptor bytes and data region
-// accessible through use. Copying Storage copies its pointers and capacity.
-// Referenced data retains the access duration established by its supplier.
+// Copying Storage copies the record, leaving the buffer and description in
+// place. The caller keeps the buffer, Representation and its descriptor bytes
+// accessible for every use. Copying the record does not extend their lifetime.
 typedef struct ttx_storage {
   const ttx_representation* representation;
   U8* data;

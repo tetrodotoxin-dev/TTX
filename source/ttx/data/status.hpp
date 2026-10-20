@@ -7,8 +7,10 @@
 
 namespace Ttx::Data {
 
-// Status exposes the C Data outcomes to C++ consumers with the same numeric
-// values. The supplying operation defines each outcome's effect on its output.
+// Status is the C++ form of ttx_data_status. Each enumerator keeps its C value
+// so the same result can pass across either interface. What a failure means
+// for the output depends on the operation. For example, Transfer leaves the
+// destination unchanged when it rejects a copy.
 enum class Status : U8 {
   Success = TTX_DATA_SUCCESS,
   Invalid = TTX_DATA_INVALID,

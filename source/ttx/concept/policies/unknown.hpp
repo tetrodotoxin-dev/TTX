@@ -8,9 +8,10 @@
 
 namespace Ttx::Concept::Policies {
 
-// Unknown carries the governing Abstract for an undetermined route result.
-// Its C++ interface preserves the supplied context and operations. To retry
-// resolution, the consumer uses the original Abstract and route.
+// Unknown exposes the Abstract returned when the provider leaves a route's
+// result undetermined. The shared sentinel from `get_unknown` returns itself
+// for further lookups. To observe the provider again, the consumer resolves
+// the same route on the original Abstract.
 class Unknown {
  public:
   static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
@@ -23,8 +24,9 @@ class Unknown {
   // performs a record copy, with the policy guaranteed by its provider.
   explicit constexpr Unknown(Api api) : api(api) {}
 
-  // Uses Abstract's pointer presence check on a readable, correctly represented
-  // table. The supplying contract establishes the policy's semantic guarantee.
+  // Checks the required pointers through `Abstract::accept`. The caller must
+  // supply a readable table with the agreed representation. The provider
+  // guarantees the Unknown policy itself.
   static auto accept(Api api) -> Bool { return Abstract::accept(api); }
 
   constexpr auto get_abi() const -> Api { return api; }

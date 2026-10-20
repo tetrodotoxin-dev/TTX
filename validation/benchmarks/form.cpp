@@ -97,7 +97,8 @@ static Toolchain::Validation::Harness Agreement = {
       },
 };
 
-// Independent publications keep pointer identity from bypassing comparison.
+// The two forms have separate byte buffers. Comparison must read those bytes
+// instead of returning early because their addresses match.
 VALIDATION_BENCHMARK(Agreement, compare_16384) {
   auto agrees = first.compatible(second);
   Toolchain::Validation::Benchmark::prevent_optimization(agrees);

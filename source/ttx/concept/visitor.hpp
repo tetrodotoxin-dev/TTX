@@ -8,14 +8,13 @@
 
 namespace Ttx::Concept {
 
-// Discovery lends the caller's callback to the provider for one enumeration.
-// The provider chooses which named values to expose and can produce each one
-// directly from its own storage. Native references and bound views use the
-// same callback shape without forcing either representation onto the other.
+// Visitor passes a route and a value to the consumer's callback. The provider
+// chooses which values to visit and can read them directly from its own data.
+// Value can be a native reference or a negotiated API record.
 //
-// The callback is borrowed, so the provider must finish calling it before
-// enumeration returns. It cannot retain the Visitor for deferred work. Each
-// discovery contract supplies the lifetime of the names and values it emits.
+// Enumeration is synchronous. The caller keeps the callback alive until
+// enumeration returns, and the provider completes every callback in that time.
+// The enumeration contract specifies how long each route and value can be used.
 template <typename Value>
 class Visitor {
  public:
@@ -26,8 +25,9 @@ class Visitor {
 
   template <typename Function>
     requires(!__is_same(__remove_cvref(Function), Visitor))
-  // The callback stays alive through synchronous visitation. Explicit
-  // construction exposes this borrowed reference at the call site.
+  // Stores a reference to callback, which the caller keeps alive until
+  // visitation returns. Explicit construction makes that borrowed reference
+  // visible at the call site.
   constexpr explicit Visitor(Function& callback)
       : Visitor(&callback, invoke<Function>) {}
 
@@ -37,8 +37,8 @@ class Visitor {
   }
 
  private:
-  // Construction supplies the address of the caller's Function. Its lifetime
-  // covers every invocation through this Visitor.
+  // The constructor stores &callback as context. The caller keeps that
+  // Function alive until all calls through this Visitor have finished.
   template <typename Function>
   static auto
       invoke(void* context, Perimortem::Core::View::Bytes route, Value value)

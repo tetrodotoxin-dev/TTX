@@ -305,8 +305,9 @@ VALIDATION_TEST(TtxNavigation, c_selected_visit) {
   EXPECT_EQ(probe.count, Count(0));
 }
 
-// A selection crosses repeated real composites and skips their padding. Both
-// selected occurrences use the same stored body, with different physical bases.
+// Offsets 4 and 36 select fields in the first and third copies of a struct.
+// Both use the same stored description, so navigation must add each copy's
+// starting offset. Offset 12 selects padding and must return Bounds.
 VALIDATION_TEST(TtxNavigation, selected_composites) {
   Preparation prepare;
   const Schema::Position member(integer, 4);

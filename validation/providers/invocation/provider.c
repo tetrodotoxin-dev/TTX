@@ -16,8 +16,9 @@ static struct {
   R64 bias;
 } state;
 
-// The result is computed from a mixed argument frame and private scalar state.
-// Its requested representation describes the result, independently of either.
+// The input contains a value, scale and negate flag, while context points to
+// the provider's bias. Each call combines them into an R64 result in output.
+// The consumer receives that computed result by calling the supplied function.
 static ttx_data_status invoke(void* context, const void* input, void* output) {
   const R64* bias = context;
   const invocation_input* values = input;

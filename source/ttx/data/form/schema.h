@@ -6,9 +6,10 @@
 
 #include "ttx/data/status.h"
 
-// Native authoring takes pointer storage from the host. Compilation can select
-// four or eight byte pointers explicitly for another target. Both supported
-// widths use their size as alignment, including function pointer storage.
+// TTX requires data and function pointers to have the same size and alignment:
+// either four bytes or eight bytes. Native schemas use the host's pointer size.
+// When compiling a schema for another target, the caller can select that
+// target's pointer size explicitly.
 #ifdef __cplusplus
 
 static_assert(sizeof(void*) == 4 || sizeof(void*) == 8);
