@@ -7,6 +7,7 @@
 
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/storage/vector.hpp"
+#include "perimortem/memory/allocator/arena.hpp"
 
 #include "validation/tests/data/form/preparation.hpp"
 
@@ -19,13 +20,14 @@ static Harness Composition = {
   .name = "TTX::Data::Form::Composition",
 };
 
-// Composition gives each imported root a real member boundary. Compare with
-// source compilation to catch lost padding, reference remapping and duplicate
-// bodies. Reversed placement order must produce the same canonical bytes.
-static auto allocate_representation(void* context, Count size, Count) -> void* {
+static auto allocate_representation(void* context, Count size, Count alignment)
+    -> void* {
   return Data::cast<Allocator::Arena>(context)->allocate(size).get_data();
 }
 
+// Composition gives each imported root a real member boundary. Compare with
+// source compilation to catch lost padding, reference remapping and duplicate
+// bodies. Reversed placement order must produce the same canonical bytes.
 static auto check_pair(const Form::Schema& child, Test::TestResult& result)
     -> void {
   Validation::DataTests::Preparation prepare;
@@ -54,16 +56,18 @@ static auto check_pair(const Form::Schema& child, Test::TestResult& result)
     },
   };
 
-  Allocator::Arena arena;
   Form::Representation::compose(
-      members.get_view().slice(0, 2), width * 2, child.get_alignment(), arena)
+      members.get_view().slice(0, 2), width * 2, child.get_alignment())
       .visit(
-          [&](const Form::Representation& actual) {
+          [&](const Global::Bytes& bytes) {
+            const Form::Representation actual(
+                bytes.get_data(), bytes.get_size());
             EXPECT(actual.compatible(expected));
           },
 
           [&](Status) { EXPECT(False); });
 
+  Allocator::Arena arena;
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&arena, allocate_representation);
   const ttx_representation* output = nullptr;
@@ -72,6 +76,50 @@ static auto check_pair(const Form::Schema& child, Test::TestResult& result)
           &form.get_abi(), width, child.get_alignment(), allocator, &output) ==
       TTX_DATA_SUCCESS);
   EXPECT(Form::Representation(*output).compatible(expected));
+}
+
+// The composed buffer survives changes to its children and the end of their
+// storage lifetimes. Moving it out of the Result keeps it available after the
+// temporary member records and both compilation Results have been destroyed.
+VALIDATION_TEST(Composition, independent_lifetime) {
+  Global::Bytes composed;
+  {
+    const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
+    Global::Bytes child;
+    Form::Representation::compile(integer).visit(
+        [&](Global::Bytes& bytes) { child = Data::take(bytes); },
+        [&](Status status) { EXPECT(False); });
+    ASSERT(child.get_size());
+
+    const Form::Representation representation(
+        child.get_data(), child.get_size());
+    const Form::Representation::Member members[] = {
+      {&representation.get_abi(), 0}, {&representation.get_abi(), 8}};
+
+    Form::Representation::compose({members[0], 2}, 12, 4)
+        .visit(
+            [&](Global::Bytes& bytes) { composed = Data::take(bytes); },
+            [&](Status status) { EXPECT(False); });
+    ASSERT(composed.get_size());
+    EXPECT(composed.get_data() != child.get_data());
+
+    child.set(0xa5);
+  }
+
+  const Form::Representation representation(
+      composed.get_data(), composed.get_size());
+  EXPECT_EQ(representation.get_extent(), Count(12));
+  EXPECT_EQ(representation.get_alignment(), Count(4));
+
+  Count visited = 0;
+  EXPECT(representation.visit([&](Form::Representation::Position position) {
+    EXPECT_EQ(position.get_offset(), visited * 8);
+    EXPECT(position.get_value() == Form::Schema::Value::U32);
+    ++visited;
+    return Status::Success;
+  }) == Status::Success);
+
+  EXPECT_EQ(visited, Count(2));
 }
 
 VALIDATION_TEST(Composition, records_and_cycles) {
@@ -150,7 +198,6 @@ VALIDATION_TEST(Composition, invalid_placements) {
     },
   };
 
-  Allocator::Arena arena;
   const Storage::Vector<Count, 2> extents = {
     {
       5,
@@ -161,22 +208,23 @@ VALIDATION_TEST(Composition, invalid_placements) {
   for (Count extent_index = 0; extent_index < extents.get_size();
        ++extent_index) {
     const Count extent = extents[extent_index];
-    Form::Representation::compose(
-        members.get_view().slice(0, 2), extent, 4, arena)
+    Form::Representation::compose(members.get_view().slice(0, 2), extent, 4)
         .visit(
-            [&](const Form::Representation&) { EXPECT(False); },
+            [&](const Global::Bytes& bytes) { EXPECT(False); },
             [&](Status status) { EXPECT(status == Status::Invalid); });
   }
 
   Form::Representation::compose(
-      View::Vector<Form::Representation::Member>(), 8, 8, arena)
+      View::Vector<Form::Representation::Member>(), 8, 8)
       .visit(
-          [&](const Form::Representation&) { EXPECT(False); },
+          [&](const Global::Bytes& bytes) { EXPECT(False); },
           [&](Status status) { EXPECT(status == Status::Invalid); });
   Form::Representation::compose(
-      View::Vector<Form::Representation::Member>(), 0, 1, arena)
+      View::Vector<Form::Representation::Member>(), 0, 1)
       .visit(
-          [&](const Form::Representation& empty) {
+          [&](const Global::Bytes& bytes) {
+            const Form::Representation empty(
+                bytes.get_data(), bytes.get_size());
             EXPECT_EQ(empty.get_extent(), Count(0));
           },
 

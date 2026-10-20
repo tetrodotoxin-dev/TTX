@@ -5,6 +5,8 @@
 
 #include "perimortem/core/data.hpp"
 
+#include "ttx/data/form/compiler.hpp"
+
 using namespace Perimortem::Core;
 using namespace Perimortem::Memory;
 using namespace Ttx::Data;
@@ -122,42 +124,40 @@ auto ttx_representation_visit_selected(
           }));
 }
 
-static auto allocate_representation(void* context, Count bytes, Count alignment)
-    -> void* {
-  auto& arena = *Data::cast<Allocator::Arena>(context);
-  return arena.allocate(bytes).get_data();
+static auto write(const Form::Compiler<>& compiler)
+    -> Storage::Result<Global::Bytes, Status> {
+  Global::Bytes bytes;
+  bytes.forgetful_resize(compiler.get_size());
+
+  const auto status = compiler.write(bytes.get_access());
+  if (status != Status::Success) {
+    return status;
+  }
+
+  return Data::take(bytes);
 }
 
 auto Form::Representation::compile(
     ttx_schema_reference schema,
-    Allocator::Arena& arena,
-    Count pointer_size) -> Storage::Result<Form::Representation, Status> {
-  const ttx_representation_allocator allocator =
-      ttx_representation_allocator(&arena, allocate_representation);
-  const ttx_representation* result = nullptr;
-  const auto status =
-      ttx_representation_compile(schema, pointer_size, allocator, &result);
-  if (status != TTX_DATA_SUCCESS) {
-    return Status(status);
+    Count pointer_size) -> Storage::Result<Global::Bytes, Status> {
+  Form::Compiler compiler;
+  const auto status = compiler.compile(schema, pointer_size);
+  if (status != Status::Success) {
+    return status;
   }
 
-  return Form::Representation(*result);
+  return write(compiler);
 }
 
 auto Form::Representation::compose(
     View::Vector<Member> members,
     Count extent,
-    Count alignment,
-    Allocator::Arena& arena) -> Storage::Result<Form::Representation, Status> {
-  const ttx_representation_allocator allocator =
-      ttx_representation_allocator(&arena, allocate_representation);
-  const ttx_representation* result = nullptr;
-  const auto status = ttx_representation_compose(
-      members.get_data(), members.get_size(), extent, alignment, allocator,
-      &result);
-  if (status != TTX_DATA_SUCCESS) {
-    return Status(status);
+    Count alignment) -> Storage::Result<Global::Bytes, Status> {
+  Form::Compiler compiler;
+  const auto status = compiler.compose(members, extent, alignment);
+  if (status != Status::Success) {
+    return status;
   }
 
-  return Form::Representation(*result);
+  return write(compiler);
 }

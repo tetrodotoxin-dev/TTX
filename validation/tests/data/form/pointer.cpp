@@ -296,10 +296,10 @@ VALIDATION_TEST(Pointers, pointer_width) {
   EXPECT_EQ(narrow_pointer.get_alignment(), Count(4));
   EXPECT(!narrow_pointer.compatible(wide_pointer));
 
-  Allocator::Arena arena;
-  Form::Representation::compile(pointer, arena, 4)
+  Form::Representation::compile(pointer, 4)
       .visit(
-          [&](const Form::Representation& form) {
+          [&](const Global::Bytes& bytes) {
+            const Form::Representation form(bytes.get_data(), bytes.get_size());
             EXPECT(form.compatible(narrow_pointer));
           },
 
@@ -332,10 +332,9 @@ VALIDATION_TEST(Pointers, unsupported_width) {
   Form::Compiler compiler;
   EXPECT(compiler.compile(pointer, 3) == Status::Unsupported);
 
-  Allocator::Arena arena;
-  Form::Representation::compile(pointer, arena, 3)
+  Form::Representation::compile(pointer, 3)
       .visit(
-          [&](const Form::Representation&) { EXPECT(false); },
+          [&](const Global::Bytes& bytes) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Unsupported); });
 }
 
@@ -362,7 +361,6 @@ VALIDATION_TEST(Pointers, convention_agreement) {
 }
 
 VALIDATION_TEST(Pointers, composed_pointers) {
-  Allocator::Arena arena;
   const Storage::Vector<Form::Representation::Member, 2> members = {
     {
       Form::Representation::Member(&narrow_pointer.get_abi(), 0),
@@ -373,9 +371,10 @@ VALIDATION_TEST(Pointers, composed_pointers) {
     },
   };
 
-  Form::Representation::compose(members, 8, 4, arena)
+  Form::Representation::compose(members, 8, 4)
       .visit(
-          [&](const Form::Representation& form) {
+          [&](const Global::Bytes& bytes) {
+            const Form::Representation form(bytes.get_data(), bytes.get_size());
             EXPECT(form.get_pointer_size() == 4);
 
             Count count = 0;
@@ -400,8 +399,8 @@ VALIDATION_TEST(Pointers, composed_pointers) {
     },
   };
 
-  Form::Representation::compose(mixed, 16, 8, arena)
+  Form::Representation::compose(mixed, 16, 8)
       .visit(
-          [&](const Form::Representation&) { EXPECT(false); },
+          [&](const Global::Bytes& bytes) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Incompatible); });
 }

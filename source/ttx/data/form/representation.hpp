@@ -4,7 +4,7 @@
 #pragma once
 
 #include "perimortem/core/storage/result.hpp"
-#include "perimortem/memory/allocator/arena.hpp"
+#include "perimortem/memory/global/bytes.hpp"
 
 #include "ttx/data/encoding/element.hpp"
 #include "ttx/data/encoding/struct.hpp"
@@ -124,25 +124,26 @@ class Representation {
   // own contracts.
   constexpr auto compatible(const Representation& other) const -> Bool;
 
-  // Compiles a stable Schema graph into canonical bytes allocated in arena.
-  // The returned value borrows those bytes until the arena is reset or
-  // destroyed. Source descriptions are needed only through this call.
+  // Compiles a stable Schema graph into canonical descriptor bytes owned by
+  // the returned Global Bytes. Source descriptions are needed only through
+  // this call. Preparation failures return their status before allocating the
+  // output buffer. A Representation can borrow the result while its allocation
+  // remains accessible and its bytes remain unchanged.
   static EXPORTED(TTX) auto compile(
       ttx_schema_reference schema,
-      Perimortem::Memory::Allocator::Arena& arena,
-      Count pointer_size = sizeof(void*))
-      -> Perimortem::Core::Storage::Result<Representation, Ttx::Data::Status>;
+      Count pointer_size = sizeof(void*)) -> Perimortem::Core::Storage::
+      Result<Perimortem::Memory::Global::Bytes, Ttx::Data::Status>;
 
   // Builds a canonical struct from complete canonical child forms. Members
   // retain their extents and padding at the requested offsets. The children
-  // remain readable through this call. The returned value borrows independent
-  // descriptor storage in arena until that arena is reset or destroyed.
+  // remain readable through this call. The returned Global Bytes owns the new
+  // descriptor buffer independently of those children. Preparation failures
+  // return their status before allocating that buffer.
   static EXPORTED(TTX) auto compose(
       Perimortem::Core::View::Vector<Member> members,
       Count extent,
-      Count alignment,
-      Perimortem::Memory::Allocator::Arena& arena)
-      -> Perimortem::Core::Storage::Result<Representation, Ttx::Data::Status>;
+      Count alignment) -> Perimortem::Core::Storage::
+      Result<Perimortem::Memory::Global::Bytes, Ttx::Data::Status>;
 
   // A byte coordinate selects the first primitive whose start is at or after
   // it. Padding is skipped, and a coordinate inside a primitive advances to
