@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "perimortem/core/data.hpp"
 #include "perimortem/core/storage/vector.hpp"
 #include "perimortem/core/writer/binary.hpp"
 
@@ -59,7 +60,7 @@ class Block {
       return Perimortem::Core::Data::ensure_endian<
           Perimortem::Core::Data::ByteOrder::Little,
           Perimortem::Core::Data::ByteOrder::Native>(
-          __builtin_bit_cast(U64, chunk_bytes));
+          Perimortem::Core::Data::bit_cast<U64>(chunk_bytes));
     };
 
     const Count offset = (first >> 6) << 3;

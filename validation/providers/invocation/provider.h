@@ -5,6 +5,7 @@
 #define VALIDATION_INVOCATION_PROVIDER_H
 
 #include "toolchain/export.h"
+
 #include "ttx/semantic/realization/invocation.h"
 
 #define INVOCATION_METHOD_HIGH 0x7a2c283c70c0447dULL
@@ -27,7 +28,7 @@ typedef struct invocation_statistics {
 typedef struct invocation_fixture {
   ttx_semantic_query query;
   invocation_statistics (*statistics)(void);
-  void (*configure)(ttx_binding_status status, U8 malformed);
+  void (*configure)(ttx_negotiation_status status, U8 malformed);
 } invocation_fixture;
 
 C_LINKAGE EXPORTED(TTX_TEST)

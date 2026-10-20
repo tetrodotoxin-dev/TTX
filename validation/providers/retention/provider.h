@@ -20,7 +20,9 @@ typedef struct retention_statistics {
 typedef struct retention_fixture {
   ttx_abstract factory;
   retention_statistics (*statistics)(void);
-  void (*configure)(ttx_binding_status creation, ttx_binding_status borrowing);
+  void (*configure)(
+      ttx_negotiation_status creation,
+      ttx_negotiation_status borrowing);
 } retention_fixture;
 
 C_LINKAGE EXPORTED(TTX_TEST)

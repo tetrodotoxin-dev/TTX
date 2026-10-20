@@ -7,11 +7,11 @@
 #include "ttx/concept/policies/none.h"
 #include "ttx/data/transfer.h"
 
-static ttx_binding_status
+static ttx_negotiation_status
     bind(void* context, perimortem_uuid id, ttx_storage output) {
   observation_subject* subject = context;
   ++subject->binds;
-  if (subject->answer != TTX_BINDING_SATISFIED) {
+  if (subject->answer != TTX_NEGOTIATION_SATISFIED) {
     return subject->answer;
   }
 
@@ -21,19 +21,19 @@ static ttx_binding_status
                            : observation_abstract(subject);
     const ttx_storage input = {subject->abstract_form, (U8*)&api, sizeof(api)};
     return ttx_transfer(&input, &output) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   if (id.high == TTX_CONSTANT_ID_HIGH && id.low == TTX_CONSTANT_ID_LOW) {
     ttx_abstract api = observation_abstract(subject);
     const ttx_storage input = {subject->marker_form, (U8*)&api, sizeof(api)};
     return ttx_transfer(&input, &output) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
-  return TTX_BINDING_UNKNOWN;
+  return TTX_NEGOTIATION_UNKNOWN;
 }
 
 // Constant preserves the selection made by the supplying Abstract and route.
@@ -82,13 +82,13 @@ static void visit(void* context, ttx_concept_visitor visitor) {
   visitor.callback(visitor.context, bytes, resolve(source));
 }
 
-static ttx_binding_status supports(void* context, perimortem_uuid id) {
+static ttx_negotiation_status supports(void* context, perimortem_uuid id) {
   (void)context;
   return (id.high == TTX_ABSTRACT_ID_HIGH && id.low == TTX_ABSTRACT_ID_LOW) ||
                  (id.high == TTX_CONSTANT_ID_HIGH &&
                   id.low == TTX_CONSTANT_ID_LOW)
-             ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNKNOWN;
+             ? TTX_NEGOTIATION_SATISFIED
+             : TTX_NEGOTIATION_UNKNOWN;
 }
 
 ttx_abstract observation_abstract(observation_subject* subject) {

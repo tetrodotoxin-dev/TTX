@@ -17,25 +17,25 @@ using namespace Ttx::Data;
 // each observation unless they also supply Constant.
 class UnknownProvider {
  public:
-  static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
+  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Policies::Unknown::contract_id
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_UNKNOWN;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_UNKNOWN;
   }
 
   static auto bind(void* context, perimortem_uuid id, ttx_storage target)
-      -> ttx_binding_status {
-    if (supports(context, id) != TTX_BINDING_SATISFIED) {
-      return TTX_BINDING_UNKNOWN;
+      -> ttx_negotiation_status {
+    if (supports(context, id) != TTX_NEGOTIATION_SATISFIED) {
+      return TTX_NEGOTIATION_UNKNOWN;
     }
 
     Abstract::Api api = resolve(context);
     return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
                    Status::Success
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   static auto data(void*) -> perimortem_view_bytes {

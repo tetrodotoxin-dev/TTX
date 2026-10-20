@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "perimortem/core/data.hpp"
+
 #include "ttx/concept/abstract.hpp"
 #include "ttx/concept/capabilities/import.h"
 
@@ -58,18 +60,17 @@ class Import {
   auto visit(
       const void* input,
       const Data::Form::Representation& representation,
-      Function& callback) const -> Semantic::Negotiation::Binding::Status {
+      Function& callback) const -> Semantic::Negotiation::Status {
     const auto api = get_abi();
-    return static_cast<Semantic::Negotiation::Binding::Status>(
-        api.operations->visit(
-            api.context, input, &representation, &callback,
-            Import::callback<Function>));
+    return Semantic::Negotiation::Status(api.operations->visit(
+        api.context, input, &representation, &callback,
+        Import::callback<Function>));
   }
 
  private:
   template <typename Function>
-  static void callback(void* context, ttx_abstract abstract) {
-    (*static_cast<Function*>(context))(Abstract(abstract));
+  static auto callback(void* context, ttx_abstract abstract) -> void {
+    (*Perimortem::Core::Data::cast<Function>(context))(Abstract(abstract));
   }
 
   Api api;

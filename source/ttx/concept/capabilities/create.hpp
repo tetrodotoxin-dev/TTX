@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "perimortem/core/data.hpp"
+
 #include "ttx/concept/abstract.hpp"
 #include "ttx/concept/capabilities/create.h"
 
@@ -54,18 +56,17 @@ class Create {
 
   template <typename Function>
   auto create(Abstract arguments, Function& callback) const
-      -> Semantic::Negotiation::Binding::Status {
+      -> Semantic::Negotiation::Status {
     const auto api = get_abi();
-    return static_cast<Semantic::Negotiation::Binding::Status>(
-        api.operations->create(
-            api.context, arguments.get_abi(), &callback,
-            Create::callback<Function>));
+    return Semantic::Negotiation::Status(api.operations->create(
+        api.context, arguments.get_abi(), &callback,
+        Create::callback<Function>));
   }
 
  private:
   template <typename Function>
-  static void callback(void* context, ttx_abstract abstract) {
-    (*static_cast<Function*>(context))(Abstract(abstract));
+  static auto callback(void* context, ttx_abstract abstract) -> void {
+    (*Perimortem::Core::Data::cast<Function>(context))(Abstract(abstract));
   }
 
   Api api;

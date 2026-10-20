@@ -5,34 +5,37 @@
 
 #include "toolchain/validation/test.hpp"
 
+#include "perimortem/core/data.hpp"
 #include "perimortem/core/storage/vector.hpp"
 
 #include "ttx/data/encoding/callable.hpp"
 #include "ttx/data/form/compiled.hpp"
 #include "validation/tests/data/form/preparation.hpp"
 
-using namespace Perimortem;
+using namespace Perimortem::Core;
+using namespace Toolchain::Validation;
 using namespace Ttx::Data;
-using namespace Ttx::Data::Form;
 
-static Toolchain::Validation::Harness Callables = {
+static Harness Callables = {
   .name = "TTX::Data::Form::Callable",
 };
 
-static constexpr auto integer = Schema::primitive(Schema::Value::U32);
-static constexpr auto real = Schema::primitive(Schema::Value::R64);
+static constexpr auto integer =
+    Form::Schema::primitive(Form::Schema::Value::U32);
+static constexpr auto real = Form::Schema::primitive(Form::Schema::Value::R64);
 
-static constexpr Schema::Argument four(integer, 4);
+static constexpr Form::Schema::Argument four(integer, 4);
 static constexpr auto function =
-    Schema::callable(Schema::Convention::SystemVAMD64, {four, 1});
-static constexpr auto& constant = Compiled<function>::get_representation();
+    Form::Schema::callable(Form::Schema::Convention::SystemVAMD64, {four, 1});
+static constexpr auto& constant =
+    Form::Compiled<function>::get_representation();
 static_assert(constant.get_bytes().get_size() == 16);
 
 // Independently written words pin the selector positions, void sentinel and
 // count compression. The only payload is the pointer at offset zero.
 VALIDATION_TEST(Callables, canonical_words) {
   Validation::DataTests::Preparation prepare;
-  const Perimortem::Core::Storage::Vector<U8, 16> expected = {
+  const Storage::Vector<U8, 16> expected = {
     {
       0x11,
       0x80,
@@ -54,12 +57,12 @@ VALIDATION_TEST(Callables, canonical_words) {
   };
 
   EXPECT(constant.compatible(
-      Representation(expected.get_data(), sizeof(expected))));
+      Form::Representation(expected.get_data(), sizeof(expected))));
   EXPECT(constant.compatible(prepare(function)));
 
-  const Perimortem::Core::Storage::Vector<Schema::Argument, 4> singles = {
+  const Storage::Vector<Form::Schema::Argument, 4> singles = {
     {
-      Schema::Argument(integer),
+      Form::Schema::Argument(integer),
       {
         integer,
       },
@@ -74,15 +77,15 @@ VALIDATION_TEST(Callables, canonical_words) {
     },
   };
 
-  const auto expanded = Schema::callable(
-      Schema::Convention::SystemVAMD64, singles.get_view().slice(0, 4));
+  const auto expanded = Form::Schema::callable(
+      Form::Schema::Convention::SystemVAMD64, singles.get_view().slice(0, 4));
   EXPECT(constant.compatible(prepare(expanded)));
 
   Count visited = 0;
-  EXPECT(constant.visit([&](Representation::Position position) {
+  EXPECT(constant.visit([&](Form::Representation::Position position) {
     ++visited;
     EXPECT_EQ(position.offset, Count(0));
-    EXPECT(position.get_value() == Schema::Value::Pointer);
+    EXPECT(position.get_value() == Form::Schema::Value::Pointer);
     return Status::Success;
   }) == Status::Success);
 
@@ -94,9 +97,9 @@ VALIDATION_TEST(Callables, canonical_words) {
 // void.
 VALIDATION_TEST(Callables, signature_differences) {
   Validation::DataTests::Preparation prepare;
-  const Perimortem::Core::Storage::Vector<Schema::Argument, 3> mixed = {
+  const Storage::Vector<Form::Schema::Argument, 3> mixed = {
     {
-      Schema::Argument(integer),
+      Form::Schema::Argument(integer),
       {
         real,
       },
@@ -107,25 +110,25 @@ VALIDATION_TEST(Callables, signature_differences) {
     },
   };
 
-  const Perimortem::Core::Storage::Vector<Schema::Argument, 2> ordered = {
+  const Storage::Vector<Form::Schema::Argument, 2> ordered = {
     {
-      Schema::Argument(integer, 2),
+      Form::Schema::Argument(integer, 2),
       {
         real,
       },
     },
   };
 
-  const auto a = Schema::callable(
-      Schema::Convention::SystemVAMD64, mixed.get_view().slice(0, 3));
-  const auto b = Schema::callable(
-      Schema::Convention::SystemVAMD64, ordered.get_view().slice(0, 2));
+  const auto a = Form::Schema::callable(
+      Form::Schema::Convention::SystemVAMD64, mixed.get_view().slice(0, 3));
+  const auto b = Form::Schema::callable(
+      Form::Schema::Convention::SystemVAMD64, ordered.get_view().slice(0, 2));
   EXPECT_NOT(prepare(a).compatible(prepare(b)));
 
-  const auto variadic =
-      Schema::callable(Schema::Convention::SystemVAMD64Variadic, {four, 1});
-  const auto returned =
-      Schema::callable(Schema::Convention::SystemVAMD64, {four, 1}, &integer);
+  const auto variadic = Form::Schema::callable(
+      Form::Schema::Convention::SystemVAMD64Variadic, {four, 1});
+  const auto returned = Form::Schema::callable(
+      Form::Schema::Convention::SystemVAMD64, {four, 1}, &integer);
   EXPECT_NOT(constant.compatible(prepare(variadic)));
   EXPECT_NOT(constant.compatible(prepare(returned)));
 
@@ -133,28 +136,29 @@ VALIDATION_TEST(Callables, signature_differences) {
   // and Windows conventions. Canonical comparison therefore includes the
   // convention and distinguishes Windows fixed and variadic calls.
   const auto windows =
-      Schema::callable(Schema::Convention::WindowsX64, {four, 1});
-  const auto windows_variadic =
-      Schema::callable(Schema::Convention::WindowsX64Variadic, {four, 1});
+      Form::Schema::callable(Form::Schema::Convention::WindowsX64, {four, 1});
+  const auto windows_variadic = Form::Schema::callable(
+      Form::Schema::Convention::WindowsX64Variadic, {four, 1});
   EXPECT_NOT(constant.compatible(prepare(windows)));
   EXPECT_NOT(prepare(windows).compatible(prepare(windows_variadic)));
 
-  const auto empty = Schema::callable(Schema::Convention::SystemVAMD64, {});
+  const auto empty =
+      Form::Schema::callable(Form::Schema::Convention::SystemVAMD64, {});
   const auto& ready = prepare(empty);
   EXPECT_EQ(ready.get_extent(), Count(8));
   EXPECT_EQ(ready.get_bytes().get_size(), Count(16));
 
-  const Schema::Position field(empty, 0);
-  EXPECT(ready.compatible(prepare(Schema::composite({field, 1}, 8, 8))));
+  const Form::Schema::Position field(empty, 0);
+  EXPECT(ready.compatible(prepare(Form::Schema::composite({field, 1}, 8, 8))));
 }
 
 // A large formal count remains one run. The wider header's unused fields and
 // the full width void sentinel are checked without expanding those parameters.
 VALIDATION_TEST(Callables, wide_signature) {
   Validation::DataTests::Preparation prepare;
-  const Schema::Argument many(integer, 1000000000);
+  const Form::Schema::Argument many(integer, 1000000000);
   const auto large =
-      Schema::callable(Schema::Convention::SystemVAMD64, {many, 1});
+      Form::Schema::callable(Form::Schema::Convention::SystemVAMD64, {many, 1});
   const auto& ready = prepare(large);
   EXPECT_EQ(ready.get_depth(), U8(4));
   EXPECT_EQ(ready.get_bytes().get_size(), Count(64));
@@ -173,7 +177,7 @@ VALIDATION_TEST(Callables, wide_signature) {
   // chunks here, while every reserved bit above it must remain zero.
   const Count distance = Count(1) << 63;
   const auto& extended =
-      prepare(Schema::range(function, 2, distance, distance + 8, 8));
+      prepare(Form::Schema::range(function, 2, distance, distance + 8, 8));
   EXPECT_EQ(extended.get_depth(), U8(9));
 
   const auto wide = extended.get_bytes();
@@ -185,27 +189,29 @@ VALIDATION_TEST(Callables, wide_signature) {
 }
 
 VALIDATION_TEST(Callables, invalid_signatures) {
-  Compiler compiler;
-  const auto array = Schema::range(integer, 4, 4, 16, 4);
-  const Schema::Argument array_argument(array);
+  Form::Compiler compiler;
+  const auto array = Form::Schema::range(integer, 4, 4, 16, 4);
+  const Form::Schema::Argument array_argument(array);
   EXPECT(
       compiler.compile(
-          Schema::callable(
-              Schema::Convention::SystemVAMD64, {array_argument, 1})) ==
+          Form::Schema::callable(
+              Form::Schema::Convention::SystemVAMD64, {array_argument, 1})) ==
       Status::Invalid);
 
-  const Schema::Argument missing(integer, 0);
+  const Form::Schema::Argument missing(integer, 0);
   EXPECT(
       compiler.compile(
-          Schema::callable(Schema::Convention::SystemVAMD64, {missing, 1})) ==
+          Form::Schema::callable(
+              Form::Schema::Convention::SystemVAMD64, {missing, 1})) ==
       Status::Invalid);
   EXPECT(
-      compiler.compile(Schema::callable(Schema::Convention(9), {})) ==
+      compiler.compile(
+          Form::Schema::callable(Form::Schema::Convention(9), {})) ==
       Status::Invalid);
 
-  const Perimortem::Core::Storage::Vector<Schema::Argument, 2> overflow = {
+  const Storage::Vector<Form::Schema::Argument, 2> overflow = {
     {
-      Schema::Argument(integer, Count(-1)),
+      Form::Schema::Argument(integer, Count(-1)),
       {
         integer,
       },
@@ -214,16 +220,17 @@ VALIDATION_TEST(Callables, invalid_signatures) {
 
   EXPECT(
       compiler.compile(
-          Schema::callable(
-              Schema::Convention::SystemVAMD64,
+          Form::Schema::callable(
+              Form::Schema::Convention::SystemVAMD64,
               overflow.get_view().slice(0, overflow.get_size()))) ==
       Status::Overflow);
 
-  const auto pointer = Schema::pointer(&array);
-  const Schema::Argument indirect(pointer);
+  const auto pointer = Form::Schema::pointer(&array);
+  const Form::Schema::Argument indirect(pointer);
   EXPECT(
       compiler.compile(
-          Schema::callable(Schema::Convention::SystemVAMD64, {indirect, 1})) ==
+          Form::Schema::callable(
+              Form::Schema::Convention::SystemVAMD64, {indirect, 1})) ==
       Status::Success);
 }
 
@@ -233,17 +240,17 @@ VALIDATION_TEST(Callables, invalid_signatures) {
 // involved in this Data format proof.
 VALIDATION_TEST(Callables, foreign_calls) {
   Validation::DataTests::Preparation prepare;
-  const auto vector = Schema::primitive(Schema::Value::V128);
-  const Schema::Argument count(integer), packed(vector);
-  const auto sum =
-      Schema::callable(Schema::Convention::SystemVAMD64, {four, 1}, &integer);
-  const auto variadic = Schema::callable(
-      Schema::Convention::SystemVAMD64Variadic, {count, 1}, &real);
-  const auto twice =
-      Schema::callable(Schema::Convention::SystemVAMD64, {packed, 1}, &vector);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 3> fields = {
+  const auto vector = Form::Schema::primitive(Form::Schema::Value::V128);
+  const Form::Schema::Argument count(integer), packed(vector);
+  const auto sum = Form::Schema::callable(
+      Form::Schema::Convention::SystemVAMD64, {four, 1}, &integer);
+  const auto variadic = Form::Schema::callable(
+      Form::Schema::Convention::SystemVAMD64Variadic, {count, 1}, &real);
+  const auto twice = Form::Schema::callable(
+      Form::Schema::Convention::SystemVAMD64, {packed, 1}, &vector);
+  const Storage::Vector<Form::Schema::Position, 3> fields = {
     {
-      Schema::Position(sum, __builtin_offsetof(ttx_test_callables, sum)),
+      Form::Schema::Position(sum, __builtin_offsetof(ttx_test_callables, sum)),
       {
         variadic,
         __builtin_offsetof(ttx_test_callables, variadic),
@@ -256,15 +263,15 @@ VALIDATION_TEST(Callables, foreign_calls) {
     },
   };
 
-  const auto table = Schema::composite(
+  const auto table = Form::Schema::composite(
       fields.get_view().slice(0, 3), sizeof(ttx_test_callables),
       alignof(ttx_test_callables));
   ASSERT(prepare(table).compatible(prepare(*ttx_test_callable_schema())));
 
   ttx_test_callables output;
-  Core::Data::copy(
-      reinterpret_cast<U8*>(&output),
-      static_cast<const U8*>(ttx_test_callable_table()), sizeof(output));
+  Data::copy(
+      Data::cast<U8>(&output), Data::cast<const U8>(ttx_test_callable_table()),
+      sizeof(output));
   EXPECT_EQ(output.sum(1, 2, 3, 4), U32(10));
   EXPECT_EQ(output.variadic(3, 1.0, 2.0, 3.0), R64(6));
 

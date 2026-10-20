@@ -29,6 +29,7 @@ static void*
     representation_allocate(void* context, Count size, Count alignment) {
   U8* source = context;
   (void)source;
+
   const Count start = (representation_usage + alignment - 1) & ~(alignment - 1);
   if (size > sizeof(representation_storage) - start) {
     abort();
@@ -45,11 +46,13 @@ static const ttx_representation* prepare_representation(
     NULL,
     representation_allocate,
   };
+
   if (compile_representation(
           (ttx_schema_reference){
             source,
             0,
           },
+
           sizeof(void*), output, &result) != TTX_DATA_SUCCESS) {
     abort();
   }

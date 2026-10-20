@@ -3,7 +3,10 @@
 
 #include "ttx/concept/abstract.hpp"
 
+using namespace Ttx::Concept;
+using namespace Ttx::Data;
+
 auto ttx_abstract_representation() -> const ttx_representation* {
-  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-      Ttx::Concept::Abstract::Api>::reference>::get_representation();
+  return &Form::Compiled<
+      Form::Native<Abstract::Api>::reference>::get_representation();
 }

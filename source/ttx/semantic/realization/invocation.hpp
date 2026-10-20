@@ -44,7 +44,7 @@ class Invocation {
   // The operation returns the provider's status without repeating layout or
   // buffer checks. Output becomes usable after Success under that contract.
   auto invoke(const void* inputs, void* outputs) const -> Data::Status {
-    return static_cast<Data::Status>(api.invoke(api.context, inputs, outputs));
+    return Data::Status(api.invoke(api.context, inputs, outputs));
   }
 
  private:

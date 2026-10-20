@@ -4,9 +4,10 @@
 #include "ttx/concept/capabilities/export.hpp"
 
 using namespace Ttx::Concept;
-using namespace Ttx::Semantic::Negotiation;
+using namespace Ttx::Data;
+using namespace Ttx::Semantic;
 
-C_LINKAGE const ttx_representation* ttx_export_representation() {
-  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-      Capabilities::Export::Api>::reference>::get_representation();
+C_LINKAGE auto ttx_export_representation() -> const ttx_representation* {
+  return &Form::Compiled<
+      Form::Native<Capabilities::Export::Api>::reference>::get_representation();
 }

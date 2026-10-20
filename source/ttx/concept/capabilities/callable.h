@@ -54,7 +54,7 @@ typedef struct ttx_callable_description {
 // Satisfied.
 typedef struct ttx_callable_operations {
   ttx_abstract_ops abstract;
-  ttx_binding_status (
+  ttx_negotiation_status (
       *describe)(void* context, ttx_callable_description* output);
 } ttx_callable_operations;
 

@@ -13,7 +13,7 @@ typedef struct counter_state {
   U64 value;
   U64 second;
   counter_statistics statistics;
-  ttx_binding_status status;
+  ttx_negotiation_status status;
   U8 omit;
   U8 stateless;
   enum counter_composition mode;
@@ -70,20 +70,20 @@ static U64 temporary_read(void* context) {
   return read(&temporary);
 }
 
-static ttx_binding_status
+static ttx_negotiation_status
     bind(void* context, perimortem_uuid id, ttx_storage requested) {
   (void)context;
   ++state.statistics.queries;
-  if (state.status != TTX_BINDING_SATISFIED) {
+  if (state.status != TTX_NEGOTIATION_SATISFIED) {
     return state.status;
   }
 
   if (id.high != COUNTER_ID_HIGH || id.low != COUNTER_ID_LOW) {
-    return TTX_BINDING_UNKNOWN;
+    return TTX_NEGOTIATION_UNKNOWN;
   }
 
   if (state.omit) {
-    return TTX_BINDING_SATISFIED;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   counter_api api = {state.stateless ? NULL : &state.value, add, read};
@@ -102,14 +102,15 @@ static ttx_binding_status
 
   const ttx_storage input = {representation, (U8*)&api, sizeof(api)};
   return ttx_transfer(&input, &requested) == TTX_DATA_SUCCESS
-             ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_REJECTED;
+             ? TTX_NEGOTIATION_SATISFIED
+             : TTX_NEGOTIATION_REJECTED;
 }
 
-static void reset(ttx_binding_status status, U8 omit, U8 stateless) {
+static void reset(ttx_negotiation_status status, U8 omit, U8 stateless) {
   state.statistics = (counter_statistics){
     0,
   };
+
   state.value = 0;
   state.second = 20;
   state.status = status;
@@ -121,15 +122,15 @@ static void reset(ttx_binding_status status, U8 omit, U8 stateless) {
 
 // Support observes the semantic promise without constructing the counter API.
 // A caller can keep using this fact even if its callable layout has drifted.
-static ttx_binding_status supports(void* context, perimortem_uuid id) {
+static ttx_negotiation_status supports(void* context, perimortem_uuid id) {
   (void)context;
-  if (state.status != TTX_BINDING_SATISFIED) {
+  if (state.status != TTX_NEGOTIATION_SATISFIED) {
     return state.status;
   }
 
   return id.high == COUNTER_ID_HIGH && id.low == COUNTER_ID_LOW
-             ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNKNOWN;
+             ? TTX_NEGOTIATION_SATISFIED
+             : TTX_NEGOTIATION_UNKNOWN;
 }
 
 static void compose(enum counter_composition mode) {
@@ -157,22 +158,27 @@ counter_fixture interface_provider_open(interface_compile compiler) {
           },
     },
   };
+
   static const ttx_schema_argument arguments[] = {
     {
       {
         NULL,
         TTX_SCHEMA_REFERENCE_POINTER,
       },
+
       1,
     },
+
     {
       {
         &integer,
         0,
       },
+
       1,
     },
   };
+
   static const ttx_schema addition = {
     sizeof(void*),
     _Alignof(void*),
@@ -186,10 +192,12 @@ counter_fixture interface_provider_open(interface_compile compiler) {
               &integer,
               0,
             },
+
             TTX_SCHEMA_NATIVE_CONVENTION,
           },
     },
   };
+
   static const ttx_schema observation = {
     sizeof(void*),
     _Alignof(void*),
@@ -203,33 +211,41 @@ counter_fixture interface_provider_open(interface_compile compiler) {
               &integer,
               0,
             },
+
             TTX_SCHEMA_NATIVE_CONVENTION,
           },
     },
   };
+
   static const ttx_schema_position fields[] = {
     {
       {
         NULL,
         TTX_SCHEMA_REFERENCE_POINTER,
       },
+
       offsetof(counter_api, context),
     },
+
     {
       {
         &addition,
         0,
       },
+
       offsetof(counter_api, add),
     },
+
     {
       {
         &observation,
         0,
       },
+
       offsetof(counter_api, read),
     },
   };
+
   static const ttx_schema schema = {
     sizeof(counter_api),
     _Alignof(counter_api),
@@ -242,18 +258,20 @@ counter_fixture interface_provider_open(interface_compile compiler) {
           },
     },
   };
+
   compile_representation = compiler;
   if (!representation) {
     representation = prepare_representation(&schema);
   }
 
-  reset(TTX_BINDING_SATISFIED, 0, 0);
+  reset(TTX_NEGOTIATION_SATISFIED, 0, 0);
   return (counter_fixture){
     {
       &state,
       bind,
       supports,
     },
+
     reset,
     statistics,
     compose,

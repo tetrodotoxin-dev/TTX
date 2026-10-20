@@ -9,31 +9,32 @@
 #include "ttx/data/form/compiler.hpp"
 #include "validation/tests/data/form/preparation.hpp"
 
-using namespace Perimortem;
+using namespace Perimortem::Core;
+using namespace Perimortem::Memory;
+using namespace Toolchain::Validation;
 using namespace Ttx::Data;
-using namespace Ttx::Data::Form;
 
-static Toolchain::Validation::Harness Pointers = {
+static Harness Pointers = {
   .name = "TTX::Data::Form::Pointer",
 };
 
 // Constant evaluation may build a temporary reference to itself. Only the
 // finished bytes escape preparation, so no constexpr allocation or source
 // pointer is retained in the canonical form.
-static consteval auto recursive_bytes() -> Core::Storage::Bytes<8> {
-  auto node = Schema::composite(
-      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
-  const auto pointer = Schema::pointer(&node);
-  const Schema::Position field(pointer, 0);
-  node = Schema::composite({field, 1}, 8, 8);
+static consteval auto recursive_bytes() -> Storage::Bytes<8> {
+  auto node =
+      Form::Schema::composite(View::Vector<Form::Schema::Position>(), 8, 8);
+  const auto pointer = Form::Schema::pointer(&node);
+  const Form::Schema::Position field(pointer, 0);
+  node = Form::Schema::composite({field, 1}, 8, 8);
 
-  Compiler<Perimortem::Memory::Compile::Vector> compiler;
+  Form::Compiler<Compile::Vector> compiler;
   if (compiler.compile(node) != Status::Success || compiler.get_size() != 8) {
-    return Core::Storage::Bytes<8>();
+    return Storage::Bytes<8>();
   }
 
-  Core::Storage::Bytes<8> bytes;
-  compiler.write(Core::Access::Bytes(bytes[0], 8));
+  Storage::Bytes<8> bytes;
+  compiler.write(Access::Bytes(bytes[0], 8));
   return bytes;
 }
 
@@ -44,18 +45,18 @@ static_assert(recursive[4] == 0x80 && recursive[5] == 0x22);
 // to the reference, so neither use changes or copies that target definition.
 VALIDATION_TEST(Pointers, reference_modifier) {
   Validation::DataTests::Preparation prepare;
-  const auto integer = Schema::primitive(Schema::Value::U32);
-  const Schema::Position member(integer, 0);
-  const auto target = Schema::composite({member, 1}, 4, 4);
-  const Schema::Reference direct(target);
-  const auto indirect = Schema::pointer(&target);
+  const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
+  const Form::Schema::Position member(integer, 0);
+  const auto target = Form::Schema::composite({member, 1}, 4, 4);
+  const Form::Schema::Reference direct(target);
+  const auto indirect = Form::Schema::pointer(&target);
   EXPECT(direct.schema == indirect.schema);
   EXPECT_NOT(direct.is_pointer());
   EXPECT(indirect.is_pointer());
 
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> fields = {
+  const Storage::Vector<Form::Schema::Position, 2> fields = {
     {
-      Schema::Position(direct, 0),
+      Form::Schema::Position(direct, 0),
       {
         indirect,
         8,
@@ -64,7 +65,7 @@ VALIDATION_TEST(Pointers, reference_modifier) {
   };
 
   const auto& form =
-      prepare(Schema::composite(fields.get_view().slice(0, 2), 16, 8));
+      prepare(Form::Schema::composite(fields.get_view().slice(0, 2), 16, 8));
   const auto a =
       Encoding::Element::decode(form.get_bytes(), 1, form.get_depth());
   const auto b =
@@ -73,13 +74,14 @@ VALIDATION_TEST(Pointers, reference_modifier) {
   EXPECT(a.is_inline());
   EXPECT(b.is_pointer());
 
-  Compiler compiler;
-  EXPECT(compiler.compile(Schema::Reference(&target, 2)) == Status::Invalid);
+  Form::Compiler compiler;
+  EXPECT(
+      compiler.compile(Form::Schema::Reference(&target, 2)) == Status::Invalid);
 }
 
 VALIDATION_TEST(Pointers, opaque_spelling) {
   Validation::DataTests::Preparation prepare;
-  const Perimortem::Core::Storage::Vector<U8, 8> expected = {
+  const Storage::Vector<U8, 8> expected = {
     {
       0x11,
       0x80,
@@ -92,19 +94,19 @@ VALIDATION_TEST(Pointers, opaque_spelling) {
     },
   };
 
-  const auto& pointer = prepare(Schema::pointer());
+  const auto& pointer = prepare(Form::Schema::pointer());
   EXPECT(pointer.compatible(
-      Representation(expected.get_data(), sizeof(expected))));
+      Form::Representation(expected.get_data(), sizeof(expected))));
   // Both ways of describing an opaque pointer compile to the same bytes.
-  EXPECT(
-      pointer.compatible(prepare(Schema::primitive(Schema::Value::Pointer))));
+  EXPECT(pointer.compatible(
+      prepare(Form::Schema::primitive(Form::Schema::Value::Pointer))));
 
-  const auto integer = Schema::primitive(Schema::Value::U32);
-  const auto& typed = prepare(Schema::pointer(&integer));
+  const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
+  const auto& typed = prepare(Form::Schema::pointer(&integer));
   EXPECT_NOT(pointer.compatible(typed));
   typed.next(0).visit(
-      [&](Representation::Position value) {
-        EXPECT(value.get_value() == Schema::Value::Pointer);
+      [&](Form::Representation::Position value) {
+        EXPECT(value.get_value() == Form::Schema::Value::Pointer);
         EXPECT_EQ(value.get_extent(), Count(8));
       },
 
@@ -115,22 +117,22 @@ VALIDATION_TEST(Pointers, opaque_spelling) {
 // must not double the emitted bodies or change their reference numbering.
 VALIDATION_TEST(Pointers, recursive_sharing) {
   Validation::DataTests::Preparation prepare;
-  auto a = Schema::composite(
-      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
-  auto b = Schema::composite(
-      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
-  const auto pa = Schema::pointer(&a), pb = Schema::pointer(&b);
-  const Schema::Position ab(pb, 0), ba(pa, 0);
-  a = Schema::composite({ab, 1}, 8, 8);
-  b = Schema::composite({ba, 1}, 8, 8);
+  auto a =
+      Form::Schema::composite(View::Vector<Form::Schema::Position>(), 8, 8);
+  auto b =
+      Form::Schema::composite(View::Vector<Form::Schema::Position>(), 8, 8);
+  const auto pa = Form::Schema::pointer(&a), pb = Form::Schema::pointer(&b);
+  const Form::Schema::Position ab(pb, 0), ba(pa, 0);
+  a = Form::Schema::composite({ab, 1}, 8, 8);
+  b = Form::Schema::composite({ba, 1}, 8, 8);
 
   const auto& ready = prepare(a);
-  EXPECT(ready.compatible(Representation(recursive.get_data(), 8)));
+  EXPECT(ready.compatible(Form::Representation(recursive.get_data(), 8)));
 
   Count count = 0;
-  EXPECT(ready.visit([&](Representation::Position position) {
+  EXPECT(ready.visit([&](Form::Representation::Position position) {
     ++count;
-    EXPECT(position.get_value() == Schema::Value::Pointer);
+    EXPECT(position.get_value() == Form::Schema::Value::Pointer);
     return Status::Success;
   }) == Status::Success);
 
@@ -138,10 +140,10 @@ VALIDATION_TEST(Pointers, recursive_sharing) {
 
   // A difference beyond a recursive edge still rejects agreement. Structural
   // sharing must preserve the other fields even when a target repeats.
-  const auto integer = Schema::primitive(Schema::Value::U64);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> different = {
+  const auto integer = Form::Schema::primitive(Form::Schema::Value::U64);
+  const Storage::Vector<Form::Schema::Position, 2> different = {
     {
-      Schema::Position(pa, 0),
+      Form::Schema::Position(pa, 0),
       {
         integer,
         8,
@@ -149,17 +151,17 @@ VALIDATION_TEST(Pointers, recursive_sharing) {
     },
   };
 
-  b = Schema::composite(different.get_view().slice(0, 2), 16, 8);
+  b = Form::Schema::composite(different.get_view().slice(0, 2), 16, 8);
   EXPECT_NOT(ready.compatible(prepare(a)));
 }
 
 VALIDATION_TEST(Pointers, inline_cycle_rejected) {
-  auto node = Schema::composite(
-      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
-  const Schema::Position self(node, 0);
-  node = Schema::composite({self, 1}, 8, 8);
+  auto node =
+      Form::Schema::composite(View::Vector<Form::Schema::Position>(), 8, 8);
+  const Form::Schema::Position self(node, 0);
+  node = Form::Schema::composite({self, 1}, 8, 8);
 
-  Compiler compiler;
+  Form::Compiler compiler;
   EXPECT(compiler.compile(node) == Status::Invalid);
 }
 
@@ -168,19 +170,20 @@ VALIDATION_TEST(Pointers, inline_cycle_rejected) {
 // containment and must not omit a function with no payload arguments.
 VALIDATION_TEST(Pointers, recursive_callable) {
   Validation::DataTests::Preparation prepare;
-  auto node = Schema::composite(
-      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
-  const Schema::Argument self(node);
+  auto node =
+      Form::Schema::composite(View::Vector<Form::Schema::Position>(), 8, 8);
+  const Form::Schema::Argument self(node);
   const auto callback =
-      Schema::callable(Schema::Convention::SystemVAMD64, {self, 1});
-  const Schema::Position field(callback, 0);
-  node = Schema::composite({field, 1}, 8, 8);
+      Form::Schema::callable(Form::Schema::Convention::SystemVAMD64, {self, 1});
+  const Form::Schema::Position field(callback, 0);
+  node = Form::Schema::composite({field, 1}, 8, 8);
 
   const auto& ready = prepare(node);
   EXPECT_EQ(ready.get_bytes().get_size(), Count(16));
-  EXPECT(ready.visit([](Representation::Position position) {
-    return position.get_value() == Schema::Value::Pointer ? Status::Success
-                                                          : Status::Invalid;
+  EXPECT(ready.visit([](Form::Representation::Position position) {
+    return position.get_value() == Form::Schema::Value::Pointer
+               ? Status::Success
+               : Status::Invalid;
   }) == Status::Success);
 }
 
@@ -189,14 +192,14 @@ VALIDATION_TEST(Pointers, recursive_callable) {
 // as one run while preserving their sixteen byte spacing.
 VALIDATION_TEST(Pointers, pointer_run) {
   Validation::DataTests::Preparation prepare;
-  const auto integer = Schema::primitive(Schema::Value::U32);
-  const Schema::Position value(integer, 0);
-  const auto a = Schema::composite({value, 1}, 4, 4);
-  const auto b = Schema::composite({value, 1}, 4, 4);
-  const auto pa = Schema::pointer(&a), pb = Schema::pointer(&b);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> fields = {
+  const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
+  const Form::Schema::Position value(integer, 0);
+  const auto a = Form::Schema::composite({value, 1}, 4, 4);
+  const auto b = Form::Schema::composite({value, 1}, 4, 4);
+  const auto pa = Form::Schema::pointer(&a), pb = Form::Schema::pointer(&b);
+  const Storage::Vector<Form::Schema::Position, 2> fields = {
     {
-      Schema::Position(pa, 0),
+      Form::Schema::Position(pa, 0),
       {
         pb,
         16,
@@ -205,16 +208,16 @@ VALIDATION_TEST(Pointers, pointer_run) {
   };
 
   const auto& explicit_fields =
-      prepare(Schema::composite(fields.get_view().slice(0, 2), 24, 8));
-  const auto& ranged = prepare(Schema::range(pa, 2, 16, 24, 8));
+      prepare(Form::Schema::composite(fields.get_view().slice(0, 2), 24, 8));
+  const auto& ranged = prepare(Form::Schema::range(pa, 2, 16, 24, 8));
   EXPECT(explicit_fields.compatible(ranged));
   EXPECT_EQ(ranged.get_bytes().get_size(), Count(16));
 
   const Count coordinate = 16;
   EXPECT(
       ranged.visit(
-          Core::View::Vector<Count>(coordinate, 1),
-          [&](Representation::Position position) {
+          View::Vector<Count>(coordinate, 1),
+          [&](Form::Representation::Position position) {
             EXPECT_EQ(position.offset, coordinate);
             return Status::Success;
           }) == Status::Success);
@@ -226,27 +229,21 @@ VALIDATION_TEST(Pointers, pointer_run) {
 VALIDATION_TEST(Pointers, distinct_ring) {
   Validation::DataTests::Preparation prepare;
   constexpr Count size = 32;
-  Perimortem::Core::Storage::Vector<
-      Perimortem::Core::Storage::Vector<Schema, size>, 2>
-      nodes;
-  Perimortem::Core::Storage::Vector<
-      Perimortem::Core::Storage::Vector<Schema::Reference, size>, 2>
-      pointers;
-  Perimortem::Core::Storage::Vector<
-      Perimortem::Core::Storage::Vector<
-          Perimortem::Core::Storage::Vector<Schema::Position, 2>, size>,
-      2>
+  Storage::Vector<Storage::Vector<Form::Schema, size>, 2> nodes;
+  Storage::Vector<Storage::Vector<Form::Schema::Reference, size>, 2> pointers;
+  Storage::Vector<
+      Storage::Vector<Storage::Vector<Form::Schema::Position, 2>, size>, 2>
       fields;
-  const auto integer = Schema::primitive(Schema::Value::U32);
-  const auto real = Schema::primitive(Schema::Value::R32);
+  const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
+  const auto real = Form::Schema::primitive(Form::Schema::Value::R32);
   for (Count copy = 0; copy < 2; ++copy) {
     for (Count i = 0; i < size; ++i) {
-      pointers[copy][i] = Schema::pointer(&nodes[copy][(i + 1) % size]);
-      fields[copy][i][copy] = Schema::Position(pointers[copy][i], 0);
+      pointers[copy][i] = Form::Schema::pointer(&nodes[copy][(i + 1) % size]);
+      fields[copy][i][copy] = Form::Schema::Position(pointers[copy][i], 0);
       fields[copy][i][1 - copy] =
-          Schema::Position(i + 1 == size ? real : integer, 8);
-      nodes[copy][i] =
-          Schema::composite(fields[copy][i].get_view().slice(0, 2), 16, 8);
+          Form::Schema::Position(i + 1 == size ? real : integer, 8);
+      nodes[copy][i] = Form::Schema::composite(
+          fields[copy][i].get_view().slice(0, 2), 16, 8);
     }
   }
 
@@ -255,20 +252,21 @@ VALIDATION_TEST(Pointers, distinct_ring) {
   EXPECT_EQ(first.get_bytes().get_size(), size * 12);
 }
 
-static constexpr auto pointer = Schema::pointer();
-static constexpr auto scalar = Schema::primitive(Schema::Value::U32);
+static constexpr auto pointer = Form::Schema::pointer();
+static constexpr auto scalar =
+    Form::Schema::primitive(Form::Schema::Value::U32);
 static constexpr auto& narrow_pointer =
-    Compiled<pointer, 4>::get_representation();
+    Form::Compiled<pointer, 4>::get_representation();
 static constexpr auto& wide_pointer =
-    Compiled<pointer, 8>::get_representation();
+    Form::Compiled<pointer, 8>::get_representation();
 
 // Neither target identity nor the compiler's native process should affect a
 // pointer free form. It remains the same agreement across both pointer widths.
-static_assert(Compiled<scalar, 8>::get_representation().compatible(
-    Compiled<scalar, 4>::get_representation()));
+static_assert(Form::Compiled<scalar, 8>::get_representation().compatible(
+    Form::Compiled<scalar, 4>::get_representation()));
 
 VALIDATION_TEST(Pointers, pointer_width) {
-  const Perimortem::Core::Storage::Vector<U8, 16> expected = {
+  const Storage::Vector<U8, 16> expected = {
     {
       0x10,
       0,
@@ -291,37 +289,38 @@ VALIDATION_TEST(Pointers, pointer_width) {
 
   EXPECT(
       narrow_pointer.get_bytes() ==
-      Core::View::Bytes(expected[0], expected.get_size()));
+      View::Bytes(expected[0], expected.get_size()));
   EXPECT(narrow_pointer.get_pointer_size() == 4);
   EXPECT_EQ(narrow_pointer.get_extent(), Count(4));
   EXPECT_EQ(narrow_pointer.get_alignment(), Count(4));
   EXPECT(!narrow_pointer.compatible(wide_pointer));
 
-  Memory::Allocator::Arena arena;
-  Representation::compile(pointer, arena, 4)
+  Allocator::Arena arena;
+  Form::Representation::compile(pointer, arena, 4)
       .visit(
-          [&](const Representation& form) {
+          [&](const Form::Representation& form) {
             EXPECT(form.compatible(narrow_pointer));
           },
 
           [&](Status) { EXPECT(false); });
 
   narrow_pointer.next(0).visit(
-      [&](Representation::Position position) {
+      [&](Form::Representation::Position position) {
         EXPECT_EQ(position.get_extent(), Count(4));
-        EXPECT(position.get_value() == Schema::Value::Pointer);
+        EXPECT(position.get_value() == Form::Schema::Value::Pointer);
       },
 
       [&](Status) { EXPECT(false); });
 
-  const Perimortem::Core::Storage::Vector<Count, 1> coordinates;
+  const Storage::Vector<Count, 1> coordinates;
   Count visits = 0;
   EXPECT(
-      narrow_pointer.visit(coordinates, [&](Representation::Position position) {
-        EXPECT_EQ(position.get_extent(), Count(4));
-        ++visits;
-        return Status::Success;
-      }) == Status::Success);
+      narrow_pointer.visit(
+          coordinates, [&](Form::Representation::Position position) {
+            EXPECT_EQ(position.get_extent(), Count(4));
+            ++visits;
+            return Status::Success;
+          }) == Status::Success);
 
   EXPECT_EQ(visits, Count(1));
 }
@@ -329,13 +328,13 @@ VALIDATION_TEST(Pointers, pointer_width) {
 // The C compilation entry receives a runtime width. Reject unsupported storage
 // there as well as in the ordinary C++ runtime entry.
 VALIDATION_TEST(Pointers, unsupported_width) {
-  Compiler compiler;
+  Form::Compiler compiler;
   EXPECT(compiler.compile(pointer, 3) == Status::Unsupported);
 
-  Memory::Allocator::Arena arena;
-  Representation::compile(pointer, arena, 3)
+  Allocator::Arena arena;
+  Form::Representation::compile(pointer, arena, 3)
       .visit(
-          [&](const Representation&) { EXPECT(false); },
+          [&](const Form::Representation&) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Unsupported); });
 }
 
@@ -343,17 +342,17 @@ VALIDATION_TEST(Pointers, identical_geometry) {
   // Both arrays have the same starts, enclosing extent and alignment. The
   // pointer width still distinguishes four byte pointers with gaps from eight
   // byte pointers, even though their ordinary descriptor blocks are identical.
-  static constexpr auto array = Schema::range(pointer, 2, 8, 16, 8);
-  const auto& narrow = Compiled<array, 4>::get_representation();
-  const auto& wide = Compiled<array, 8>::get_representation();
+  static constexpr auto array = Form::Schema::range(pointer, 2, 8, 16, 8);
+  const auto& narrow = Form::Compiled<array, 4>::get_representation();
+  const auto& wide = Form::Compiled<array, 8>::get_representation();
   EXPECT(narrow.get_blocks() == wide.get_blocks());
   EXPECT(!narrow.compatible(wide));
 }
 
 VALIDATION_TEST(Pointers, convention_agreement) {
-  const auto function =
-      Schema::callable(Schema::Convention::EmscriptenWasm32, {}, scalar, 4);
-  Compiler compiler;
+  const auto function = Form::Schema::callable(
+      Form::Schema::Convention::EmscriptenWasm32, {}, scalar, 4);
+  Form::Compiler compiler;
   EXPECT(compiler.compile(function, 4) == Status::Success);
 
   auto wrong = function;
@@ -362,10 +361,10 @@ VALIDATION_TEST(Pointers, convention_agreement) {
 }
 
 VALIDATION_TEST(Pointers, composed_pointers) {
-  Memory::Allocator::Arena arena;
-  const Perimortem::Core::Storage::Vector<Representation::Member, 2> members = {
+  Allocator::Arena arena;
+  const Storage::Vector<Form::Representation::Member, 2> members = {
     {
-      Representation::Member(narrow_pointer, 0),
+      Form::Representation::Member(narrow_pointer, 0),
       {
         narrow_pointer,
         4,
@@ -373,13 +372,13 @@ VALIDATION_TEST(Pointers, composed_pointers) {
     },
   };
 
-  Representation::compose(members, 8, 4, arena)
+  Form::Representation::compose(members, 8, 4, arena)
       .visit(
-          [&](const Representation& form) {
+          [&](const Form::Representation& form) {
             EXPECT(form.get_pointer_size() == 4);
 
             Count count = 0;
-            EXPECT(form.visit([&](Representation::Position position) {
+            EXPECT(form.visit([&](Form::Representation::Position position) {
               EXPECT_EQ(position.get_extent(), Count(4));
               ++count;
               return Status::Success;
@@ -390,9 +389,9 @@ VALIDATION_TEST(Pointers, composed_pointers) {
 
           [&](Status) { EXPECT(false); });
 
-  const Perimortem::Core::Storage::Vector<Representation::Member, 2> mixed = {
+  const Storage::Vector<Form::Representation::Member, 2> mixed = {
     {
-      Representation::Member(narrow_pointer, 0),
+      Form::Representation::Member(narrow_pointer, 0),
       {
         wide_pointer,
         8,
@@ -400,8 +399,8 @@ VALIDATION_TEST(Pointers, composed_pointers) {
     },
   };
 
-  Representation::compose(mixed, 16, 8, arena)
+  Form::Representation::compose(mixed, 16, 8, arena)
       .visit(
-          [&](const Representation&) { EXPECT(false); },
+          [&](const Form::Representation&) { EXPECT(false); },
           [&](Status status) { EXPECT(status == Status::Incompatible); });
 }

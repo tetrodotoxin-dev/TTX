@@ -10,29 +10,29 @@
 #include "validation/tests/data/form/visitation.h"
 
 using namespace Perimortem::Core;
+using namespace Toolchain::Validation;
 using namespace Ttx::Data;
-using namespace Ttx::Data::Form;
-using Ttx::Data::Form::Schema;
-using Validation::DataTests::Preparation;
+using namespace Validation::DataTests;
 
-static Toolchain::Validation::Harness TtxNavigation = {
+static Harness TtxNavigation = {
   .name = "TTX::Data::Form::Navigation",
 };
 
-static constexpr auto integer = Schema::primitive(Schema::Value::U32);
-static constexpr auto small = Schema::primitive(Schema::Value::U16);
+static constexpr auto integer =
+    Form::Schema::primitive(Form::Schema::Value::U32);
+static constexpr auto small = Form::Schema::primitive(Form::Schema::Value::U16);
 
 // A byte coordinate selects the last element of a large range directly from
 // its stride. Neither this lookup nor the descriptor expands the other values.
 VALIDATION_TEST(TtxNavigation, range_coordinate) {
   Preparation prepare;
-  const auto range = Schema::range(integer, 1000000000, 4, 4000000000, 4);
+  const auto range = Form::Schema::range(integer, 1000000000, 4, 4000000000, 4);
   const auto& prepared = prepare(range);
   EXPECT_EQ(prepared.get_bytes().get_size(), Count(32));
 
   prepared.next(3999999996)
       .visit(
-          [&](const Representation::Position& answer) {
+          [&](const Form::Representation::Position& answer) {
             EXPECT(answer.get_value() == integer.get_value());
             EXPECT_EQ(answer.offset, Count(3999999996));
           },
@@ -49,9 +49,9 @@ VALIDATION_TEST(TtxNavigation, range_coordinate) {
 // the child placement to its own member offset, preserving leading padding.
 VALIDATION_TEST(TtxNavigation, composite_coordinate) {
   Preparation prepare;
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> members = {
+  const Storage::Vector<Form::Schema::Position, 2> members = {
     {
-      Schema::Position(small, 0),
+      Form::Schema::Position(small, 0),
       {
         integer,
         8,
@@ -59,18 +59,20 @@ VALIDATION_TEST(TtxNavigation, composite_coordinate) {
     },
   };
 
-  const auto record = Schema::composite(members.get_view().slice(0, 2), 16, 4);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 1> entries = {
+  const auto record =
+      Form::Schema::composite(members.get_view().slice(0, 2), 16, 4);
+  const Storage::Vector<Form::Schema::Position, 1> entries = {
     {
-      Schema::Position(record, 16),
+      Form::Schema::Position(record, 16),
     },
   };
 
-  const auto root = Schema::composite(entries.get_view().slice(0, 1), 32, 4);
+  const auto root =
+      Form::Schema::composite(entries.get_view().slice(0, 1), 32, 4);
   const auto& prepared = prepare(root);
 
   prepared.next(24).visit(
-      [&](const Representation::Position& answer) {
+      [&](const Form::Representation::Position& answer) {
         EXPECT(answer.get_value() == integer.get_value());
         EXPECT_EQ(answer.offset, Count(24));
       },
@@ -83,9 +85,9 @@ VALIDATION_TEST(TtxNavigation, composite_coordinate) {
 // active composite path and performs no repeated lookup of earlier fields.
 VALIDATION_TEST(TtxNavigation, padded_range_walk) {
   Preparation prepare;
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> fields = {
+  const Storage::Vector<Form::Schema::Position, 2> fields = {
     {
-      Schema::Position(small, 0),
+      Form::Schema::Position(small, 0),
       {
         integer,
         8,
@@ -93,18 +95,21 @@ VALIDATION_TEST(TtxNavigation, padded_range_walk) {
     },
   };
 
-  const auto record = Schema::composite(fields.get_view().slice(0, 2), 16, 4);
-  const auto records = Schema::range(record, 16, 16, 256, 4);
+  const auto record =
+      Form::Schema::composite(fields.get_view().slice(0, 2), 16, 4);
+  const auto records = Form::Schema::range(record, 16, 16, 256, 4);
   const auto& prepared = prepare(records);
   Count seen = 0;
 
-  const auto status = prepared.visit([&](Representation::Position position) {
-    const auto expected = seen % 2 ? integer.get_value() : small.get_value();
-    EXPECT(position.get_value() == expected);
-    EXPECT_EQ(position.offset, (seen / 2) * 16 + (seen % 2 ? 8 : 0));
-    ++seen;
-    return Status::Success;
-  });
+  const auto status =
+      prepared.visit([&](Form::Representation::Position position) {
+        const auto expected =
+            seen % 2 ? integer.get_value() : small.get_value();
+        EXPECT(position.get_value() == expected);
+        EXPECT_EQ(position.offset, (seen / 2) * 16 + (seen % 2 ? 8 : 0));
+        ++seen;
+        return Status::Success;
+      });
 
   EXPECT(status == Status::Success);
   EXPECT_EQ(seen, Count(32));
@@ -116,9 +121,9 @@ VALIDATION_TEST(TtxNavigation, padded_range_walk) {
 // returned coordinate with their requested offset.
 VALIDATION_TEST(TtxNavigation, physical_coordinates) {
   Preparation prepare;
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> fields = {
+  const Storage::Vector<Form::Schema::Position, 2> fields = {
     {
-      Schema::Position(small, 0),
+      Form::Schema::Position(small, 0),
       {
         integer,
         8,
@@ -126,15 +131,16 @@ VALIDATION_TEST(TtxNavigation, physical_coordinates) {
     },
   };
 
-  const auto record = Schema::composite(fields.get_view().slice(0, 2), 16, 4);
-  const auto records = Schema::range(record, 4, 16, 64, 4);
+  const auto record =
+      Form::Schema::composite(fields.get_view().slice(0, 2), 16, 4);
+  const auto records = Form::Schema::range(record, 4, 16, 64, 4);
   const auto& prepared = prepare(records);
 
   for (Count offset = 0; offset <= records.extent; ++offset) {
     const Count local = offset % 16;
     const Count expected = offset - local + (!local ? 0 : local <= 8 ? 8 : 16);
     prepared.next(offset).visit(
-        [&](const Representation::Position& answer) {
+        [&](const Form::Representation::Position& answer) {
           EXPECT(expected < 64);
           EXPECT_EQ(answer.offset, expected);
         },
@@ -151,14 +157,14 @@ VALIDATION_TEST(TtxNavigation, physical_coordinates) {
 VALIDATION_TEST(TtxNavigation, empty_and_invalid) {
   Preparation prepare;
   const auto empty =
-      Schema::composite(Perimortem::Core::View::Vector<Schema::Position>(), 0);
+      Form::Schema::composite(View::Vector<Form::Schema::Position>(), 0);
   const auto& prepared = prepare(empty);
 
   prepared.next(0).visit(
       [&](auto) { EXPECT(false); },
       [&](Status status) { EXPECT(status == Status::Bounds); });
 
-  Representation::Position answer;
+  Form::Representation::Position answer;
   EXPECT(ttx_representation_next(nullptr, 0, &answer) == TTX_DATA_INVALID);
   EXPECT(ttx_representation_next(&prepared, 0, nullptr) == TTX_DATA_INVALID);
 }
@@ -167,21 +173,21 @@ VALIDATION_TEST(TtxNavigation, empty_and_invalid) {
 // preceding subtree has to be counted to return an ABI byte coordinate.
 VALIDATION_TEST(TtxNavigation, deep_coordinate) {
   Preparation prepare;
-  Perimortem::Core::Storage::Vector<Schema, 256> layers;
-  Perimortem::Core::Storage::Vector<Schema::Position, 256> entries;
+  Storage::Vector<Form::Schema, 256> layers;
+  Storage::Vector<Form::Schema::Position, 256> entries;
   for (Count i = 0; i < 256; ++i) {
     entries[i] = {
       i ? &layers[i - 1] : &integer,
       4,
     };
 
-    layers[i] = Schema::composite({entries[i], 1}, (i + 2) * 4, 4);
+    layers[i] = Form::Schema::composite({entries[i], 1}, (i + 2) * 4, 4);
   }
 
   const auto& root = layers[255];
   const auto& prepared = prepare(root);
   prepared.next(0).visit(
-      [&](const Representation::Position& answer) {
+      [&](const Form::Representation::Position& answer) {
         EXPECT(answer.get_value() == integer.get_value());
         EXPECT_EQ(answer.offset, Count(1024));
       },
@@ -195,35 +201,33 @@ VALIDATION_TEST(TtxNavigation, deep_coordinate) {
 // instead of enumerating the entire advertised payload before its first call.
 VALIDATION_TEST(TtxNavigation, shared_body_access) {
   Preparation prepare;
-  const auto byte = Schema::primitive(Schema::Value::U8);
-  Perimortem::Core::Storage::Vector<Schema, 24> bodies;
-  Perimortem::Core::Storage::Vector<
-      Perimortem::Core::Storage::Vector<Schema::Position, 3>, 24>
-      fields;
+  const auto byte = Form::Schema::primitive(Form::Schema::Value::U8);
+  Storage::Vector<Form::Schema, 24> bodies;
+  Storage::Vector<Storage::Vector<Form::Schema::Position, 3>, 24> fields;
   for (Count i = 0; i < 24; ++i) {
     const auto& child = i ? bodies[i - 1] : byte;
     const Count extent = child.get_extent();
-    fields[i][0] = Schema::Position(child, 0);
-    fields[i][1] = Schema::Position(byte, extent);
-    fields[i][2] = Schema::Position(child, extent + 1);
-    bodies[i] = Schema::composite(
-        View::Vector<Schema::Position>(fields[i][0], 3), extent * 2 + 1);
+    fields[i][0] = Form::Schema::Position(child, 0);
+    fields[i][1] = Form::Schema::Position(byte, extent);
+    fields[i][2] = Form::Schema::Position(child, extent + 1);
+    bodies[i] = Form::Schema::composite(
+        View::Vector<Form::Schema::Position>(fields[i][0], 3), extent * 2 + 1);
   }
 
   const auto& representation = prepare(bodies[23]);
   const Count last = bodies[23].get_extent() - 1;
   ASSERT(representation.get_bytes().get_size() < 2048);
   representation.next(last).visit(
-      [&](Representation::Position position) {
+      [&](Form::Representation::Position position) {
         EXPECT_EQ(position.offset, last);
-        EXPECT(position.get_value() == Schema::Value::U8);
+        EXPECT(position.get_value() == Form::Schema::Value::U8);
       },
 
       [&](Status) { EXPECT(false); });
 
   Count seen = 0;
   const auto status =
-      representation.visit([&](Representation::Position position) {
+      representation.visit([&](Form::Representation::Position position) {
         EXPECT_EQ(position.offset, seen);
         ++seen;
         return seen == 9 ? Status::Denied : Status::Success;
@@ -238,7 +242,8 @@ VALIDATION_TEST(TtxNavigation, shared_body_access) {
 // a fresh walk over the same borrowed descriptor.
 VALIDATION_TEST(TtxNavigation, c_streaming_visit) {
   Preparation prepare;
-  const auto& representation = prepare(Schema::range(integer, 4, 4, 16, 4));
+  const auto& representation =
+      prepare(Form::Schema::range(integer, 4, 4, 16, 4));
   visitation_probe probe = {
     .stop = 2,
   };
@@ -264,8 +269,8 @@ VALIDATION_TEST(TtxNavigation, c_streaming_visit) {
 VALIDATION_TEST(TtxNavigation, c_selected_visit) {
   Preparation prepare;
   const auto& representation =
-      prepare(Schema::range(integer, 1000000000, 4, 4000000000, 4));
-  const Perimortem::Core::Storage::Vector<Count, 1> last = {
+      prepare(Form::Schema::range(integer, 1000000000, 4, 4000000000, 4));
+  const Storage::Vector<Count, 1> last = {
     {
       3999999996,
     },
@@ -281,7 +286,7 @@ VALIDATION_TEST(TtxNavigation, c_selected_visit) {
   EXPECT_EQ(probe.count, Count(1));
   EXPECT_EQ(probe.offsets[0], last[0]);
 
-  const Perimortem::Core::Storage::Vector<Count, 1> interior = {
+  const Storage::Vector<Count, 1> interior = {
     {
       1,
     },
@@ -293,7 +298,7 @@ VALIDATION_TEST(TtxNavigation, c_selected_visit) {
       TTX_DATA_BOUNDS);
   EXPECT_EQ(probe.count, Count(0));
 
-  const Perimortem::Core::Storage::Vector<Count, 1> outside = {
+  const Storage::Vector<Count, 1> outside = {
     {
       4000000000,
     },
@@ -310,11 +315,12 @@ VALIDATION_TEST(TtxNavigation, c_selected_visit) {
 // starting offset. Offset 12 selects padding and must return Bounds.
 VALIDATION_TEST(TtxNavigation, selected_composites) {
   Preparation prepare;
-  const Schema::Position member(integer, 4);
-  const auto record =
-      Schema::composite(View::Vector<Schema::Position>(member, 1), 12, 4);
-  const auto& representation = prepare(Schema::range(record, 3, 16, 44, 4));
-  const Perimortem::Core::Storage::Vector<Count, 2> selected = {
+  const Form::Schema::Position member(integer, 4);
+  const auto record = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(member, 1), 12, 4);
+  const auto& representation =
+      prepare(Form::Schema::range(record, 3, 16, 44, 4));
+  const Storage::Vector<Count, 2> selected = {
     {
       4,
       36,
@@ -331,7 +337,7 @@ VALIDATION_TEST(TtxNavigation, selected_composites) {
   EXPECT_EQ(probe.offsets[0], Count(4));
   EXPECT_EQ(probe.offsets[1], Count(36));
 
-  const Perimortem::Core::Storage::Vector<Count, 1> padding = {
+  const Storage::Vector<Count, 1> padding = {
     {
       12,
     },

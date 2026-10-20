@@ -116,19 +116,19 @@ class Callable {
   // canonical forms, field arrays and Abstracts. This operation checks the
   // status and API pointer, leaving those contents and ranges to the provider.
   auto describe() const -> Perimortem::Core::Storage::
-      Result<Description, Semantic::Negotiation::Binding::Status> {
+      Result<Description, Semantic::Negotiation::Status> {
     const auto api = get_abi();
     ttx_callable_description output = ttx_callable_description();
     const auto status = api.operations->describe(api.context, &output);
-    if (status == TTX_BINDING_SATISFIED && output.api) {
+    if (status == TTX_NEGOTIATION_SATISFIED && output.api) {
       return Description(output);
     }
 
-    if (status == TTX_BINDING_UNKNOWN) {
-      return Semantic::Negotiation::Binding::Status::Unknown;
+    if (status == TTX_NEGOTIATION_UNKNOWN) {
+      return Semantic::Negotiation::Status::Unknown;
     }
 
-    return Semantic::Negotiation::Binding::Status::Rejected;
+    return Semantic::Negotiation::Status::Rejected;
   }
 
  private:

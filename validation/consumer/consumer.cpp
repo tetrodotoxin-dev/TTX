@@ -4,17 +4,18 @@
 #include "ttx/concept/policies/none.hpp"
 #include "ttx/data/transfer.hpp"
 
-int main() {
+using namespace Ttx::Concept;
+using namespace Ttx::Data;
+
+S32 main() {
   U32 value = 73, output = 0;
-  if (Ttx::Data::Transfer::copy(
-          Ttx::Data::Form::Storage::from(value),
-          Ttx::Data::Form::Storage::from(output)) !=
-      Ttx::Data::Status::Success) {
+  if (Transfer::copy(Form::Storage::from(value), Form::Storage::from(output)) !=
+      Status::Success) {
     return 1;
   }
 
-  const auto none = Ttx::Concept::Policies::None::get_none();
-  if (!Ttx::Concept::Abstract::accept(none.get_abstract().get_abi())) {
+  const auto none = Policies::None::get_none();
+  if (!Abstract::accept(none.get_abstract().get_abi())) {
     return 2;
   }
 

@@ -3,6 +3,7 @@
 
 #ifndef TTX_CONCEPT_CAPABILITIES_CREATE_H
 #define TTX_CONCEPT_CAPABILITIES_CREATE_H
+
 #include "ttx/concept/abstract.h"
 
 #define TTX_CREATE_ID_HIGH 0x5b2cd19ec46d4873ULL
@@ -31,7 +32,7 @@ typedef struct ttx_create {
 
 typedef struct ttx_create_ops {
   ttx_abstract_ops abstract;
-  ttx_binding_status (*create)(
+  ttx_negotiation_status (*create)(
       void* context,
       ttx_abstract arguments,
       void* callback_context,
@@ -40,4 +41,5 @@ typedef struct ttx_create_ops {
 
 C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_create_representation(
     void);
+
 #endif

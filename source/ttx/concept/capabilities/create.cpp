@@ -4,9 +4,10 @@
 #include "ttx/concept/capabilities/create.hpp"
 
 using namespace Ttx::Concept;
-using namespace Ttx::Semantic::Negotiation;
+using namespace Ttx::Data;
+using namespace Ttx::Semantic;
 
-C_LINKAGE const ttx_representation* ttx_create_representation() {
-  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-      Capabilities::Create::Api>::reference>::get_representation();
+C_LINKAGE auto ttx_create_representation() -> const ttx_representation* {
+  return &Form::Compiled<
+      Form::Native<Capabilities::Create::Api>::reference>::get_representation();
 }

@@ -18,7 +18,7 @@ class Transfer {
   static auto copy(Form::Storage input, Form::Storage output) -> Status {
     const auto source = input.get_abi();
     const auto target = output.get_abi();
-    return static_cast<Status>(ttx_transfer(&source, &target));
+    return Status(ttx_transfer(&source, &target));
   }
 };
 

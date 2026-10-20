@@ -27,7 +27,7 @@ typedef struct ttx_export {
 
 typedef struct ttx_export_ops {
   ttx_abstract_ops abstract;
-  ttx_binding_status (*expose)(void* context, ttx_abstract abstract);
+  ttx_negotiation_status (*expose)(void* context, ttx_abstract abstract);
 } ttx_export_ops;
 
 C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_export_representation(

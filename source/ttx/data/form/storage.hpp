@@ -4,6 +4,7 @@
 #pragma once
 
 #include "perimortem/core/access/bytes.hpp"
+#include "perimortem/core/data.hpp"
 
 #include "ttx/data/form/compiled.hpp"
 #include "ttx/data/form/representation.hpp"
@@ -30,7 +31,7 @@ class Storage {
 
     const auto status = ttx_storage_check(value);
     if (status) {
-      return static_cast<Status>(status);
+      return Status(status);
     }
 
     return Storage(value);
@@ -47,7 +48,7 @@ class Storage {
   static auto from(Value& data) -> Storage {
     return Storage(ttx_storage(
         &Compiled<Native<Value>::reference>::get_representation(),
-        reinterpret_cast<U8*>(&data), sizeof(Value)));
+        Perimortem::Core::Data::cast<U8>(&data), sizeof(Value)));
   }
 
   constexpr auto get_representation() const -> const Representation& {

@@ -26,7 +26,7 @@ static const composition_subject* checked(composition_subject* source) {
   return subject;
 }
 
-static int is(perimortem_uuid id, U64 high, U64 low) {
+static U8 is(perimortem_uuid id, U64 high, U64 low) {
   return id.high == high && id.low == low;
 }
 
@@ -34,13 +34,13 @@ static ttx_abstract abstract_view(composition_subject* source) {
   return (ttx_abstract){source, &abstract_operations};
 }
 
-static ttx_binding_status supports(void* context, perimortem_uuid id) {
+static ttx_negotiation_status supports(void* context, perimortem_uuid id) {
   composition_subject* source = context;
   const composition_subject* subject = checked(source);
   if (is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW) ||
       is(id, TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW) ||
       is(id, COMPOSITION_ID_HIGH, EXPRESSION_ID_LOW)) {
-    return TTX_BINDING_SATISFIED;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   if (is(id, COMPOSITION_ID_HIGH, ADDITIONAL_ID_LOW)) {
@@ -52,29 +52,29 @@ static ttx_binding_status supports(void* context, perimortem_uuid id) {
   if (subject->acquired) {
     if (is(id, TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW) ||
         is(id, TTX_CONSTANT_ID_HIGH, TTX_CONSTANT_ID_LOW)) {
-      return TTX_BINDING_SATISFIED;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     if (is(id, COMPOSITION_ID_HIGH, BORROWED_EXPRESSION_ID_LOW)) {
-      return subject->state->qualified ? TTX_BINDING_SATISFIED
-                                       : TTX_BINDING_REJECTED;
+      return subject->state->qualified ? TTX_NEGOTIATION_SATISFIED
+                                       : TTX_NEGOTIATION_REJECTED;
     }
   }
 
-  return TTX_BINDING_UNKNOWN;
+  return TTX_NEGOTIATION_UNKNOWN;
 }
 
 // These named operations remain callable through the supplied tables while
 // HIDDEN keeps them out of the library's exported interface.
-HIDDEN ttx_binding_status
+HIDDEN ttx_negotiation_status
     composition_bind(void* context, perimortem_uuid id, ttx_storage target) {
   composition_subject* source = context;
   const composition_subject* subject = checked(source);
   composition_state* state = subject->state;
   ++state->binds;
 
-  const ttx_binding_status status = supports(source, id);
-  if (status != TTX_BINDING_SATISFIED) {
+  const ttx_negotiation_status status = supports(source, id);
+  if (status != TTX_NEGOTIATION_SATISFIED) {
     return status;
   }
 
@@ -84,39 +84,39 @@ HIDDEN ttx_binding_status
     ttx_borrow api = {source, &borrow_operations};
     const ttx_storage input = {state->forms.borrow, (U8*)&api, sizeof(api)};
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   if (is(id, TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW)) {
     ttx_borrowed api = {source, &borrowed_operations};
     const ttx_storage input = {state->forms.borrowed, (U8*)&api, sizeof(api)};
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   if (is(id, COMPOSITION_ID_HIGH, EXPRESSION_ID_LOW)) {
     expression api = {source, &expression_operations};
     const ttx_storage input = {state->forms.expression, (U8*)&api, sizeof(api)};
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   if (is(id, COMPOSITION_ID_HIGH, BORROWED_EXPRESSION_ID_LOW)) {
     borrowed_expression api = {source, &qualified_operations};
     const ttx_storage input = {state->forms.qualified, (U8*)&api, sizeof(api)};
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   ttx_abstract api = abstract_view(source);
   const ttx_storage input = {state->forms.abstract, (U8*)&api, sizeof(api)};
   return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-             ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_REJECTED;
+             ? TTX_NEGOTIATION_SATISFIED
+             : TTX_NEGOTIATION_REJECTED;
 }
 
 static perimortem_view_bytes data(void* context) {
@@ -164,7 +164,7 @@ static void release(void* context) {
   ++subject->state->releases;
 }
 
-static ttx_binding_status borrow(void* context, ttx_borrowed* output) {
+static ttx_negotiation_status borrow(void* context, ttx_borrowed* output) {
   composition_subject* source = context;
   composition_state* state = checked(source)->state;
 
@@ -177,7 +177,7 @@ static ttx_binding_status borrow(void* context, ttx_borrowed* output) {
   ++state->references;
   ++state->acquisitions;
   *output = (ttx_borrowed){&state->retained, &borrowed_operations};
-  return TTX_BINDING_SATISFIED;
+  return TTX_NEGOTIATION_SATISFIED;
 }
 
 static const ttx_abstract_ops abstract_operations = {
@@ -210,15 +210,15 @@ ttx_abstract composition_open(
 }
 
 C_LINKAGE EXPORTED(TTX_TEST)
-ttx_binding_status composition_acquire(
+ttx_negotiation_status composition_acquire(
     composition_state* state,
     borrowed_expression* output) {
   if (!state->qualified) {
-    return TTX_BINDING_REJECTED;
+    return TTX_NEGOTIATION_REJECTED;
   }
 
   ttx_borrowed acquired;
   borrow(&state->weak, &acquired);
   *output = (borrowed_expression){acquired.context, &qualified_operations};
-  return TTX_BINDING_SATISFIED;
+  return TTX_NEGOTIATION_SATISFIED;
 }

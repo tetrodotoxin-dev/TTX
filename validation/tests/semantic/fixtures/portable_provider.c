@@ -38,11 +38,11 @@ static const ttx_representation form = {
   sizeof(bytes),
 };
 
-static ttx_binding_status
+static ttx_negotiation_status
     bind(void* context, perimortem_uuid id, ttx_storage output) {
   U32* source = context;
   if (id.high != 17 || id.low != 23) {
-    return TTX_BINDING_UNKNOWN;
+    return TTX_NEGOTIATION_UNKNOWN;
   }
 
   portable_counter api = {
@@ -52,14 +52,14 @@ static ttx_binding_status
 
   const ttx_storage input = {&form, (U8*)&api, sizeof(api)};
   return ttx_transfer(&input, &output) == TTX_DATA_SUCCESS
-             ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_REJECTED;
+             ? TTX_NEGOTIATION_SATISFIED
+             : TTX_NEGOTIATION_REJECTED;
 }
 
-static ttx_binding_status supports(void* context, perimortem_uuid id) {
+static ttx_negotiation_status supports(void* context, perimortem_uuid id) {
   (void)context;
-  return id.high == 17 && id.low == 23 ? TTX_BINDING_SATISFIED
-                                       : TTX_BINDING_UNKNOWN;
+  return id.high == 17 && id.low == 23 ? TTX_NEGOTIATION_SATISFIED
+                                       : TTX_NEGOTIATION_UNKNOWN;
 }
 
 ttx_semantic_query portable_counter_open(void) {

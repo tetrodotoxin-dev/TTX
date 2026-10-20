@@ -3,6 +3,7 @@
 
 #include "toolchain/validation/test.hpp"
 
+#include "perimortem/core/data.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
 #include "ttx/concept/policies/constant.hpp"
@@ -12,27 +13,30 @@
 #include "ttx/data/transfer.hpp"
 #include "validation/tests/concept/fixtures/observation.h"
 
-using namespace Perimortem;
+using namespace Perimortem::Core;
+using namespace Perimortem::Serialization;
+using namespace Toolchain::Validation;
 using namespace Ttx::Concept;
-using namespace Ttx::Semantic::Negotiation;
+using namespace Ttx::Data;
+using namespace Ttx::Semantic;
 
-static Toolchain::Validation::Harness Abstracts = {
+static Harness Abstracts = {
   .name = "TTX::Abstract",
 };
 
 VALIDATION_TEST(Abstracts, c_observations) {
   observation_subject provider = observation_subject(
-      &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-          Abstract::Api>::reference>::get_representation(),
-      &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-          Policies::Constant::Api>::reference>::get_representation(),
+      &Form::Compiled<
+          Form::Native<Abstract::Api>::reference>::get_representation(),
+      &Form::Compiled<Form::Native<Policies::Constant::Api>::reference>::
+          get_representation(),
       0);
   const Abstract subject(observation_abstract(&provider));
   subject.get_query().bind<Abstract>().visit(
       [&](Abstract acquired) { EXPECT(acquired == subject); },
-      [&](Binding::Status) { EXPECT(False); });
+      [&](Negotiation::Status) { EXPECT(False); });
   subject.bind<Policies::Constant>().visit(
-      [](Policies::Constant) {}, [&](Binding::Status) { EXPECT(False); });
+      [](Policies::Constant) {}, [&](Negotiation::Status) { EXPECT(False); });
 
   // Copy the first byte before asking for another observation, which can
   // replace the provider's buffer. Constant keeps the selection stable while
@@ -44,7 +48,7 @@ VALIDATION_TEST(Abstracts, c_observations) {
   EXPECT(subject.resolve().resolve() == subject);
 
   Count visited = 0;
-  auto callback = [&](Core::View::Bytes route, Abstract value) {
+  auto callback = [&](View::Bytes route, Abstract value) {
     ++visited;
     EXPECT_EQ(route.get_size(), Count(3));
     EXPECT_EQ(route.get_data()[1], U8(0));
@@ -62,10 +66,10 @@ VALIDATION_TEST(Abstracts, c_observations) {
 // the provider, which makes a fresh byte observation on every call.
 VALIDATION_TEST(Abstracts, copied_view) {
   observation_subject provider = observation_subject(
-      &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-          Abstract::Api>::reference>::get_representation(),
-      &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-          Policies::Constant::Api>::reference>::get_representation(),
+      &Form::Compiled<
+          Form::Native<Abstract::Api>::reference>::get_representation(),
+      &Form::Compiled<Form::Native<Policies::Constant::Api>::reference>::
+          get_representation(),
       0);
   const Abstract subject(observation_abstract(&provider));
   const auto copy = subject;
@@ -79,16 +83,16 @@ VALIDATION_TEST(Abstracts, copied_view) {
 
 VALIDATION_TEST(Abstracts, fresh_abstract_binding) {
   observation_subject provider = observation_subject(
-      &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-          Abstract::Api>::reference>::get_representation(),
-      &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-          Policies::Constant::Api>::reference>::get_representation(),
+      &Form::Compiled<
+          Form::Native<Abstract::Api>::reference>::get_representation(),
+      &Form::Compiled<Form::Native<Policies::Constant::Api>::reference>::
+          get_representation(),
       0);
   const Abstract subject(observation_abstract(&provider));
   const auto check = [&](Abstract expected) {
     subject.bind<Abstract>().visit(
         [&](Abstract answer) { EXPECT(answer == expected); },
-        [&](Binding::Status) { EXPECT(False); });
+        [&](Negotiation::Status) { EXPECT(False); });
   };
 
   provider.selected = ttx_none();
@@ -97,15 +101,15 @@ VALIDATION_TEST(Abstracts, fresh_abstract_binding) {
   provider.selected = ttx_unknown();
   check(Abstract(ttx_unknown()));
 
-  const ttx_binding_status failures[] = {
-    TTX_BINDING_UNKNOWN, TTX_BINDING_REJECTED};
+  const ttx_negotiation_status failures[] = {
+    TTX_NEGOTIATION_UNKNOWN, TTX_NEGOTIATION_REJECTED};
 
   for (auto status : failures) {
     provider.answer = status;
     subject.bind<Abstract>().visit(
         [&](Abstract) { EXPECT(False); },
-        [&](Binding::Status failure) {
-          EXPECT_EQ(static_cast<ttx_binding_status>(failure), status);
+        [&](Negotiation::Status failure) {
+          EXPECT_EQ(ttx_negotiation_status(failure), status);
         });
   }
 
@@ -118,31 +122,32 @@ VALIDATION_TEST(Abstracts, fresh_abstract_binding) {
 VALIDATION_TEST(Abstracts, encountered_policy) {
   struct Policy {
     ttx_abstract target;
-    ttx_binding_status answer;
+    ttx_negotiation_status answer;
     Count binds = 0;
 
-    static auto supports(void* context, perimortem_uuid) -> ttx_binding_status {
-      return static_cast<Policy*>(context)->answer;
+    static auto supports(void* context, perimortem_uuid)
+        -> ttx_negotiation_status {
+      return Data::cast<Policy>(context)->answer;
     }
 
     static auto bind(void* context, perimortem_uuid, ttx_storage)
-        -> ttx_binding_status {
-      ++static_cast<Policy*>(context)->binds;
-      return TTX_BINDING_REJECTED;
+        -> ttx_negotiation_status {
+      ++Data::cast<Policy>(context)->binds;
+      return TTX_NEGOTIATION_REJECTED;
     }
 
     static auto data(void*) -> perimortem_view_bytes { return {}; }
 
     static auto resolve(void* context) -> ttx_abstract {
-      return static_cast<Policy*>(context)->target;
+      return Data::cast<Policy>(context)->target;
     }
 
     static auto lookup(void*, perimortem_view_bytes) -> ttx_abstract {
       return ttx_unknown();
     }
 
-    static void visit(void*, ttx_concept_visitor) {}
-  } policy{ttx_none(), TTX_BINDING_REJECTED};
+    static auto visit(void*, ttx_concept_visitor) -> void {}
+  } policy{ttx_none(), TTX_NEGOTIATION_REJECTED};
 
   const ttx_abstract_ops operations = {Policy::supports, Policy::bind,
                                        Policy::data,     Policy::resolve,
@@ -150,16 +155,16 @@ VALIDATION_TEST(Abstracts, encountered_policy) {
 
   const Abstract subject(&policy, operations);
   EXPECT(subject.resolve() == Abstract(ttx_none()));
-  EXPECT(subject.supports<Policies::None>() == Binding::Status::Rejected);
+  EXPECT(subject.supports<Policies::None>() == Negotiation::Status::Rejected);
 
-  policy.answer = TTX_BINDING_UNKNOWN;
-  EXPECT(subject.supports<Policies::None>() == Binding::Status::Unknown);
+  policy.answer = TTX_NEGOTIATION_UNKNOWN;
+  EXPECT(subject.supports<Policies::None>() == Negotiation::Status::Unknown);
   EXPECT_EQ(policy.binds, Count(0));
 
   subject.bind<Policies::None>().visit(
       [&](Policies::None) { EXPECT(False); },
-      [&](Binding::Status failure) {
-        EXPECT(failure == Binding::Status::Rejected);
+      [&](Negotiation::Status failure) {
+        EXPECT(failure == Negotiation::Status::Rejected);
       });
 
   EXPECT_EQ(policy.binds, Count(1));
@@ -171,41 +176,38 @@ VALIDATION_TEST(Abstracts, qualified_question) {
   struct Subject {
     Count probes = 0;
 
-    static auto contract() -> Serialization::Formats::Uuid {
-      return Serialization::Formats::Uuid(
-          0x274605faccbb48b0ULL, 0x89c84603372550d1ULL);
+    static auto contract() -> Formats::Uuid {
+      return Formats::Uuid(0x274605faccbb48b0ULL, 0x89c84603372550d1ULL);
     }
 
     static auto supports(void* context, perimortem_uuid id)
-        -> ttx_binding_status {
-      ++static_cast<Subject*>(context)->probes;
-      return Serialization::Formats::Uuid(id) == contract()
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_UNKNOWN;
+        -> ttx_negotiation_status {
+      ++Data::cast<Subject>(context)->probes;
+      return Formats::Uuid(id) == contract() ? TTX_NEGOTIATION_SATISFIED
+                                             : TTX_NEGOTIATION_UNKNOWN;
     }
 
     static auto bind(void*, perimortem_uuid id, ttx_storage target)
-        -> ttx_binding_status {
-      if (Serialization::Formats::Uuid(id) != contract()) {
-        return TTX_BINDING_UNKNOWN;
+        -> ttx_negotiation_status {
+      if (Formats::Uuid(id) != contract()) {
+        return TTX_NEGOTIATION_UNKNOWN;
       }
 
       Abstract::Api api = ttx_none();
-      return Ttx::Data::Transfer::copy(
-                 Ttx::Data::Form::Storage::from(api),
-                 Ttx::Data::Form::Storage(target)) == Ttx::Data::Status::Success
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
+      return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
+                     Status::Success
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_REJECTED;
     }
   } provider;
 
-  const Query query({&provider, Subject::bind, Subject::supports});
-  EXPECT(query.supports<Policies::Ordered>() == Binding::Status::Unknown);
+  const Negotiation::Query query({&provider, Subject::bind, Subject::supports});
+  EXPECT(query.supports<Policies::Ordered>() == Negotiation::Status::Unknown);
 
   const auto probes = provider.probes;
   query.bind<Abstract>(Subject::contract())
       .visit(
           [&](Abstract answer) { EXPECT(answer == Abstract(ttx_none())); },
-          [&](Binding::Status) { EXPECT(False); });
+          [&](Negotiation::Status) { EXPECT(False); });
   EXPECT_EQ(provider.probes, probes);
 }

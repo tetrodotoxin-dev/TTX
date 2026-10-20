@@ -1,7 +1,7 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/data/transfer.h"
+#include "ttx/data/transfer.hpp"
 
 #include <string.h>
 

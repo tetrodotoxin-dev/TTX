@@ -61,25 +61,24 @@ class Abstract {
   }
 
   auto supports(Perimortem::Serialization::Formats::Uuid contract) const
-      -> Semantic::Negotiation::Binding::Status {
+      -> Semantic::Negotiation::Status {
     return get_query().supports(contract);
   }
 
   template <typename Contract>
-  auto supports() const -> Semantic::Negotiation::Binding::Status {
+  auto supports() const -> Semantic::Negotiation::Status {
     return supports(Contract::contract_id);
   }
 
   auto bind_interface(
       Perimortem::Serialization::Formats::Uuid contract,
-      Data::Form::Storage destination) const
-      -> Semantic::Negotiation::Binding::Status {
+      Data::Form::Storage destination) const -> Semantic::Negotiation::Status {
     return get_query().bind(contract, destination);
   }
 
   template <typename Contract>
   auto bind() const -> Perimortem::Core::Storage::
-      Result<Contract, Semantic::Negotiation::Binding::Status> {
+      Result<Contract, Semantic::Negotiation::Status> {
     return get_query().template bind<Contract>();
   }
 

@@ -57,12 +57,12 @@ constexpr auto ttx_schema::primitive(
     Count pointer_size) -> ttx_schema {
   const Count width = get_width(type, pointer_size);
   return ttx_schema(
-      width, width, static_cast<U8>(Kind::Value),
+      width, width, U8(Kind::Value),
       {
         .value =
             {
-              static_cast<U8>(type),
-              static_cast<U8>(order),
+              U8(type),
+              U8(order),
             },
       });
 }
@@ -77,14 +77,14 @@ constexpr auto ttx_schema::callable(
     Reference result,
     Count pointer_size) -> ttx_schema {
   return ttx_schema(
-      pointer_size, pointer_size, static_cast<U8>(Kind::Callable),
+      pointer_size, pointer_size, U8(Kind::Callable),
       {
         .callable =
             {
               arguments.get_data(),
               arguments.get_size(),
               result,
-              static_cast<ttx_schema_convention>(convention),
+              ttx_schema_convention(convention),
             },
       });
 }
@@ -94,7 +94,7 @@ constexpr auto ttx_schema::composite(
     Count extent,
     Count alignment) -> ttx_schema {
   return ttx_schema(
-      extent, alignment, static_cast<U8>(Kind::Composite),
+      extent, alignment, U8(Kind::Composite),
       {
         .composite =
             {
@@ -111,7 +111,7 @@ constexpr auto ttx_schema::range(
     Count extent,
     Count alignment) -> ttx_schema {
   return ttx_schema(
-      extent, alignment, static_cast<U8>(Kind::Range),
+      extent, alignment, U8(Kind::Range),
       {
         .range =
             {

@@ -6,7 +6,8 @@
 
 #include "perimortem/serialization/formats/uuid.h"
 
-#include "ttx/semantic/negotiation/binding.h"
+#include "ttx/data/form/storage.h"
+#include "ttx/semantic/negotiation/status.h"
 
 // Query negotiates semantic contracts before a consumer enters an Abstract
 // graph. The requested UUID selects meaning, while destination Storage
@@ -49,9 +50,9 @@
 // explicitly provide those guarantees.
 typedef struct ttx_semantic_query {
   void* context;
-  ttx_binding_status (
+  ttx_negotiation_status (
       *bind)(void* context, perimortem_uuid contract, ttx_storage requested);
-  ttx_binding_status (*supports)(void* context, perimortem_uuid contract);
+  ttx_negotiation_status (*supports)(void* context, perimortem_uuid contract);
 } ttx_semantic_query;
 
 C_LINKAGE EXPORTED(TTX) const ttx_representation*

@@ -7,8 +7,8 @@
 #include "perimortem/serialization/formats/uuid.hpp"
 
 #include "ttx/data/form/storage.hpp"
-#include "ttx/semantic/negotiation/binding.hpp"
 #include "ttx/semantic/negotiation/query.h"
+#include "ttx/semantic/negotiation/status.hpp"
 
 namespace Ttx::Semantic::Negotiation {
 
@@ -38,21 +38,20 @@ class Query {
     return api.bind != nullptr && api.supports != nullptr;
   }
 
-  EXPORTED(TTX) auto supports(Perimortem::Serialization::Formats::Uuid contract)
-      const -> Binding::Status;
+  EXPORTED(TTX) auto supports(
+      Perimortem::Serialization::Formats::Uuid contract) const -> Status;
 
   template <typename Contract>
-  auto supports() const -> Binding::Status {
+  auto supports() const -> Status {
     return supports(Contract::contract_id);
   }
 
   EXPORTED(TTX) auto bind(
       Perimortem::Serialization::Formats::Uuid contract,
-      Data::Form::Storage requested) const -> Binding::Status;
+      Data::Form::Storage requested) const -> Status;
 
   template <typename Contract>
-  auto bind() const
-      -> Perimortem::Core::Storage::Result<Contract, Binding::Status> {
+  auto bind() const -> Perimortem::Core::Storage::Result<Contract, Status> {
     return bind<Contract>(Contract::contract_id);
   }
 
@@ -66,17 +65,17 @@ class Query {
   // regardless of whether the C++ interface supplies this additional check.
   template <typename Interface>
   auto bind(Perimortem::Serialization::Formats::Uuid contract) const
-      -> Perimortem::Core::Storage::Result<Interface, Binding::Status> {
+      -> Perimortem::Core::Storage::Result<Interface, Status> {
     typename Interface::Api api = {};
     const auto requested = Data::Form::Storage::from(api);
     const auto status = bind(contract, requested);
-    if (status != Binding::Status::Satisfied) {
+    if (status != Status::Satisfied) {
       return status;
     }
 
     if constexpr (requires { Interface::accept(api); }) {
       if (!Interface::accept(api)) {
-        return Binding::Status::Rejected;
+        return Status::Rejected;
       }
     }
 

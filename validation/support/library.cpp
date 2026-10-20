@@ -3,6 +3,8 @@
 
 #include "validation/support/library.hpp"
 
+#include "perimortem/core/data.hpp"
+
 #ifdef TOOLCHAIN_WINDOWS
 #include <windows.h>
 #else
@@ -16,28 +18,28 @@
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Memory;
-using namespace Perimortem::System::Process;
+using namespace Perimortem::System;
 using namespace Validation::Support;
 
 auto Validation::Support::library_path(View::Bytes name) -> Thread::Bytes {
-  Perimortem::Core::Storage::Vector<U8, 4096> path;
+  Storage::Vector<U8, 4096> path;
 
 #ifdef TOOLCHAIN_WINDOWS
 
-  Perimortem::Core::Storage::Vector<WCHAR, 4096> native;
+  Storage::Vector<WCHAR, 4096> native;
   const auto length =
       GetModuleFileNameW(nullptr, native.get_data(), native.get_size());
   const auto size = length && length < native.get_size()
                         ? WideCharToMultiByte(
                               CP_UTF8, WC_ERR_INVALID_CHARS, native.get_data(),
-                              length, reinterpret_cast<char*>(path.get_data()),
+                              length, Data::cast<char>(path.get_data()),
                               path.get_size(), nullptr, nullptr)
                         : 0;
 
 #else
 
   const auto size = readlink(
-      "/proc/self/exe", reinterpret_cast<char*>(path.get_data()), sizeof(path));
+      "/proc/self/exe", Data::cast<char>(path.get_data()), sizeof(path));
 
 #endif
 
@@ -56,19 +58,20 @@ auto Validation::Support::library_path(View::Bytes name) -> Thread::Bytes {
   return location;
 }
 
-auto Validation::Support::open_library(View::Bytes name) -> Library {
+auto Validation::Support::open_library(View::Bytes name) -> Process::Library {
   const auto location = library_path(name);
   Allocator::Arena errors;
-  return Library::open(location.get_view(), errors)
+  return Process::Library::open(location.get_view(), errors)
       .visit(
-          [](Library& library) { return Data::take(library); },
-          [](View::Bytes message) -> Library {
+          [](Process::Library& library) { return Data::take(library); },
+          [](View::Bytes message) -> Process::Library {
             Diagnostics::Log::fatal(message);
           });
 }
 
-auto Validation::Support::find_symbol(const Library& library, View::Bytes name)
-    -> void* {
+auto Validation::Support::find_symbol(
+    const Process::Library& library,
+    View::Bytes name) -> void* {
   Allocator::Arena errors;
   return library.symbol(name, errors)
       .visit(

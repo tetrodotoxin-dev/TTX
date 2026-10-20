@@ -39,14 +39,14 @@ typedef struct ttx_representation_position {
       ByteOrder byte_order = ByteOrder::Little,
       U32 extent = 0)
       : offset(offset),
-        type(static_cast<U8>(type)),
-        byte_order(static_cast<U8>(byte_order)),
+        type(U8(type)),
+        byte_order(U8(byte_order)),
         extent(extent ? extent : U32(ttx_schema::get_width(type))) {}
 
-  constexpr auto get_value() const -> Value { return static_cast<Value>(type); }
+  constexpr auto get_value() const -> Value { return Value(type); }
 
   constexpr auto get_byte_order() const -> ByteOrder {
-    return static_cast<ByteOrder>(byte_order);
+    return ByteOrder(byte_order);
   }
 
   constexpr auto get_extent() const -> Count;

@@ -54,7 +54,7 @@ class Borrow {
   }
 
   EXPORTED(TTX) auto borrow() const -> Perimortem::Core::Storage::
-      Result<Policies::Borrowed, Semantic::Negotiation::Binding::Status>;
+      Result<Policies::Borrowed, Semantic::Negotiation::Status>;
 
  private:
   Api api;

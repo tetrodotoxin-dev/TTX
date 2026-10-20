@@ -3,18 +3,21 @@
 
 #include "ttx/data/form/representation.hpp"
 
+#include "perimortem/core/data.hpp"
+
+using namespace Perimortem::Core;
+using namespace Perimortem::Memory;
 using namespace Ttx::Data;
-using namespace Ttx::Data::Form;
 
 // Byte lookup can skip padding and whole instances. A coordinate inside a
 // primitive asks for the next start, while an exact coordinate selects that
 // primitive. Whole traversal uses visit instead of repeating this search.
 static auto next(
-    const Representation& source,
+    const Form::Representation& source,
     Count body,
     Count offset,
     Count requested,
-    Representation::Position& result) -> Bool {
+    Form::Representation::Position& result) -> Bool {
   const auto bytes = source.get_blocks();
   const U8 depth = source.get_depth();
   const auto form = Encoding::Struct::decode(bytes, body, depth);
@@ -38,7 +41,7 @@ static auto next(
       } else {
         instance += start < requested;
         if (instance < entry.count) {
-          result = Representation::Position(
+          result = Form::Representation::Position(
               first + instance * entry.distance, entry.get_value(),
               entry.get_byte_order(),
               U32(entry.get_extent(source.get_pointer_size())));
@@ -52,15 +55,15 @@ static auto next(
 }
 
 auto ttx_representation_compatible(
-    const Representation* source,
-    const Representation* destination) -> U8 {
+    const Form::Representation* source,
+    const Form::Representation* destination) -> U8 {
   return source && destination && source->compatible(*destination);
 }
 
 auto ttx_representation_next(
-    const Representation* source,
+    const Form::Representation* source,
     Count offset,
-    Representation::Position* result) -> ttx_data_status {
+    Form::Representation::Position* result) -> ttx_data_status {
   if (!source || !result) {
     return TTX_DATA_INVALID;
   }
@@ -70,31 +73,31 @@ auto ttx_representation_next(
 }
 
 auto ttx_representation::next(Count offset) const
-    -> Perimortem::Core::Storage::Result<Position, Status> {
+    -> Storage::Result<Position, Status> {
   Position result;
   const auto status = ttx_representation_next(this, offset, &result);
   if (status != TTX_DATA_SUCCESS) {
-    return static_cast<Status>(status);
+    return Status(status);
   }
 
   return result;
 }
 
 auto ttx_representation_visit(
-    const Representation* source,
+    const Form::Representation* source,
     ttx_representation_visitor visitor) -> ttx_data_status {
   if (!source || !visitor.visit) {
     return TTX_DATA_INVALID;
   }
 
-  return static_cast<ttx_data_status>(
-      source->visit([&](Representation::Position position) {
-        return static_cast<Status>(visitor.visit(visitor.context, position));
+  return ttx_data_status(
+      source->visit([&](Form::Representation::Position position) {
+        return Status(visitor.visit(visitor.context, position));
       }));
 }
 
 auto ttx_representation_visit_selected(
-    const Representation* source,
+    const Form::Representation* source,
     const Count* coordinates,
     Count count,
     ttx_representation_visitor visitor) -> ttx_data_status {
@@ -102,45 +105,43 @@ auto ttx_representation_visit_selected(
     return TTX_DATA_INVALID;
   }
 
-  const auto coordinate_view =
-      count ? Perimortem::Core::View::Vector<Count>(coordinates[0], count)
-            : Perimortem::Core::View::Vector<Count>();
-  return static_cast<ttx_data_status>(source->visit(
-      coordinate_view,
-      [&](Representation::Position position) {
-        return static_cast<Status>(visitor.visit(visitor.context, position));
+  const auto coordinate_view = count
+                                   ? View::Vector<Count>(coordinates[0], count)
+                                   : View::Vector<Count>();
+  return ttx_data_status(source->visit(
+      coordinate_view, [&](Form::Representation::Position position) {
+        return Status(visitor.visit(visitor.context, position));
       }));
 }
 
 static auto allocate_representation(void* context, Count bytes, Count)
     -> void* {
-  auto& arena = *static_cast<Perimortem::Memory::Allocator::Arena*>(context);
+  auto& arena = *Data::cast<Allocator::Arena>(context);
   return arena.allocate(bytes).get_data();
 }
 
 auto ttx_representation::compile(
     ttx_schema_reference schema,
-    Perimortem::Memory::Allocator::Arena& arena,
-    Count pointer_size)
-    -> Perimortem::Core::Storage::Result<const ttx_representation&, Status> {
+    Allocator::Arena& arena,
+    Count pointer_size) -> Storage::Result<const ttx_representation&, Status> {
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&arena, allocate_representation);
   const ttx_representation* result = nullptr;
   const auto status =
       ttx_representation_compile(schema, pointer_size, allocator, &result);
   if (status != TTX_DATA_SUCCESS) {
-    return static_cast<Status>(status);
+    return Status(status);
   }
 
   return *result;
 }
 
 auto ttx_representation::compose(
-    Perimortem::Core::View::Vector<Member> members,
+    View::Vector<Member> members,
     Count extent,
     Count alignment,
-    Perimortem::Memory::Allocator::Arena& arena)
-    -> Perimortem::Core::Storage::Result<const ttx_representation&, Status> {
+    Allocator::Arena& arena)
+    -> Storage::Result<const ttx_representation&, Status> {
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&arena, allocate_representation);
   const ttx_representation* result = nullptr;
@@ -148,7 +149,7 @@ auto ttx_representation::compose(
       members.get_data(), members.get_size(), extent, alignment, allocator,
       &result);
   if (status != TTX_DATA_SUCCESS) {
-    return static_cast<Status>(status);
+    return Status(status);
   }
 
   return *result;

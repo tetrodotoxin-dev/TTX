@@ -35,7 +35,7 @@ enum counter_composition {
 
 typedef struct counter_fixture {
   ttx_semantic_query query;
-  void (*reset)(ttx_binding_status status, U8 omit, U8 stateless);
+  void (*reset)(ttx_negotiation_status status, U8 omit, U8 stateless);
   counter_statistics (*statistics)(void);
   void (*compose)(enum counter_composition mode);
 } counter_fixture;

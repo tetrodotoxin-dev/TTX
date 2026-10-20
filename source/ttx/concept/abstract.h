@@ -9,7 +9,8 @@
 #include "perimortem/core/view/bytes.h"
 #include "perimortem/serialization/formats/uuid.h"
 
-#include "ttx/semantic/negotiation/binding.h"
+#include "ttx/data/form/storage.h"
+#include "ttx/semantic/negotiation/status.h"
 
 #define TTX_ABSTRACT_ID_HIGH 0x01a08522d86b7decULL
 #define TTX_ABSTRACT_ID_LOW 0x9fa65e9c70720964ULL
@@ -62,7 +63,7 @@ typedef struct ttx_abstract_ops {
   //
   // Using a context pointer other than the pointer provided when `supports` was
   // acquired is undefined behavior.
-  ttx_binding_status (*supports)(void* context, perimortem_uuid contract);
+  ttx_negotiation_status (*supports)(void* context, perimortem_uuid contract);
 
   // Transfers the complete API for the UUID into the caller's destination.
   // The caller supplies Storage with a checked canonical Representation and
@@ -80,7 +81,7 @@ typedef struct ttx_abstract_ops {
   //
   // The caller uses the context supplied with this operation. Substituting
   // another context through this interface is undefined behavior.
-  ttx_binding_status (
+  ttx_negotiation_status (
       *bind)(void* context, perimortem_uuid contract, ttx_storage requested);
 
   // The data observation supplies bytes without another Abstract to inspect.

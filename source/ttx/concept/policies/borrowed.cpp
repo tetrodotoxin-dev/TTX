@@ -3,7 +3,10 @@
 
 #include "ttx/concept/policies/borrowed.hpp"
 
-C_LINKAGE const ttx_representation* ttx_borrowed_representation() {
-  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-      Ttx::Concept::Policies::Borrowed::Api>::reference>::get_representation();
+using namespace Ttx::Concept;
+using namespace Ttx::Data;
+
+C_LINKAGE auto ttx_borrowed_representation() -> const ttx_representation* {
+  return &Form::Compiled<
+      Form::Native<Policies::Borrowed::Api>::reference>::get_representation();
 }

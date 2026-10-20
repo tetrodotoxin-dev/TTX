@@ -7,24 +7,28 @@
 
 #include "toolchain/validation/test.hpp"
 
+#include "perimortem/core/data.hpp"
+
+using namespace Perimortem::Core;
+using namespace Toolchain::Validation;
 using namespace Ttx::Data;
-using namespace Ttx::Data::Form;
 
-static Toolchain::Validation::Harness Transfers = {
-  .name = "TTX::Data::Transfer"};
+static Harness Transfers = {.name = "TTX::Data::Transfer"};
 
-static constexpr auto integer = Schema::primitive(Schema::Value::U32);
-static constexpr auto four = Schema::range(integer, 4, 4, 16, 4);
-static constexpr auto spaced = Schema::range(integer, 2, 256, 260, 4);
+static constexpr auto integer =
+    Form::Schema::primitive(Form::Schema::Value::U32);
+static constexpr auto four = Form::Schema::range(integer, 4, 4, 16, 4);
+static constexpr auto spaced = Form::Schema::range(integer, 2, 256, 260, 4);
 
 // Moving canonical descriptor bytes preserves their meaning at every byte
 // alignment. Payload addresses still satisfy the alignment described by them.
 VALIDATION_TEST(Transfers, unaligned_descriptors) {
-  const Representation* forms[] = {
-    &Compiled<four>::get_representation(),
-    &Compiled<spaced>::get_representation()};
+  const Form::Representation* forms[] = {
+    &Form::Compiled<four>::get_representation(),
+    &Form::Compiled<spaced>::get_representation()};
 
-  constexpr Count descriptor_size = Compiled<spaced>::get_representation().size;
+  constexpr Count descriptor_size =
+      Form::Compiled<spaced>::get_representation().size;
   alignas(8) U8 source_bytes[descriptor_size + 7] = {};
   alignas(8) U8 target_bytes[descriptor_size + 7] = {};
   alignas(U32) U8 input[260] = {};
@@ -43,8 +47,9 @@ VALIDATION_TEST(Transfers, unaligned_descriptors) {
       memcpy(source_bytes + offset, canonical.data, canonical.size);
       memcpy(target_bytes + 8 - offset, canonical.data, canonical.size);
 
-      const Representation source(source_bytes + offset, canonical.size);
-      const Representation target(target_bytes + 8 - offset, canonical.size);
+      const Form::Representation source(source_bytes + offset, canonical.size);
+      const Form::Representation target(
+          target_bytes + 8 - offset, canonical.size);
       EXPECT(ttx_representation_compatible(&canonical, &source));
       EXPECT(ttx_representation_compatible(&source, &target));
       EXPECT_EQ(source.get_extent(), extent);
@@ -54,10 +59,10 @@ VALIDATION_TEST(Transfers, unaligned_descriptors) {
       ASSERT_EQ(
           ttx_representation_next(&source, 1, &position), TTX_DATA_SUCCESS);
       EXPECT_EQ(position.offset, distance);
-      EXPECT(position.get_value() == Schema::Value::U32);
+      EXPECT(position.get_value() == Form::Schema::Value::U32);
 
       Count visited = 0;
-      EXPECT(source.visit([&](Representation::Position current) {
+      EXPECT(source.visit([&](Form::Representation::Position current) {
         EXPECT_EQ(current.offset, visited * distance);
         EXPECT_EQ(current.get_extent(), Count(4));
         ++visited;
@@ -70,8 +75,8 @@ VALIDATION_TEST(Transfers, unaligned_descriptors) {
       visited = 0;
       EXPECT(
           source.visit(
-              Perimortem::Core::View::Vector<Count>(last, 1),
-              [&](Representation::Position current) {
+              View::Vector<Count>(last, 1),
+              [&](Form::Representation::Position current) {
                 EXPECT_EQ(current.offset, last);
                 ++visited;
                 return Status::Success;
@@ -99,10 +104,10 @@ VALIDATION_TEST(Transfers, unaligned_descriptors) {
 }
 
 VALIDATION_TEST(Transfers, complete_extent_and_overlap) {
-  const auto& form = Compiled<four>::get_representation();
+  const auto& form = Form::Compiled<four>::get_representation();
   U32 values[] = {1, 2, 3, 4, 5};
-  const ttx_storage input{&form, reinterpret_cast<U8*>(values), sizeof(values)};
-  const ttx_storage output{&form, reinterpret_cast<U8*>(values + 1), 16};
+  const ttx_storage input{&form, Data::cast<U8>(values), sizeof(values)};
+  const ttx_storage output{&form, Data::cast<U8>(values + 1), 16};
   ASSERT_EQ(ttx_transfer(&input, &output), TTX_DATA_SUCCESS);
 
   const U32 expected[] = {1, 1, 2, 3, 4};
@@ -113,7 +118,7 @@ VALIDATION_TEST(Transfers, complete_extent_and_overlap) {
   EXPECT_EQ(ttx_transfer(&output, &output), TTX_DATA_SUCCESS);
 
   U32 destination[] = {90, 90, 90, 90, 90, 90};
-  const ttx_storage spare{&form, reinterpret_cast<U8*>(destination + 1), 20};
+  const ttx_storage spare{&form, Data::cast<U8>(destination + 1), 20};
   ASSERT_EQ(ttx_transfer(&output, &spare), TTX_DATA_SUCCESS);
   EXPECT_EQ(destination[0], U32(90));
   EXPECT_EQ(destination[5], U32(90));
@@ -126,8 +131,8 @@ VALIDATION_TEST(Transfers, complete_extent_and_overlap) {
 // the foreign form or modifying any output.
 VALIDATION_TEST(Transfers, refused_regions_and_forms) {
   U32 value = 42, output = 99;
-  const auto input = Storage::from(value).get_abi();
-  const auto target = Storage::from(output).get_abi();
+  const auto input = Form::Storage::from(value).get_abi();
+  const auto target = Form::Storage::from(output).get_abi();
   alignas(U32) U8 unaligned[sizeof(U32) + 1] = {};
 
   const ttx_storage invalid[] = {
@@ -149,7 +154,7 @@ VALIDATION_TEST(Transfers, refused_regions_and_forms) {
   EXPECT_EQ(ttx_transfer(&input, nullptr), TTX_DATA_INVALID);
 
   R32 real = 0;
-  const auto different = Storage::from(real).get_abi();
+  const auto different = Form::Storage::from(real).get_abi();
   EXPECT_EQ(ttx_transfer(&different, &target), TTX_DATA_INCOMPATIBLE);
 
   const U8 malformed[] = {0xff};
@@ -161,8 +166,8 @@ VALIDATION_TEST(Transfers, refused_regions_and_forms) {
 
 VALIDATION_TEST(Transfers, empty_value) {
   static constexpr auto empty =
-      Schema::composite(Perimortem::Core::View::Vector<Schema::Position>(), 0);
-  const auto& form = Compiled<empty>::get_representation();
+      Form::Schema::composite(View::Vector<Form::Schema::Position>(), 0);
+  const auto& form = Form::Compiled<empty>::get_representation();
   const ttx_storage input{&form, nullptr, 0};
   const ttx_storage output{&form, nullptr, 0};
   EXPECT_EQ(ttx_transfer(&input, &output), TTX_DATA_SUCCESS);
@@ -182,14 +187,14 @@ VALIDATION_TEST(Transfers, callable_record_without_query) {
   struct State {
     U32 calls = 0;
     static U32 call(void* context, U32 value) {
-      ++static_cast<State*>(context)->calls;
+      ++Data::cast<State>(context)->calls;
       return value + 1;
     }
   } state;
 
   DataOperation input{&state, State::call}, output{};
   EXPECT(
-      Transfer::copy(Storage::from(input), Storage::from(output)) ==
+      Transfer::copy(Form::Storage::from(input), Form::Storage::from(output)) ==
       Status::Success);
   EXPECT_EQ(state.calls, U32(0));
   ASSERT(output.call);

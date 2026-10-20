@@ -3,16 +3,19 @@
 
 #include "ttx/data/form/compiler.hpp"
 
+#include "perimortem/core/data.hpp"
 #include "perimortem/memory/thread/map.hpp"
 
 #include "ttx/data/form/representation.hpp"
 
+using namespace Perimortem::Core;
+using namespace Perimortem::Memory;
+using namespace Toolchain::Memory;
 using namespace Ttx::Data;
-using namespace Ttx::Data::Form;
 
 template <>
-auto Compiler<>::import_body(
-    const Representation& form,
+auto Form::Compiler<>::import_body(
+    const Form::Representation& form,
     Count block,
     Bool callable,
     Indices& indices) -> Count {
@@ -72,11 +75,10 @@ auto Compiler<>::import_body(
 }
 
 template <>
-auto Compiler<>::compose(
-    Perimortem::Core::View::Vector<ttx_representation_member> members,
+auto Form::Compiler<>::compose(
+    View::Vector<ttx_representation_member> members,
     Count size,
     Count alignment) -> Status {
-  using namespace Perimortem::Memory;
   clear();
   if (!alignment || (alignment & (alignment - 1)) ||
       (members.get_size() && !members.get_data())) {
@@ -138,11 +140,11 @@ auto Compiler<>::compose(
 }
 
 static auto publish(
-    const Compiler<>& compiler,
+    const Form::Compiler<>& compiler,
     ttx_representation_allocator allocator,
     const ttx_representation** result) -> ttx_data_status {
   const Count size = compiler.get_size();
-  if (size > Count(-1) - sizeof(Representation)) {
+  if (size > Count(-1) - sizeof(Form::Representation)) {
     return TTX_DATA_OVERFLOW;
   }
 
@@ -150,24 +152,23 @@ static auto publish(
   // Representation record. Aligning the allocation and keeping the record's
   // size divisible by eight gives both parts eight byte alignment, including
   // on targets with four byte pointers.
-  static_assert(sizeof(Representation) % 8 == 0);
-  const Count alignment = Perimortem::Core::Math::Scalar::max(
-      Count(8), Count(alignof(Representation)));
+  static_assert(sizeof(Form::Representation) % 8 == 0);
+  const Count alignment =
+      Math::Scalar::max(Count(8), Count(alignof(Form::Representation)));
   auto* allocation = allocator.allocate(
-      allocator.context, sizeof(Representation) + size, alignment);
+      allocator.context, sizeof(Form::Representation) + size, alignment);
   if (!allocation) {
     return TTX_DATA_BOUNDS;
   }
 
-  auto* bytes = static_cast<U8*>(allocation) + sizeof(Representation);
-  const auto written =
-      compiler.write(Perimortem::Core::Access::Bytes(*bytes, size));
+  auto* bytes = Data::cast<U8>(allocation) + sizeof(Form::Representation);
+  const auto written = compiler.write(Access::Bytes(*bytes, size));
   if (written != Status::Success) {
-    return static_cast<ttx_data_status>(written);
+    return ttx_data_status(written);
   }
 
-  *result = &Toolchain::Memory::Lifetime::construct<Representation>(
-      allocation, [&] { return Representation(bytes, size); });
+  *result = &Lifetime::construct<Form::Representation>(
+      allocation, [&] { return Form::Representation(bytes, size); });
   return TTX_DATA_SUCCESS;
 }
 
@@ -183,10 +184,10 @@ auto ttx_representation_compile(
     return TTX_DATA_INVALID;
   }
 
-  Compiler compiler;
+  Form::Compiler compiler;
   const auto status = compiler.compile(schema, pointer_size);
   if (status != Status::Success) {
-    return static_cast<ttx_data_status>(status);
+    return ttx_data_status(status);
   }
 
   return publish(compiler, allocator, result);
@@ -203,12 +204,11 @@ auto ttx_representation_compose(
     return TTX_DATA_INVALID;
   }
 
-  Compiler compiler;
+  Form::Compiler compiler;
   const auto member_view =
-      count ? Perimortem::Core::View::Vector<ttx_representation_member>(
-                  members[0], count)
-            : Perimortem::Core::View::Vector<ttx_representation_member>();
+      count ? View::Vector<ttx_representation_member>(members[0], count)
+            : View::Vector<ttx_representation_member>();
   const auto status = compiler.compose(member_view, extent, alignment);
   return status == Status::Success ? publish(compiler, allocator, result)
-                                   : static_cast<ttx_data_status>(status);
+                                   : ttx_data_status(status);
 }

@@ -5,15 +5,17 @@
 
 #include "toolchain/validation/test.hpp"
 
+#include "perimortem/core/data.hpp"
 #include "perimortem/core/storage/vector.hpp"
 
 #include "validation/tests/data/form/preparation.hpp"
 
-using namespace Perimortem;
+using namespace Perimortem::Core;
+using namespace Perimortem::Memory;
+using namespace Toolchain::Validation;
 using namespace Ttx::Data;
-using namespace Ttx::Data::Form;
 
-static Toolchain::Validation::Harness Composition = {
+static Harness Composition = {
   .name = "TTX::Data::Form::Composition",
 };
 
@@ -21,20 +23,17 @@ static Toolchain::Validation::Harness Composition = {
 // source compilation to catch lost padding, reference remapping and duplicate
 // bodies. Reversed placement order must produce the same canonical bytes.
 static auto allocate_representation(void* context, Count size, Count) -> void* {
-  return static_cast<Memory::Allocator::Arena*>(context)
-      ->allocate(size)
-      .get_data();
+  return Data::cast<Allocator::Arena>(context)->allocate(size).get_data();
 }
 
-static auto check_pair(
-    const Schema& child,
-    Toolchain::Validation::Test::TestResult& result) -> void {
+static auto check_pair(const Form::Schema& child, Test::TestResult& result)
+    -> void {
   Validation::DataTests::Preparation prepare;
   const auto& form = prepare(child);
   const Count width = child.get_extent();
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> positions = {
+  const Storage::Vector<Form::Schema::Position, 2> positions = {
     {
-      Schema::Position(child, 0),
+      Form::Schema::Position(child, 0),
       {
         child,
         width,
@@ -43,11 +42,11 @@ static auto check_pair(
   };
 
   const auto& expected = prepare(
-      Schema::composite(
+      Form::Schema::composite(
           positions.get_view().slice(0, 2), width * 2, child.get_alignment()));
-  const Perimortem::Core::Storage::Vector<Representation::Member, 2> members = {
+  const Storage::Vector<Form::Representation::Member, 2> members = {
     {
-      Representation::Member(form, width),
+      Form::Representation::Member(form, width),
       {
         form,
         0,
@@ -55,11 +54,11 @@ static auto check_pair(
     },
   };
 
-  Memory::Allocator::Arena arena;
-  Representation::compose(
+  Allocator::Arena arena;
+  Form::Representation::compose(
       members.get_view().slice(0, 2), width * 2, child.get_alignment(), arena)
       .visit(
-          [&](const Representation& actual) {
+          [&](const Form::Representation& actual) {
             EXPECT(actual.compatible(expected));
           },
 
@@ -67,7 +66,7 @@ static auto check_pair(
 
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&arena, allocate_representation);
-  const Representation* output = nullptr;
+  const Form::Representation* output = nullptr;
   ASSERT(
       compose_pair(&form, width, child.get_alignment(), allocator, &output) ==
       TTX_DATA_SUCCESS);
@@ -75,10 +74,10 @@ static auto check_pair(
 }
 
 VALIDATION_TEST(Composition, records_and_cycles) {
-  const auto integer = Schema::primitive(Schema::Value::U32);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> fields = {
+  const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
+  const Storage::Vector<Form::Schema::Position, 2> fields = {
     {
-      Schema::Position(integer, 0),
+      Form::Schema::Position(integer, 0),
       {
         integer,
         8,
@@ -86,31 +85,32 @@ VALIDATION_TEST(Composition, records_and_cycles) {
     },
   };
 
-  check_pair(Schema::composite(fields.get_view().slice(0, 2), 16, 8), result);
+  check_pair(
+      Form::Schema::composite(fields.get_view().slice(0, 2), 16, 8), result);
 
-  auto recursive = Schema::composite(
-      Perimortem::Core::View::Vector<Schema::Position>(), 8, 8);
-  const Schema::Position pointer(Schema::pointer(&recursive), 0);
-  recursive = Schema::composite({pointer, 1}, 8, 8);
+  auto recursive =
+      Form::Schema::composite(View::Vector<Form::Schema::Position>(), 8, 8);
+  const Form::Schema::Position pointer(Form::Schema::pointer(&recursive), 0);
+  recursive = Form::Schema::composite({pointer, 1}, 8, 8);
   check_pair(recursive, result);
 
   // Callable returns and arguments reference the same recursive body. Neither
   // navigation nor composition may mistake their descriptions for payload.
-  const Perimortem::Core::Storage::Vector<Schema::Argument, 2> args = {
+  const Storage::Vector<Form::Schema::Argument, 2> args = {
     {
-      Schema::pointer(&recursive),
-      Schema::Argument(integer),
+      Form::Schema::pointer(&recursive),
+      Form::Schema::Argument(integer),
     },
   };
 
-  const auto function = Schema::callable(
-      Schema::Convention::SystemVAMD64, args.get_view().slice(0, 2),
-      Schema::pointer(&recursive));
+  const auto function = Form::Schema::callable(
+      Form::Schema::Convention::SystemVAMD64, args.get_view().slice(0, 2),
+      Form::Schema::pointer(&recursive));
   const auto no_arguments =
-      Schema::callable(Schema::Convention::SystemVAMD64, {});
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> calls = {
+      Form::Schema::callable(Form::Schema::Convention::SystemVAMD64, {});
+  const Storage::Vector<Form::Schema::Position, 2> calls = {
     {
-      Schema::Position(function, 0),
+      Form::Schema::Position(function, 0),
       {
         no_arguments,
         8,
@@ -118,27 +118,30 @@ VALIDATION_TEST(Composition, records_and_cycles) {
     },
   };
 
-  check_pair(Schema::composite(calls.get_view().slice(0, 2), 16, 8), result);
+  check_pair(
+      Form::Schema::composite(calls.get_view().slice(0, 2), 16, 8), result);
 }
 
 VALIDATION_TEST(Composition, compact_ranges) {
   Validation::DataTests::Preparation prepare;
-  const auto integer = Schema::primitive(Schema::Value::U32);
-  const auto range = Schema::range(integer, 1000000000, 4, 4000000000ULL, 4);
+  const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
+  const auto range =
+      Form::Schema::range(integer, 1000000000, 4, 4000000000ULL, 4);
   // A compiled Range has a root covering the whole form. Embedding that form is
   // equivalent to an explicit struct around the range, not flattening away its
   // boundary.
-  const Schema::Position field(range, 0);
-  check_pair(Schema::composite({field, 1}, range.get_extent(), 4), result);
+  const Form::Schema::Position field(range, 0);
+  check_pair(
+      Form::Schema::composite({field, 1}, range.get_extent(), 4), result);
 }
 
 VALIDATION_TEST(Composition, invalid_placements) {
   Validation::DataTests::Preparation prepare;
-  const auto integer = Schema::primitive(Schema::Value::U32);
+  const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
   const auto& form = prepare(integer);
-  const Perimortem::Core::Storage::Vector<Representation::Member, 2> members = {
+  const Storage::Vector<Form::Representation::Member, 2> members = {
     {
-      Representation::Member(form, 0),
+      Form::Representation::Member(form, 0),
       {
         form,
         2,
@@ -146,8 +149,8 @@ VALIDATION_TEST(Composition, invalid_placements) {
     },
   };
 
-  Memory::Allocator::Arena arena;
-  const Perimortem::Core::Storage::Vector<Count, 2> extents = {
+  Allocator::Arena arena;
+  const Storage::Vector<Count, 2> extents = {
     {
       5,
       8,
@@ -157,21 +160,22 @@ VALIDATION_TEST(Composition, invalid_placements) {
   for (Count extent_index = 0; extent_index < extents.get_size();
        ++extent_index) {
     const Count extent = extents[extent_index];
-    Representation::compose(members.get_view().slice(0, 2), extent, 4, arena)
+    Form::Representation::compose(
+        members.get_view().slice(0, 2), extent, 4, arena)
         .visit(
-            [&](const Representation&) { EXPECT(False); },
+            [&](const Form::Representation&) { EXPECT(False); },
             [&](Status status) { EXPECT(status == Status::Invalid); });
   }
 
-  Representation::compose(
-      Perimortem::Core::View::Vector<Representation::Member>(), 8, 8, arena)
+  Form::Representation::compose(
+      View::Vector<Form::Representation::Member>(), 8, 8, arena)
       .visit(
-          [&](const Representation&) { EXPECT(False); },
+          [&](const Form::Representation&) { EXPECT(False); },
           [&](Status status) { EXPECT(status == Status::Invalid); });
-  Representation::compose(
-      Perimortem::Core::View::Vector<Representation::Member>(), 0, 1, arena)
+  Form::Representation::compose(
+      View::Vector<Form::Representation::Member>(), 0, 1, arena)
       .visit(
-          [&](const Representation& empty) {
+          [&](const Form::Representation& empty) {
             EXPECT_EQ(empty.get_extent(), Count(0));
           },
 

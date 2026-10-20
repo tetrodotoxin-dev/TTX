@@ -1,29 +1,31 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
+#include "perimortem/core/data.hpp"
 #include "perimortem/core/storage/vector.hpp"
 
 #include "ttx/data/form/compiled.hpp"
 #include "validation/tests/data/form/preparation.hpp"
 
 using namespace Perimortem::Core;
+using namespace Toolchain::Validation;
 using namespace Ttx::Data;
-using namespace Ttx::Data::Form;
-using Validation::DataTests::Preparation;
+using namespace Validation::DataTests;
 
-static Toolchain::Validation::Harness TtxEncoding = {
+static Harness TtxEncoding = {
   .name = "TTX::Data::Form::Encoding",
 };
 
-static constexpr auto byte = Schema::primitive(Schema::Value::U8);
-static constexpr auto integer = Schema::primitive(Schema::Value::U32);
+static constexpr auto byte = Form::Schema::primitive(Form::Schema::Value::U8);
+static constexpr auto integer =
+    Form::Schema::primitive(Form::Schema::Value::U32);
 
 // These are literal streams, not bytes generated with Encoding's helpers.
 // Crossing each array threshold exercises a new global field width. F3 also
 // proves that its trailing U32 follows the lower U64 without padding.
 VALIDATION_TEST(TtxEncoding, depth_bytes) {
   Preparation prepare;
-  const Perimortem::Core::Storage::Vector<U8, 16> f2 = {
+  const Storage::Vector<U8, 16> f2 = {
     {
       0x12,
       0x00,
@@ -44,14 +46,14 @@ VALIDATION_TEST(TtxEncoding, depth_bytes) {
     },
   };
 
-  const Perimortem::Core::Storage::Vector<U8, 24> f3 = {
+  const Storage::Vector<U8, 24> f3 = {
     {
       0x13, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00,
       0x01, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
     },
   };
 
-  const Perimortem::Core::Storage::Vector<U8, 32> f4 = {
+  const Storage::Vector<U8, 32> f4 = {
     {
       0x14, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x10, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x04, 0x00,
@@ -59,12 +61,12 @@ VALIDATION_TEST(TtxEncoding, depth_bytes) {
     },
   };
 
-  EXPECT(prepare(Schema::range(byte, 256, 1, 256))
-             .compatible(Representation(f2.get_data(), sizeof(f2))));
-  EXPECT(prepare(Schema::range(byte, 65536, 1, 65536))
-             .compatible(Representation(f3.get_data(), sizeof(f3))));
-  EXPECT(prepare(Schema::range(byte, 16777216, 1, 16777216))
-             .compatible(Representation(f4.get_data(), sizeof(f4))));
+  EXPECT(prepare(Form::Schema::range(byte, 256, 1, 256))
+             .compatible(Form::Representation(f2.get_data(), sizeof(f2))));
+  EXPECT(prepare(Form::Schema::range(byte, 65536, 1, 65536))
+             .compatible(Form::Representation(f3.get_data(), sizeof(f3))));
+  EXPECT(prepare(Form::Schema::range(byte, 16777216, 1, 16777216))
+             .compatible(Form::Representation(f4.get_data(), sizeof(f4))));
 }
 
 // Equal occupied bytes do not erase a real struct boundary. The flat case
@@ -72,9 +74,9 @@ VALIDATION_TEST(TtxEncoding, depth_bytes) {
 // primitive, even though both payloads occupy 24 bytes at alignment eight.
 VALIDATION_TEST(TtxEncoding, struct_bytes) {
   Preparation prepare;
-  const Perimortem::Core::Storage::Vector<Schema::Position, 3> fields = {
+  const Storage::Vector<Form::Schema::Position, 3> fields = {
     {
-      Schema::Position(integer, 0),
+      Form::Schema::Position(integer, 0),
       {
         integer,
         8,
@@ -87,13 +89,13 @@ VALIDATION_TEST(TtxEncoding, struct_bytes) {
     },
   };
 
-  const auto flat =
-      Schema::composite(View::Vector<Schema::Position>(fields[0], 3), 24, 8);
-  const Schema::Position member(integer, 0);
-  const auto cell =
-      Schema::composite(View::Vector<Schema::Position>(member, 1), 8, 8);
-  const auto cells = Schema::range(cell, 3, 8, 24, 8);
-  const Perimortem::Core::Storage::Vector<U8, 8> flat_bytes = {
+  const auto flat = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(fields[0], 3), 24, 8);
+  const Form::Schema::Position member(integer, 0);
+  const auto cell = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(member, 1), 8, 8);
+  const auto cells = Form::Schema::range(cell, 3, 8, 24, 8);
+  const Storage::Vector<U8, 8> flat_bytes = {
     {
       0x11,
       0x80,
@@ -106,7 +108,7 @@ VALIDATION_TEST(TtxEncoding, struct_bytes) {
     },
   };
 
-  const Perimortem::Core::Storage::Vector<U8, 16> cell_bytes = {
+  const Storage::Vector<U8, 16> cell_bytes = {
     {
       0x11,
       0x80,
@@ -128,9 +130,9 @@ VALIDATION_TEST(TtxEncoding, struct_bytes) {
   };
 
   EXPECT(prepare(flat).compatible(
-      Representation(flat_bytes.get_data(), sizeof(flat_bytes))));
+      Form::Representation(flat_bytes.get_data(), sizeof(flat_bytes))));
   EXPECT(prepare(cells).compatible(
-      Representation(cell_bytes.get_data(), sizeof(cell_bytes))));
+      Form::Representation(cell_bytes.get_data(), sizeof(cell_bytes))));
   EXPECT_NOT(prepare(flat).compatible(prepare(cells)));
 }
 
@@ -138,9 +140,9 @@ VALIDATION_TEST(TtxEncoding, struct_bytes) {
 // Both ordinary members and an authored byte array produce this same stream.
 VALIDATION_TEST(TtxEncoding, padding_bytes) {
   Preparation prepare;
-  const Perimortem::Core::Storage::Vector<Schema::Position, 4> fields = {
+  const Storage::Vector<Form::Schema::Position, 4> fields = {
     {
-      Schema::Position(byte, 0),
+      Form::Schema::Position(byte, 0),
       {
         byte,
         1,
@@ -158,10 +160,10 @@ VALIDATION_TEST(TtxEncoding, padding_bytes) {
     },
   };
 
-  const auto bytes = Schema::range(byte, 3, 1, 3);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> grouped = {
+  const auto bytes = Form::Schema::range(byte, 3, 1, 3);
+  const Storage::Vector<Form::Schema::Position, 2> grouped = {
     {
-      Schema::Position(bytes, 0),
+      Form::Schema::Position(bytes, 0),
       {
         integer,
         4,
@@ -169,11 +171,11 @@ VALIDATION_TEST(TtxEncoding, padding_bytes) {
     },
   };
 
-  const auto flat =
-      Schema::composite(View::Vector<Schema::Position>(fields[0], 4), 8, 4);
-  const auto array =
-      Schema::composite(View::Vector<Schema::Position>(grouped[0], 2), 8, 4);
-  const Perimortem::Core::Storage::Vector<U8, 16> expected = {
+  const auto flat = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(fields[0], 4), 8, 4);
+  const auto array = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(grouped[0], 2), 8, 4);
+  const Storage::Vector<U8, 16> expected = {
     {
       0x21,
       0x40,
@@ -195,7 +197,7 @@ VALIDATION_TEST(TtxEncoding, padding_bytes) {
   };
 
   EXPECT(prepare(flat).compatible(
-      Representation(expected.get_data(), sizeof(expected))));
+      Form::Representation(expected.get_data(), sizeof(expected))));
   EXPECT(prepare(flat).compatible(prepare(array)));
 }
 
@@ -203,7 +205,7 @@ VALIDATION_TEST(TtxEncoding, native_profiles) {
   Preparation prepare;
   for (U8 depth = 1; depth <= 8; ++depth) {
     const Count count = Count(1) << (8 * (depth - 1));
-    const auto schema = Schema::range(byte, count, 1, count);
+    const auto schema = Form::Schema::range(byte, count, 1, count);
     const auto& representation = prepare(schema);
 
     EXPECT_EQ(representation.get_depth(), depth);
@@ -214,15 +216,18 @@ VALIDATION_TEST(TtxEncoding, native_profiles) {
 
 VALIDATION_TEST(TtxEncoding, field_promotions) {
   Preparation prepare;
-  const Schema::Position distant(byte, 256);
-  const Schema::Position first(byte, 0);
-  const Perimortem::Core::Storage::Vector<Schema, 5> forms = {
+  const Form::Schema::Position distant(byte, 256);
+  const Form::Schema::Position first(byte, 0);
+  const Storage::Vector<Form::Schema, 5> forms = {
     {
-      Schema::range(byte, 256, 1, 256),
-      Schema::composite(View::Vector<Schema::Position>(distant, 1), 257),
-      Schema::range(byte, 2, 256, 257),
-      Schema::composite(View::Vector<Schema::Position>(first, 1), 4096),
-      Schema::composite(View::Vector<Schema::Position>(first, 1), 256, 256),
+      Form::Schema::range(byte, 256, 1, 256),
+      Form::Schema::composite(
+          View::Vector<Form::Schema::Position>(distant, 1), 257),
+      Form::Schema::range(byte, 2, 256, 257),
+      Form::Schema::composite(
+          View::Vector<Form::Schema::Position>(first, 1), 4096),
+      Form::Schema::composite(
+          View::Vector<Form::Schema::Position>(first, 1), 256, 256),
     },
   };
 
@@ -234,14 +239,14 @@ VALIDATION_TEST(TtxEncoding, field_promotions) {
 
   // Alternating byte types prevent run compaction, forcing the header count
   // to widen while offsets and primitive codes still fit the narrow profile.
-  const auto signed_byte = Schema::primitive(Schema::Value::S8);
-  Perimortem::Core::Storage::Vector<Schema::Position, 256> fields;
+  const auto signed_byte = Form::Schema::primitive(Form::Schema::Value::S8);
+  Storage::Vector<Form::Schema::Position, 256> fields;
   for (Count i = 0; i < 256; ++i) {
-    fields[i] = Schema::Position(i % 2 ? byte : signed_byte, i);
+    fields[i] = Form::Schema::Position(i % 2 ? byte : signed_byte, i);
   }
 
-  const auto wide =
-      Schema::composite(View::Vector<Schema::Position>(fields[0], 256), 256);
+  const auto wide = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(fields[0], 256), 256);
   EXPECT_EQ(prepare(wide).get_depth(), U8(2));
 }
 
@@ -250,12 +255,12 @@ VALIDATION_TEST(TtxEncoding, field_promotions) {
 // and offsets still fit F1. The whole stream must promote together.
 VALIDATION_TEST(TtxEncoding, reference_promotion) {
   Preparation prepare;
-  Perimortem::Core::Storage::Vector<Schema, 65> bodies;
-  Perimortem::Core::Storage::Vector<Schema::Position, 65> fields;
+  Storage::Vector<Form::Schema, 65> bodies;
+  Storage::Vector<Form::Schema::Position, 65> fields;
   for (Count i = 0; i < 65; ++i) {
-    fields[i] = Schema::Position(i ? &bodies[i - 1] : &byte, 0);
-    bodies[i] =
-        Schema::composite(View::Vector<Schema::Position>(fields[i], 1), 1);
+    fields[i] = Form::Schema::Position(i ? &bodies[i - 1] : &byte, 0);
+    bodies[i] = Form::Schema::composite(
+        View::Vector<Form::Schema::Position>(fields[i], 1), 1);
   }
 
   EXPECT_EQ(prepare(bodies[63]).get_depth(), U8(1));
@@ -267,11 +272,11 @@ VALIDATION_TEST(TtxEncoding, reference_promotion) {
 // descriptors would make these two equivalent inputs encode differently.
 VALIDATION_TEST(TtxEncoding, split_run_prefix) {
   Preparation prepare;
-  const auto first = Schema::range(integer, 2, 4, 8, 4);
-  const auto second = Schema::range(integer, 2, 8, 12, 4);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> split = {
+  const auto first = Form::Schema::range(integer, 2, 4, 8, 4);
+  const auto second = Form::Schema::range(integer, 2, 8, 12, 4);
+  const Storage::Vector<Form::Schema::Position, 2> split = {
     {
-      Schema::Position(first, 0),
+      Form::Schema::Position(first, 0),
       {
         second,
         8,
@@ -279,9 +284,9 @@ VALIDATION_TEST(TtxEncoding, split_run_prefix) {
     },
   };
 
-  const Perimortem::Core::Storage::Vector<Schema::Position, 4> flat = {
+  const Storage::Vector<Form::Schema::Position, 4> flat = {
     {
-      Schema::Position(integer, 0),
+      Form::Schema::Position(integer, 0),
       {
         integer,
         4,
@@ -299,10 +304,10 @@ VALIDATION_TEST(TtxEncoding, split_run_prefix) {
     },
   };
 
-  const auto a =
-      Schema::composite(View::Vector<Schema::Position>(split[0], 2), 20, 4);
-  const auto b =
-      Schema::composite(View::Vector<Schema::Position>(flat[0], 4), 20, 4);
+  const auto a = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(split[0], 2), 20, 4);
+  const auto b = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(flat[0], 4), 20, 4);
 
   EXPECT(prepare(a).compatible(prepare(b)));
   EXPECT_EQ(prepare(a).get_bytes().get_size(), Count(16));
@@ -312,11 +317,11 @@ VALIDATION_TEST(TtxEncoding, split_run_prefix) {
 // needs three runs here, but still needs no synthetic struct to hold padding.
 VALIDATION_TEST(TtxEncoding, gapped_batches) {
   Preparation prepare;
-  const auto pair = Schema::range(integer, 2, 4, 8, 4);
-  const auto repeated = Schema::range(pair, 3, 12, 32, 4);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 6> fields = {
+  const auto pair = Form::Schema::range(integer, 2, 4, 8, 4);
+  const auto repeated = Form::Schema::range(pair, 3, 12, 32, 4);
+  const Storage::Vector<Form::Schema::Position, 6> fields = {
     {
-      Schema::Position(integer, 0),
+      Form::Schema::Position(integer, 0),
       {
         integer,
         4,
@@ -344,8 +349,8 @@ VALIDATION_TEST(TtxEncoding, gapped_batches) {
     },
   };
 
-  const auto flat =
-      Schema::composite(View::Vector<Schema::Position>(fields[0], 6), 32, 4);
+  const auto flat = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(fields[0], 6), 32, 4);
 
   EXPECT(prepare(repeated).compatible(prepare(flat)));
   EXPECT_EQ(prepare(repeated).get_bytes().get_size(), Count(16));
@@ -353,12 +358,12 @@ VALIDATION_TEST(TtxEncoding, gapped_batches) {
 
 VALIDATION_TEST(TtxEncoding, interleaved_runs) {
   Preparation prepare;
-  const auto signed_byte = Schema::primitive(Schema::Value::S8);
-  const auto even = Schema::range(byte, 3, 4, 9);
-  const auto odd = Schema::range(signed_byte, 2, 4, 5);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> ranges = {
+  const auto signed_byte = Form::Schema::primitive(Form::Schema::Value::S8);
+  const auto even = Form::Schema::range(byte, 3, 4, 9);
+  const auto odd = Form::Schema::range(signed_byte, 2, 4, 5);
+  const Storage::Vector<Form::Schema::Position, 2> ranges = {
     {
-      Schema::Position(even, 0),
+      Form::Schema::Position(even, 0),
       {
         odd,
         2,
@@ -366,9 +371,9 @@ VALIDATION_TEST(TtxEncoding, interleaved_runs) {
     },
   };
 
-  const Perimortem::Core::Storage::Vector<Schema::Position, 5> fields = {
+  const Storage::Vector<Form::Schema::Position, 5> fields = {
     {
-      Schema::Position(byte, 0),
+      Form::Schema::Position(byte, 0),
       {
         signed_byte,
         2,
@@ -391,17 +396,17 @@ VALIDATION_TEST(TtxEncoding, interleaved_runs) {
     },
   };
 
-  const auto a =
-      Schema::composite(View::Vector<Schema::Position>(ranges[0], 2), 9);
-  const auto b =
-      Schema::composite(View::Vector<Schema::Position>(fields[0], 5), 9);
+  const auto a = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(ranges[0], 2), 9);
+  const auto b = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(fields[0], 5), 9);
   const auto& representation = prepare(a);
 
   EXPECT(representation.compatible(prepare(b)));
 
   Count seen = 0;
   const auto status =
-      representation.visit([&](Representation::Position position) {
+      representation.visit([&](Form::Representation::Position position) {
         EXPECT_EQ(position.offset, seen * 2);
         ++seen;
         return Status::Success;
@@ -415,13 +420,13 @@ VALIDATION_TEST(TtxEncoding, interleaved_runs) {
 // Two independent cell declarations share one body in either source order.
 VALIDATION_TEST(TtxEncoding, independent_bodies) {
   Preparation prepare;
-  const Schema::Position member(integer, 0);
-  const auto cell =
-      Schema::composite(View::Vector<Schema::Position>(member, 1), 4, 4);
+  const Form::Schema::Position member(integer, 0);
+  const auto cell = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(member, 1), 4, 4);
   auto other_cell = cell;
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> ordered = {
+  const Storage::Vector<Form::Schema::Position, 2> ordered = {
     {
-      Schema::Position(cell, 0),
+      Form::Schema::Position(cell, 0),
       {
         other_cell,
         8,
@@ -429,9 +434,9 @@ VALIDATION_TEST(TtxEncoding, independent_bodies) {
     },
   };
 
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> reversed = {
+  const Storage::Vector<Form::Schema::Position, 2> reversed = {
     {
-      Schema::Position(other_cell, 8),
+      Form::Schema::Position(other_cell, 8),
       {
         cell,
         0,
@@ -439,10 +444,10 @@ VALIDATION_TEST(TtxEncoding, independent_bodies) {
     },
   };
 
-  const auto a =
-      Schema::composite(View::Vector<Schema::Position>(ordered[0], 2), 12, 4);
-  const auto b =
-      Schema::composite(View::Vector<Schema::Position>(reversed[0], 2), 12, 4);
+  const auto a = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(ordered[0], 2), 12, 4);
+  const auto b = Form::Schema::composite(
+      View::Vector<Form::Schema::Position>(reversed[0], 2), 12, 4);
 
   EXPECT(prepare(a).compatible(prepare(b)));
   EXPECT_EQ(prepare(a).get_bytes().get_size(), Count(16));
@@ -450,18 +455,18 @@ VALIDATION_TEST(TtxEncoding, independent_bodies) {
 
 VALIDATION_TEST(TtxEncoding, payload_endian) {
   Preparation prepare;
-  const auto big_byte =
-      Schema::primitive(Schema::Value::U8, Schema::ByteOrder::Big);
-  const auto big_integer =
-      Schema::primitive(Schema::Value::U32, Schema::ByteOrder::Big);
+  const auto big_byte = Form::Schema::primitive(
+      Form::Schema::Value::U8, Form::Schema::ByteOrder::Big);
+  const auto big_integer = Form::Schema::primitive(
+      Form::Schema::Value::U32, Form::Schema::ByteOrder::Big);
 
   EXPECT(prepare(byte).compatible(prepare(big_byte)));
   EXPECT_NOT(prepare(integer).compatible(prepare(big_integer)));
   prepare(big_integer)
       .next(0)
       .visit(
-          [&](Representation::Position position) {
-            EXPECT(position.get_byte_order() == Schema::ByteOrder::Big);
+          [&](Form::Representation::Position position) {
+            EXPECT(position.get_byte_order() == Form::Schema::ByteOrder::Big);
           },
 
           [&](Status) { EXPECT(false); });
@@ -472,20 +477,20 @@ VALIDATION_TEST(TtxEncoding, payload_endian) {
 // allocating payload storage or overflowing the final occupied byte.
 VALIDATION_TEST(TtxEncoding, native_count_limit) {
   Preparation prepare;
-  const auto huge = Schema::range(byte, Count(-1), 1, Count(-1));
+  const auto huge = Form::Schema::range(byte, Count(-1), 1, Count(-1));
   const auto& representation = prepare(huge);
 
   EXPECT_EQ(representation.get_depth(), U8(8));
   EXPECT_EQ(representation.get_bytes().get_size(), Count(64));
   representation.next(Count(-2)).visit(
-      [&](Representation::Position position) {
+      [&](Form::Representation::Position position) {
         EXPECT_EQ(position.offset, Count(-2));
       },
 
       [&](Status) { EXPECT(false); });
 
   representation.next(Count(-1)).visit(
-      [&](Representation::Position) { EXPECT(false); },
+      [&](Form::Representation::Position) { EXPECT(false); },
       [&](Status status) { EXPECT(status == Status::Bounds); });
 }
 
@@ -493,11 +498,11 @@ VALIDATION_TEST(TtxEncoding, native_count_limit) {
 // keeps both the output slot and the allocator's allocation count unchanged.
 VALIDATION_TEST(TtxEncoding, final_allocation) {
   struct Allocation {
-    alignas(Representation) Perimortem::Core::Storage::Vector<U8, 128> bytes;
+    alignas(Form::Representation) Storage::Vector<U8, 128> bytes;
     Count allocations = 0;
 
     static auto allocate(void* context, Count size, Count) -> void* {
-      auto& allocation = *static_cast<Allocation*>(context);
+      auto& allocation = *Data::cast<Allocation>(context);
       ++allocation.allocations;
       return size <= sizeof(allocation.bytes) ? allocation.bytes.get_data()
                                               : nullptr;
@@ -506,7 +511,7 @@ VALIDATION_TEST(TtxEncoding, final_allocation) {
 
   const ttx_representation_allocator allocator =
       ttx_representation_allocator(&allocation, Allocation::allocate);
-  const Representation* output = nullptr;
+  const Form::Representation* output = nullptr;
   auto invalid = integer;
   invalid.data.value.type = 11;
 
@@ -520,5 +525,5 @@ VALIDATION_TEST(TtxEncoding, final_allocation) {
       ttx_representation_compile(&integer, sizeof(void*), allocator, &output) ==
       TTX_DATA_SUCCESS);
   EXPECT_EQ(allocation.allocations, Count(1));
-  EXPECT(output->compatible(Compiled<integer>::get_representation()));
+  EXPECT(output->compatible(Form::Compiled<integer>::get_representation()));
 }

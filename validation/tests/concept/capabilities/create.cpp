@@ -5,51 +5,54 @@
 
 #include "toolchain/validation/test.hpp"
 
+#include "perimortem/core/data.hpp"
+
 #include "ttx/concept/capabilities/borrow.hpp"
 #include "ttx/concept/policies/none.hpp"
 #include "ttx/concept/policies/unknown.h"
 #include "ttx/data/transfer.hpp"
 
-using namespace Perimortem;
+using namespace Perimortem::Core;
+using namespace Perimortem::Serialization;
+using namespace Toolchain::Validation;
 using namespace Ttx::Concept;
-using namespace Ttx::Semantic::Negotiation;
+using namespace Ttx::Data;
+using namespace Ttx::Semantic;
 
-static Toolchain::Validation::Harness Creation = {.name = "TTX::Create"};
+static Harness Creation = {.name = "TTX::Create"};
 
 class ScopedCreate {
  public:
-  Binding::Status status = Binding::Status::Satisfied;
+  Negotiation::Status status = Negotiation::Status::Satisfied;
   bool observing = false;
 
-  static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
-    const Serialization::Formats::Uuid contract(id);
+  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+    const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Create::contract_id
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_UNKNOWN;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_UNKNOWN;
   }
 
   static auto bind(void* context, perimortem_uuid id, ttx_storage target)
-      -> ttx_binding_status {
-    if (Serialization::Formats::Uuid(id) == Capabilities::Create::contract_id) {
+      -> ttx_negotiation_status {
+    if (Formats::Uuid(id) == Capabilities::Create::contract_id) {
       Capabilities::Create::Api api = {context, &operations};
-      return Ttx::Data::Transfer::copy(
-                 Ttx::Data::Form::Storage::from(api),
-                 Ttx::Data::Form::Storage(target)) == Ttx::Data::Status::Success
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
+      return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
+                     Status::Success
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_REJECTED;
     }
 
-    if (Serialization::Formats::Uuid(id) == Abstract::contract_id) {
+    if (Formats::Uuid(id) == Abstract::contract_id) {
       Abstract::Api api = resolve(context);
-      return Ttx::Data::Transfer::copy(
-                 Ttx::Data::Form::Storage::from(api),
-                 Ttx::Data::Form::Storage(target)) == Ttx::Data::Status::Success
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
+      return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
+                     Status::Success
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_REJECTED;
     }
 
-    return TTX_BINDING_UNKNOWN;
+    return TTX_NEGOTIATION_UNKNOWN;
   }
 
   static auto data(void*) -> perimortem_view_bytes { return {}; }
@@ -62,33 +65,32 @@ class ScopedCreate {
     return ttx_unknown();
   }
 
-  static void visit(void*, ttx_concept_visitor) {}
+  static auto visit(void*, ttx_concept_visitor) -> void {}
 
   struct Created {
     U8 value = 42;
 
-    static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
-      return Serialization::Formats::Uuid(id) == Abstract::contract_id
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_UNKNOWN;
+    static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+      return Formats::Uuid(id) == Abstract::contract_id
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_UNKNOWN;
     }
 
     static auto bind(void* context, perimortem_uuid id, ttx_storage target)
-        -> ttx_binding_status {
-      if (supports(context, id) != TTX_BINDING_SATISFIED) {
-        return TTX_BINDING_UNKNOWN;
+        -> ttx_negotiation_status {
+      if (supports(context, id) != TTX_NEGOTIATION_SATISFIED) {
+        return TTX_NEGOTIATION_UNKNOWN;
       }
 
       Abstract::Api api = resolve(context);
-      return Ttx::Data::Transfer::copy(
-                 Ttx::Data::Form::Storage::from(api),
-                 Ttx::Data::Form::Storage(target)) == Ttx::Data::Status::Success
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
+      return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
+                     Status::Success
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_REJECTED;
     }
 
     static auto data(void* context) -> perimortem_view_bytes {
-      return {&static_cast<Created*>(context)->value, 1};
+      return {&Data::cast<Created>(context)->value, 1};
     }
 
     static auto resolve(void* context) -> ttx_abstract {
@@ -103,17 +105,17 @@ class ScopedCreate {
       void* context,
       ttx_abstract,
       void* callback_context,
-      void (*callback)(void*, ttx_abstract)) -> ttx_binding_status {
-    auto& subject = *static_cast<ScopedCreate*>(context);
-    if (subject.status != Binding::Status::Satisfied) {
-      return static_cast<ttx_binding_status>(subject.status);
+      void (*callback)(void*, ttx_abstract)) -> ttx_negotiation_status {
+    auto& subject = *Data::cast<ScopedCreate>(context);
+    if (subject.status != Negotiation::Status::Satisfied) {
+      return ttx_negotiation_status(subject.status);
     }
 
     Created created;
     subject.observing = true;
     callback(callback_context, Created::resolve(&created));
     subject.observing = false;
-    return TTX_BINDING_SATISFIED;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   static constexpr ttx_create_ops operations = {
@@ -132,7 +134,7 @@ VALIDATION_TEST(Creation, scoped_answer) {
           [&](Capabilities::Create create) {
             EXPECT(
                 create.get_abstract().supports<Capabilities::Borrow>() ==
-                Binding::Status::Unknown);
+                Negotiation::Status::Unknown);
 
             U8 copied = 0;
             Count visits = 0;
@@ -140,7 +142,7 @@ VALIDATION_TEST(Creation, scoped_answer) {
               EXPECT(provider.observing);
               EXPECT(
                   subject.supports<Capabilities::Borrow>() ==
-                  Binding::Status::Unknown);
+                  Negotiation::Status::Unknown);
               copied = subject.get_data()[0];
               ++visits;
             };
@@ -148,12 +150,12 @@ VALIDATION_TEST(Creation, scoped_answer) {
             EXPECT(
                 create.create(
                     Policies::None::get_none().get_abstract(), callback) ==
-                Binding::Status::Satisfied);
+                Negotiation::Status::Satisfied);
             EXPECT_NOT(provider.observing);
             EXPECT_EQ(copied, U8(42));
 
-            const Binding::Status failures[] = {
-              Binding::Status::Unknown, Binding::Status::Rejected};
+            const Negotiation::Status failures[] = {
+              Negotiation::Status::Unknown, Negotiation::Status::Rejected};
 
             for (const auto failure : failures) {
               provider.status = failure;
@@ -166,5 +168,5 @@ VALIDATION_TEST(Creation, scoped_answer) {
             EXPECT_EQ(visits, Count(1));
           },
 
-          [&](Binding::Status) { EXPECT(False); });
+          [&](Negotiation::Status) { EXPECT(False); });
 }

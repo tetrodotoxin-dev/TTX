@@ -4,7 +4,6 @@
 #pragma once
 
 #include "perimortem/memory/thread/bytes.hpp"
-
 #include "perimortem/system/process/library.hpp"
 
 namespace Validation::Support {

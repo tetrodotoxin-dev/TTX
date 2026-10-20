@@ -86,8 +86,6 @@ typedef struct ttx_vector512 {
 
 #undef TTX_VECTOR_ALIGNMENT
 
-struct ttx_schema;
-
 // A reference chooses whether a described target is stored inline or through
 // a pointer. Keeping that choice on the edge lets one struct or callable
 // description be reused without manufacturing a second Schema object.
@@ -369,18 +367,16 @@ typedef struct ttx_schema {
 
   constexpr auto get_alignment() const -> Count { return alignment; }
 
-  constexpr auto get_kind() const -> Kind { return static_cast<Kind>(kind); }
+  constexpr auto get_kind() const -> Kind { return Kind(kind); }
 
   // The caller reads the union member selected by Kind. These accessors use
   // the stored fields directly. `get_positions` returns an empty View for a
   // null pointer or zero count. Compilation checks the original pointer and
   // count before using that View so malformed arrays remain distinguishable.
-  constexpr auto get_value() const -> Value {
-    return static_cast<Value>(data.value.type);
-  }
+  constexpr auto get_value() const -> Value { return Value(data.value.type); }
 
   constexpr auto get_byte_order() const -> ByteOrder {
-    return static_cast<ByteOrder>(data.value.byte_order);
+    return ByteOrder(data.value.byte_order);
   }
 
   constexpr auto get_positions() const

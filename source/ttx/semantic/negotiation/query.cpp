@@ -3,33 +3,37 @@
 
 #include "ttx/semantic/negotiation/query.hpp"
 
-using namespace Perimortem;
-using namespace Ttx::Semantic::Negotiation;
+using namespace Perimortem::Serialization;
+using namespace Ttx::Data;
+using namespace Ttx::Semantic;
 
-auto Query::supports(Serialization::Formats::Uuid contract) const -> Binding::Status {
+auto Negotiation::Query::supports(Formats::Uuid contract) const
+    -> Negotiation::Status {
   if (!api.supports) {
-    return Binding::Status::Rejected;
+    return Negotiation::Status::Rejected;
   }
 
   const auto status = api.supports(api.context, contract);
-  return status == TTX_BINDING_SATISFIED || status == TTX_BINDING_UNKNOWN
-             ? static_cast<Binding::Status>(status)
-             : Binding::Status::Rejected;
+  return status == TTX_NEGOTIATION_SATISFIED ||
+                 status == TTX_NEGOTIATION_UNKNOWN
+             ? Negotiation::Status(status)
+             : Negotiation::Status::Rejected;
 }
 
-auto Query::bind(Serialization::Formats::Uuid contract, Ttx::Data::Form::Storage requested)
-    const -> Binding::Status {
+auto Negotiation::Query::bind(Formats::Uuid contract, Form::Storage requested)
+    const -> Negotiation::Status {
   if (!api.bind || ttx_storage_check(requested.get_abi()) != TTX_DATA_SUCCESS) {
-    return Binding::Status::Rejected;
+    return Negotiation::Status::Rejected;
   }
 
   const auto status = api.bind(api.context, contract, requested.get_abi());
-  return status == TTX_BINDING_SATISFIED || status == TTX_BINDING_UNKNOWN
-             ? static_cast<Binding::Status>(status)
-             : Binding::Status::Rejected;
+  return status == TTX_NEGOTIATION_SATISFIED ||
+                 status == TTX_NEGOTIATION_UNKNOWN
+             ? Negotiation::Status(status)
+             : Negotiation::Status::Rejected;
 }
 
 auto ttx_semantic_query_representation() -> const ttx_representation* {
-  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-      ttx_semantic_query>::reference>::get_representation();
+  return &Form::Compiled<
+      Form::Native<ttx_semantic_query>::reference>::get_representation();
 }

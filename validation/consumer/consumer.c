@@ -2,7 +2,6 @@
 // Copyright (c) 2023-present Matt Kaes and contributors
 
 #include <stddef.h>
-#include <stdint.h>
 
 #include "ttx/data/transfer.h"
 
@@ -12,13 +11,13 @@ typedef struct output_storage {
 
 static void* allocate(void* context, Count size, Count alignment) {
   output_storage* storage = context;
-  const uintptr_t start = (uintptr_t)storage->bytes;
-  const uintptr_t aligned = (start + alignment - 1) & ~(alignment - 1);
+  const CppSize start = (CppSize)storage->bytes;
+  const CppSize aligned = (start + alignment - 1) & ~(alignment - 1);
   return aligned + size <= start + sizeof(storage->bytes) ? (void*)aligned
                                                           : NULL;
 }
 
-int main(void) {
+S32 main(void) {
   static const ttx_schema integer = {
     4,
     4,
@@ -31,6 +30,7 @@ int main(void) {
           },
     },
   };
+
   output_storage encoded = {0};
   const ttx_representation* representation = NULL;
   const ttx_representation_allocator allocator = {&encoded, allocate};
@@ -48,6 +48,7 @@ int main(void) {
     (U8*)&output,
     sizeof(output),
   };
+
   if (ttx_transfer(&input, &target) != TTX_DATA_SUCCESS) {
     return 2;
   }

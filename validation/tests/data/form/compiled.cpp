@@ -9,18 +9,19 @@
 #include "validation/tests/data/form/preparation.hpp"
 
 using namespace Perimortem::Core;
+using namespace Toolchain::Validation;
 using namespace Ttx::Data;
-using namespace Ttx::Data::Form;
 
-static Toolchain::Validation::Harness TtxCompiled = {
+static Harness TtxCompiled = {
   .name = "TTX::Data::Form::Compiled",
 };
 
-static constexpr auto integer = Schema::primitive(Schema::Value::U32);
-static constexpr auto real = Schema::primitive(Schema::Value::R32);
+static constexpr auto integer =
+    Form::Schema::primitive(Form::Schema::Value::U32);
+static constexpr auto real = Form::Schema::primitive(Form::Schema::Value::R32);
 static constexpr auto billion =
-    Schema::range(integer, 1000000000, 4, 4000000000, 4);
-static constexpr auto& prepared = Compiled<billion>::get_representation();
+    Form::Schema::range(integer, 1000000000, 4, 4000000000, 4);
+static constexpr auto& prepared = Form::Compiled<billion>::get_representation();
 
 // The count changes field width, not the size of the temporary inventory.
 // Even one billion values need only a header and one repeated element block.
@@ -29,22 +30,25 @@ static_assert(prepared.get_depth() == 4);
 static_assert(prepared.get_bytes().get_size() == 32);
 
 static constexpr auto fields = [] {
-  Perimortem::Core::Storage::Vector<Schema::Position, 512> result;
+  Storage::Vector<Form::Schema::Position, 512> result;
   for (Count i = 0; i < result.get_size(); ++i) {
-    result[i] = Schema::Position(i % 2 ? integer : real, i * 4);
+    result[i] = Form::Schema::Position(i % 2 ? integer : real, i * 4);
   }
 
   return result;
 }();
 
-static constexpr auto record = Schema::composite(fields.get_view(), 2048, 4);
-static constexpr auto& compiled_record = Compiled<record>::get_representation();
+static constexpr auto record =
+    Form::Schema::composite(fields.get_view(), 2048, 4);
+static constexpr auto& compiled_record =
+    Form::Compiled<record>::get_representation();
 static_assert(compiled_record.get_extent() == 2048);
 static_assert(compiled_record.get_bytes().get_size() == 513 * 8);
 
 static constexpr auto empty =
-    Schema::composite(View::Vector<Schema::Position>(), 0);
-static constexpr auto& compiled_empty = Compiled<empty>::get_representation();
+    Form::Schema::composite(View::Vector<Form::Schema::Position>(), 0);
+static constexpr auto& compiled_empty =
+    Form::Compiled<empty>::get_representation();
 static_assert(compiled_empty.get_extent() == 0);
 static_assert(compiled_empty.get_bytes().get_size() == 8);
 
@@ -60,7 +64,7 @@ VALIDATION_TEST(TtxCompiled, primitive_bytes) {
   // These bytes are written independently of Encoding's field helpers. They
   // establish the first byte depth, header geometry and primitive descriptor.
   // Header: F=1, C=1, alignment=4, extent=4. Element: N=1, O=0, D=4, U32=3.
-  const Perimortem::Core::Storage::Vector<U8, 8> expected = {
+  const Storage::Vector<U8, 8> expected = {
     {
       0x11,
       0x40,
@@ -73,7 +77,7 @@ VALIDATION_TEST(TtxCompiled, primitive_bytes) {
     },
   };
 
-  const auto& representation = Compiled<integer>::get_representation();
+  const auto& representation = Form::Compiled<integer>::get_representation();
 
   ASSERT_EQ(representation.get_bytes().get_size(), sizeof(expected));
   EXPECT(
@@ -83,12 +87,12 @@ VALIDATION_TEST(TtxCompiled, primitive_bytes) {
   // A borrowed canonical form must also be usable for observation. This checks
   // the literal distance against the current format rather than merely
   // comparing two copies of the same byte array.
-  Representation(expected.get_data(), sizeof(expected))
+  Form::Representation(expected.get_data(), sizeof(expected))
       .next(0)
       .visit(
-          [&](Representation::Position position) {
+          [&](Form::Representation::Position position) {
             EXPECT_EQ(position.offset, Count(0));
-            EXPECT(position.get_value() == Schema::Value::U32);
+            EXPECT(position.get_value() == Form::Schema::Value::U32);
             EXPECT_EQ(position.get_extent(), Count(4));
           },
 
@@ -98,15 +102,15 @@ VALIDATION_TEST(TtxCompiled, primitive_bytes) {
 VALIDATION_TEST(TtxCompiled, repeated_publication) {
   // Preparing owns temporary records. Two writes after preparation must not
   // depend on the Schema still being present, or compile it a second time.
-  Compiler compiler;
+  Form::Compiler compiler;
   {
     auto source = integer;
     ASSERT(compiler.compile(source) == Status::Success);
     source.data.value.type = TTX_SCHEMA_R64;
   }
 
-  Perimortem::Core::Storage::Vector<U8, 8> first;
-  Perimortem::Core::Storage::Vector<U8, 8> second;
+  Storage::Vector<U8, 8> first;
+  Storage::Vector<U8, 8> second;
   ASSERT_EQ(compiler.get_size(), Count(8));
   ASSERT(
       compiler.write(Access::Bytes(first[0], first.get_size())) ==
@@ -115,8 +119,10 @@ VALIDATION_TEST(TtxCompiled, repeated_publication) {
       compiler.write(Access::Bytes(second[0], second.get_size())) ==
       Status::Success);
 
-  const auto& reference = Compiled<integer>::get_representation();
-  EXPECT(Representation(first.get_data(), sizeof(first)).compatible(reference));
+  const auto& reference = Form::Compiled<integer>::get_representation();
+  EXPECT(
+      Form::Representation(first.get_data(), sizeof(first))
+          .compatible(reference));
   EXPECT(Data::compare(first.get_data(), second.get_data(), sizeof(first)));
 }
 
@@ -124,9 +130,9 @@ VALIDATION_TEST(TtxCompiled, repeated_publication) {
 // F3 both leave four tail bytes after these three blocks. Empty has only
 // its root block. Dirty destination bytes make an unwritten tail observable.
 VALIDATION_TEST(TtxCompiled, canonical_padding) {
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> small_fields = {
+  const Storage::Vector<Form::Schema::Position, 2> small_fields = {
     {
-      Schema::Position(integer, 0),
+      Form::Schema::Position(integer, 0),
       {
         real,
         4,
@@ -134,9 +140,9 @@ VALIDATION_TEST(TtxCompiled, canonical_padding) {
     },
   };
 
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> wide_fields = {
+  const Storage::Vector<Form::Schema::Position, 2> wide_fields = {
     {
-      Schema::Position(integer, 0),
+      Form::Schema::Position(integer, 0),
       {
         real,
         65536,
@@ -144,15 +150,17 @@ VALIDATION_TEST(TtxCompiled, canonical_padding) {
     },
   };
 
-  const Perimortem::Core::Storage::Vector<Schema, 3> forms = {
+  const Storage::Vector<Form::Schema, 3> forms = {
     {
       empty,
-      Schema::composite(View::Vector<Schema::Position>(small_fields), 8, 4),
-      Schema::composite(View::Vector<Schema::Position>(wide_fields), 65540, 4),
+      Form::Schema::composite(
+          View::Vector<Form::Schema::Position>(small_fields), 8, 4),
+      Form::Schema::composite(
+          View::Vector<Form::Schema::Position>(wide_fields), 65540, 4),
     },
   };
 
-  const Perimortem::Core::Storage::Vector<Count, 3> ends = {
+  const Storage::Vector<Count, 3> ends = {
     {
       4,
       12,
@@ -160,8 +168,8 @@ VALIDATION_TEST(TtxCompiled, canonical_padding) {
     },
   };
 
-  Perimortem::Core::Storage::Vector<U8, 48> buffer;
-  Compiler compiler;
+  Storage::Vector<U8, 48> buffer;
+  Form::Compiler compiler;
   for (Count form = 0; form < 3; ++form) {
     ASSERT(compiler.compile(forms[form]) == Status::Success);
 
@@ -188,7 +196,7 @@ VALIDATION_TEST(TtxCompiled, canonical_padding) {
     }
   }
 
-  const Perimortem::Core::Storage::Vector<U8, 8> expected = {
+  const Storage::Vector<U8, 8> expected = {
     {
       0x01,
       0x10,
@@ -202,5 +210,5 @@ VALIDATION_TEST(TtxCompiled, canonical_padding) {
   };
 
   EXPECT(compiled_empty.compatible(
-      Representation(expected.get_data(), sizeof(expected))));
+      Form::Representation(expected.get_data(), sizeof(expected))));
 }

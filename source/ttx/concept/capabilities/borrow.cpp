@@ -3,20 +3,22 @@
 
 #include "ttx/concept/capabilities/borrow.hpp"
 
+using namespace Perimortem::Core;
 using namespace Ttx::Concept;
-using namespace Ttx::Semantic::Negotiation;
+using namespace Ttx::Data;
+using namespace Ttx::Semantic;
 
-C_LINKAGE const ttx_representation* ttx_borrow_representation() {
-  return &Ttx::Data::Form::Compiled<Ttx::Data::Form::Native<
-      Capabilities::Borrow::Api>::reference>::get_representation();
+C_LINKAGE auto ttx_borrow_representation() -> const ttx_representation* {
+  return &Form::Compiled<
+      Form::Native<Capabilities::Borrow::Api>::reference>::get_representation();
 }
 
 auto Capabilities::Borrow::borrow() const
-    -> Perimortem::Core::Storage::Result<Policies::Borrowed, Binding::Status> {
+    -> Storage::Result<Policies::Borrowed, Negotiation::Status> {
   const auto api = get_abi();
   ttx_borrowed output = ttx_borrowed();
   const auto status = api.operations->borrow(api.context, &output);
-  if (status == TTX_BINDING_SATISFIED) {
+  if (status == TTX_NEGOTIATION_SATISFIED) {
     if (Policies::Borrowed::accept(output)) {
       return Policies::Borrowed(output);
     }
@@ -25,9 +27,9 @@ auto Capabilities::Borrow::borrow() const
       output.operations->release(output.context);
     }
 
-    return Binding::Status::Rejected;
+    return Negotiation::Status::Rejected;
   }
 
-  return status == TTX_BINDING_UNKNOWN ? Binding::Status::Unknown
-                                       : Binding::Status::Rejected;
+  return status == TTX_NEGOTIATION_UNKNOWN ? Negotiation::Status::Unknown
+                                           : Negotiation::Status::Rejected;
 }

@@ -47,10 +47,9 @@ class Export {
     return Abstract(api.context, api.operations->abstract);
   }
 
-  auto expose(Abstract abstract) const
-      -> Semantic::Negotiation::Binding::Status {
+  auto expose(Abstract abstract) const -> Semantic::Negotiation::Status {
     const auto api = get_abi();
-    return static_cast<Semantic::Negotiation::Binding::Status>(
+    return Semantic::Negotiation::Status(
         api.operations->expose(api.context, abstract.get_abi()));
   }
 

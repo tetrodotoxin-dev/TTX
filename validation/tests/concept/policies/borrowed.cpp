@@ -3,6 +3,8 @@
 
 #include "toolchain/validation/test.hpp"
 
+#include "perimortem/core/data.hpp"
+
 #include "ttx/concept/capabilities/borrow.hpp"
 #include "ttx/concept/capabilities/create.hpp"
 #include "ttx/concept/policies/constant.hpp"
@@ -10,12 +12,14 @@
 #include "ttx/concept/policies/unknown.h"
 #include "ttx/data/transfer.hpp"
 
-using namespace Perimortem;
-using namespace Ttx;
+using namespace Perimortem::Core;
+using namespace Perimortem::Serialization;
+using namespace Toolchain::Validation;
 using namespace Ttx::Concept;
-using namespace Ttx::Semantic::Negotiation;
+using namespace Ttx::Data;
+using namespace Ttx::Semantic;
 
-static Toolchain::Validation::Harness Borrowing = {.name = "TTX::Borrowed"};
+static Harness Borrowing = {.name = "TTX::Borrowed"};
 
 struct Observations {
   Count borrowed = 0, released = 0, created = 0, binds = 0;
@@ -30,66 +34,58 @@ class Retained {
   U8 value;
 
   static auto data(void* context) -> perimortem_view_bytes {
-    auto& subject = *static_cast<Retained*>(context);
+    auto& subject = *Data::cast<Retained>(context);
     return {&subject.value, 1};
   }
 
-  static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
-    const Serialization::Formats::Uuid contract(id);
+  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+    const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Policies::Borrowed::contract_id ||
                    contract == Capabilities::Borrow::contract_id ||
                    contract == Capabilities::Create::contract_id ||
                    contract == Policies::Constant::contract_id
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_UNKNOWN;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_UNKNOWN;
   }
 
   static auto bind(void* context, perimortem_uuid id, ttx_storage requested)
-      -> ttx_binding_status {
-    auto& subject = *static_cast<Retained*>(context);
+      -> ttx_negotiation_status {
+    auto& subject = *Data::cast<Retained>(context);
     ++subject.counts.binds;
 
-    const Serialization::Formats::Uuid contract(id);
-    const Data::Form::Storage target(requested);
+    const Formats::Uuid contract(id);
+    const Form::Storage target(requested);
     if (contract == Policies::Borrowed::contract_id) {
       Policies::Borrowed::Api api = {context, &borrowed_operations};
-      return Ttx::Data::Transfer::copy(
-                 Ttx::Data::Form::Storage::from(api), target) ==
-                     Ttx::Data::Status::Success
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
+      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_REJECTED;
     }
 
     if (contract == Capabilities::Borrow::contract_id) {
       Capabilities::Borrow::Api api = {context, &borrow_operations};
-      return Ttx::Data::Transfer::copy(
-                 Ttx::Data::Form::Storage::from(api), target) ==
-                     Ttx::Data::Status::Success
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
+      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_REJECTED;
     }
 
     if (contract == Capabilities::Create::contract_id) {
       Capabilities::Create::Api api = {context, &create_operations};
-      return Ttx::Data::Transfer::copy(
-                 Ttx::Data::Form::Storage::from(api), target) ==
-                     Ttx::Data::Status::Success
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
+      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_REJECTED;
     }
 
     if (contract == Abstract::contract_id ||
         contract == Policies::Constant::contract_id) {
       Abstract::Api api = resolve(context);
-      return Ttx::Data::Transfer::copy(
-                 Ttx::Data::Form::Storage::from(api), target) ==
-                     Ttx::Data::Status::Success
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
+      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_REJECTED;
     }
 
-    return TTX_BINDING_UNKNOWN;
+    return TTX_NEGOTIATION_UNKNOWN;
   }
 
   static auto resolve(void* context) -> ttx_abstract {
@@ -100,30 +96,30 @@ class Retained {
     return ttx_unknown();
   }
 
-  static void visit(void*, ttx_concept_visitor) {}
+  static auto visit(void*, ttx_concept_visitor) -> void {}
 
   static auto borrow(void* context, ttx_borrowed* output)
-      -> ttx_binding_status {
-    auto& subject = *static_cast<Retained*>(context);
+      -> ttx_negotiation_status {
+    auto& subject = *Data::cast<Retained>(context);
     ++subject.references;
     ++subject.counts.borrowed;
     *output = {context, &borrowed_operations};
-    return TTX_BINDING_SATISFIED;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   static auto create(
       void* context,
       ttx_abstract,
       void* callback_context,
-      void (*callback)(void*, ttx_abstract)) -> ttx_binding_status {
-    auto& subject = *static_cast<Retained*>(context);
+      void (*callback)(void*, ttx_abstract)) -> ttx_negotiation_status {
+    auto& subject = *Data::cast<Retained>(context);
     ++subject.counts.created;
     callback(callback_context, resolve(context));
-    return TTX_BINDING_SATISFIED;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
-  static void release(void* context) {
-    auto& subject = *static_cast<Retained*>(context);
+  static auto release(void* context) -> void {
+    auto& subject = *Data::cast<Retained>(context);
     ++subject.counts.released;
     if (!--subject.references) {
       delete &subject;
@@ -147,44 +143,40 @@ class Discovery {
  public:
   Observations& counts;
   U8 value = 7;
-  Binding::Status answer = Binding::Status::Satisfied;
+  Negotiation::Status answer = Negotiation::Status::Satisfied;
 
   static auto data(void* context) -> perimortem_view_bytes {
-    auto& subject = *static_cast<Discovery*>(context);
+    auto& subject = *Data::cast<Discovery>(context);
     return {&subject.value, 1};
   }
 
-  static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
-    const Serialization::Formats::Uuid contract(id);
+  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+    const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Borrow::contract_id
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_UNKNOWN;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_UNKNOWN;
   }
 
   static auto bind(void* context, perimortem_uuid id, ttx_storage requested)
-      -> ttx_binding_status {
-    const Serialization::Formats::Uuid contract(id);
-    const Data::Form::Storage target(requested);
+      -> ttx_negotiation_status {
+    const Formats::Uuid contract(id);
+    const Form::Storage target(requested);
     if (contract == Capabilities::Borrow::contract_id) {
       Capabilities::Borrow::Api api = {context, &operations};
-      return Ttx::Data::Transfer::copy(
-                 Ttx::Data::Form::Storage::from(api), target) ==
-                     Ttx::Data::Status::Success
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
+      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_REJECTED;
     }
 
     if (contract == Abstract::contract_id) {
       Abstract::Api api = resolve(context);
-      return Ttx::Data::Transfer::copy(
-                 Ttx::Data::Form::Storage::from(api), target) ==
-                     Ttx::Data::Status::Success
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
+      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_REJECTED;
     }
 
-    return TTX_BINDING_UNKNOWN;
+    return TTX_NEGOTIATION_UNKNOWN;
   }
 
   static auto resolve(void* context) -> ttx_abstract {
@@ -195,13 +187,13 @@ class Discovery {
     return ttx_unknown();
   }
 
-  static void visit(void*, ttx_concept_visitor) {}
+  static auto visit(void*, ttx_concept_visitor) -> void {}
 
   static auto borrow(void* context, ttx_borrowed* output)
-      -> ttx_binding_status {
-    auto& subject = *static_cast<Discovery*>(context);
-    if (subject.answer != Binding::Status::Satisfied) {
-      return static_cast<ttx_binding_status>(subject.answer);
+      -> ttx_negotiation_status {
+    auto& subject = *Data::cast<Discovery>(context);
+    if (subject.answer != Negotiation::Status::Satisfied) {
+      return ttx_negotiation_status(subject.answer);
     }
 
     ++subject.counts.borrowed;
@@ -209,7 +201,7 @@ class Discovery {
       new Retained(subject.counts, 1, subject.value),
       &Retained::borrowed_operations};
 
-    return TTX_BINDING_SATISFIED;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   static constexpr ttx_borrow_ops operations = {
@@ -219,7 +211,7 @@ class Discovery {
 
 VALIDATION_TEST(Borrowing, independent_context) {
   Observations counts;
-  Core::Storage::Option<Policies::Borrowed> retained;
+  Storage::Option<Policies::Borrowed> retained;
   {
     Discovery source = Discovery(counts);
     const auto weak = Abstract(Discovery::resolve(&source));
@@ -228,13 +220,13 @@ VALIDATION_TEST(Borrowing, independent_context) {
           EXPECT_EQ(counts.borrowed, Count(0));
           EXPECT(
               request.get_abstract().supports<Abstract>() ==
-              Binding::Status::Satisfied);
+              Negotiation::Status::Satisfied);
           request.borrow().visit(
               [&](Policies::Borrowed answer) { retained = answer; },
-              [&](Binding::Status) { EXPECT(False); });
+              [&](Negotiation::Status) { EXPECT(False); });
         },
 
-        [&](Binding::Status) { EXPECT(False); });
+        [&](Negotiation::Status) { EXPECT(False); });
 
     source.value = 12;
     retained.visit(
@@ -253,7 +245,7 @@ VALIDATION_TEST(Borrowing, independent_context) {
             [&](Capabilities::Create create) {
               EXPECT(
                   create.get_abstract().supports<Policies::Borrowed>() ==
-                  Binding::Status::Satisfied);
+                  Negotiation::Status::Satisfied);
 
               const auto binds = counts.binds;
               for (Count i = 0; i != 100; ++i) {
@@ -264,13 +256,13 @@ VALIDATION_TEST(Borrowing, independent_context) {
                 EXPECT(
                     create.create(
                         Policies::None::get_none().get_abstract(), callback) ==
-                    Binding::Status::Satisfied);
+                    Negotiation::Status::Satisfied);
               }
 
               EXPECT_EQ(counts.binds, binds);
             },
 
-            [&](Binding::Status) { EXPECT(False); });
+            [&](Negotiation::Status) { EXPECT(False); });
         EXPECT_EQ(counts.created, Count(100));
         EXPECT_EQ(counts.borrowed, Count(1));
         EXPECT_EQ(counts.released, Count(0));
@@ -285,15 +277,15 @@ VALIDATION_TEST(Borrowing, independent_context) {
                     acquired.release();
                     EXPECT(
                         second.get_abstract().supports<Policies::Constant>() ==
-                        Binding::Status::Satisfied);
+                        Negotiation::Status::Satisfied);
                     EXPECT_EQ(second.get_abstract().get_data()[0], U8(7));
                     second.release();
                   },
 
-                  [&](Binding::Status) { EXPECT(False); });
+                  [&](Negotiation::Status) { EXPECT(False); });
             },
 
-            [&](Binding::Status) { EXPECT(False); });
+            [&](Negotiation::Status) { EXPECT(False); });
       },
 
       [&] { EXPECT(False); });
@@ -306,8 +298,8 @@ VALIDATION_TEST(Borrowing, scoped_and_refused) {
   const auto weak = Abstract(Discovery::resolve(&source));
   EXPECT_EQ(weak.get_data()[0], U8(7));
 
-  const Binding::Status answers[] = {
-    Binding::Status::Unknown, Binding::Status::Rejected};
+  const Negotiation::Status answers[] = {
+    Negotiation::Status::Unknown, Negotiation::Status::Rejected};
 
   weak.bind<Capabilities::Borrow>().visit(
       [&](Capabilities::Borrow request) {
@@ -315,13 +307,13 @@ VALIDATION_TEST(Borrowing, scoped_and_refused) {
           source.answer = answer;
           request.borrow().visit(
               [&](Policies::Borrowed) { EXPECT(False); },
-              [&](Binding::Status failure) {
-                EXPECT(static_cast<Binding::Status>(failure) == answer);
+              [&](Negotiation::Status failure) {
+                EXPECT(Negotiation::Status(failure) == answer);
               });
         }
       },
 
-      [&](Binding::Status) { EXPECT(False); });
+      [&](Negotiation::Status) { EXPECT(False); });
   EXPECT_EQ(counts.borrowed, Count(0));
   EXPECT_EQ(counts.released, Count(0));
 }
@@ -333,15 +325,15 @@ VALIDATION_TEST(Borrowing, malformed_answer_return) {
   struct Provider {
     Count releases = 0;
 
-    static void release(void* context) {
-      ++static_cast<Provider*>(context)->releases;
+    static auto release(void* context) -> void {
+      ++Data::cast<Provider>(context)->releases;
     }
 
     static auto borrow(void* context, ttx_borrowed* output)
-        -> ttx_binding_status {
+        -> ttx_negotiation_status {
       static const ttx_borrowed_ops malformed = {{}, release};
       *output = {context, &malformed};
-      return TTX_BINDING_SATISFIED;
+      return TTX_NEGOTIATION_SATISFIED;
     }
   } provider;
 
@@ -353,8 +345,8 @@ VALIDATION_TEST(Borrowing, malformed_answer_return) {
   ASSERT(Capabilities::Borrow::accept(request.get_abi()));
   request.borrow().visit(
       [&](Policies::Borrowed) { EXPECT(False); },
-      [&](Binding::Status failure) {
-        EXPECT(failure == Binding::Status::Rejected);
+      [&](Negotiation::Status failure) {
+        EXPECT(failure == Negotiation::Status::Rejected);
       });
 
   EXPECT_EQ(provider.releases, Count(1));

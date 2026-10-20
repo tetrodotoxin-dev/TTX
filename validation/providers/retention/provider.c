@@ -18,7 +18,7 @@ static const perimortem_uuid increment_id = {
   0x75a9a5de1b164e82ULL, 0x823e42db676680acULL};
 
 static retention_statistics observed;
-static ttx_binding_status creation_status, borrowing_status;
+static ttx_negotiation_status creation_status, borrowing_status;
 static const ttx_representation* integer_form;
 static const ttx_borrow_ops temporary_operations, retained_borrow_operations;
 static const ttx_borrowed_ops retained_operations;
@@ -37,7 +37,7 @@ typedef struct retained_value {
   U64 value;
 } retained_value;
 
-static int is(perimortem_uuid id, U64 high, U64 low) {
+static U8 is(perimortem_uuid id, U64 high, U64 low) {
   return id.high == high && id.low == low;
 }
 
@@ -61,17 +61,17 @@ static ttx_abstract temporary_abstract(void* context) {
   return (ttx_abstract){context, &temporary_operations.abstract};
 }
 
-static ttx_binding_status temporary_supports(
+static ttx_negotiation_status temporary_supports(
     void* context,
     perimortem_uuid id) {
   (void)context;
   return is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW) ||
                  is(id, TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW)
-             ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNKNOWN;
+             ? TTX_NEGOTIATION_SATISFIED
+             : TTX_NEGOTIATION_UNKNOWN;
 }
 
-static ttx_binding_status
+static ttx_negotiation_status
     temporary_bind(void* context, perimortem_uuid id, ttx_storage target) {
   if (is(id, TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW)) {
     ttx_borrow api = {context, &temporary_operations};
@@ -79,8 +79,8 @@ static ttx_binding_status
       ttx_borrow_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   if (is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW)) {
@@ -89,25 +89,27 @@ static ttx_binding_status
       ttx_abstract_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
-  return TTX_BINDING_UNKNOWN;
+  return TTX_NEGOTIATION_UNKNOWN;
 }
 
 static ttx_abstract retained_abstract(void* context) {
   return (ttx_abstract){context, &retained_operations.abstract};
 }
 
-static ttx_binding_status retained_supports(void* context, perimortem_uuid id) {
+static ttx_negotiation_status retained_supports(
+    void* context,
+    perimortem_uuid id) {
   (void)context;
-  return temporary_supports(context, id) == TTX_BINDING_SATISFIED ||
+  return temporary_supports(context, id) == TTX_NEGOTIATION_SATISFIED ||
                  is(id, TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW) ||
                  is(id, TTX_CALLABLE_ID_HIGH, TTX_CALLABLE_ID_LOW) ||
                  is(id, increment_id.high, increment_id.low)
-             ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNKNOWN;
+             ? TTX_NEGOTIATION_SATISFIED
+             : TTX_NEGOTIATION_UNKNOWN;
 }
 
 // The consumer obtains this function through a negotiated API, even though
@@ -125,7 +127,7 @@ HIDDEN ttx_data_status
   return TTX_DATA_SUCCESS;
 }
 
-static ttx_binding_status
+static ttx_negotiation_status
     retained_bind(void* context, perimortem_uuid id, ttx_storage target) {
   if (is(id, TTX_BORROW_ID_HIGH, TTX_BORROW_ID_LOW)) {
     ttx_borrow api = {context, &retained_borrow_operations};
@@ -133,8 +135,8 @@ static ttx_binding_status
       ttx_borrow_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   if (is(id, TTX_BORROWED_ID_HIGH, TTX_BORROWED_ID_LOW)) {
@@ -143,8 +145,8 @@ static ttx_binding_status
       ttx_borrowed_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   if (is(id, TTX_CALLABLE_ID_HIGH, TTX_CALLABLE_ID_LOW)) {
@@ -153,8 +155,8 @@ static ttx_binding_status
       ttx_callable_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   if (is(id, increment_id.high, increment_id.low)) {
@@ -165,8 +167,8 @@ static ttx_binding_status
       ttx_invocation_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   if (is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW)) {
@@ -175,25 +177,25 @@ static ttx_binding_status
       ttx_abstract_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
-  return TTX_BINDING_UNKNOWN;
+  return TTX_NEGOTIATION_UNKNOWN;
 }
 
-static ttx_binding_status acquire(void* context, ttx_borrowed* output) {
+static ttx_negotiation_status acquire(void* context, ttx_borrowed* output) {
   retained_value* value = context;
   ++value->references;
   ++observed.acquisitions;
   *output = (ttx_borrowed){value, &retained_operations};
-  return TTX_BINDING_SATISFIED;
+  return TTX_NEGOTIATION_SATISFIED;
 }
 
-static ttx_binding_status borrow_temporary(
+static ttx_negotiation_status borrow_temporary(
     void* context,
     ttx_borrowed* output) {
-  if (borrowing_status != TTX_BINDING_SATISFIED) {
+  if (borrowing_status != TTX_NEGOTIATION_SATISFIED) {
     return borrowing_status;
   }
 
@@ -214,7 +216,7 @@ static void release(void* context) {
   }
 }
 
-static ttx_binding_status describe(
+static ttx_negotiation_status describe(
     void* context,
     ttx_callable_description* output) {
   (void)context;
@@ -227,22 +229,24 @@ static ttx_binding_status describe(
     {integer_form, &field, 1},
     {integer_form, &field, 1}};
 
-  return TTX_BINDING_SATISFIED;
+  return TTX_NEGOTIATION_SATISFIED;
 }
 
 static ttx_abstract factory_abstract(void* context) {
   return (ttx_abstract){context, &factory_operations.abstract};
 }
 
-static ttx_binding_status factory_supports(void* context, perimortem_uuid id) {
+static ttx_negotiation_status factory_supports(
+    void* context,
+    perimortem_uuid id) {
   (void)context;
   return is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW) ||
                  is(id, TTX_CREATE_ID_HIGH, TTX_CREATE_ID_LOW)
-             ? TTX_BINDING_SATISFIED
-             : TTX_BINDING_UNKNOWN;
+             ? TTX_NEGOTIATION_SATISFIED
+             : TTX_NEGOTIATION_UNKNOWN;
 }
 
-static ttx_binding_status
+static ttx_negotiation_status
     factory_bind(void* context, perimortem_uuid id, ttx_storage target) {
   if (is(id, TTX_CREATE_ID_HIGH, TTX_CREATE_ID_LOW)) {
     ttx_create api = {context, &factory_operations};
@@ -250,8 +254,8 @@ static ttx_binding_status
       ttx_create_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   if (is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW)) {
@@ -260,21 +264,21 @@ static ttx_binding_status
       ttx_abstract_representation(), (U8*)&api, sizeof(api)};
 
     return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
-  return TTX_BINDING_UNKNOWN;
+  return TTX_NEGOTIATION_UNKNOWN;
 }
 
-static ttx_binding_status create(
+static ttx_negotiation_status create(
     void* context,
     ttx_abstract arguments,
     void* callback_context,
     void (*callback)(void*, ttx_abstract)) {
   (void)context;
   (void)arguments;
-  if (creation_status != TTX_BINDING_SATISFIED) {
+  if (creation_status != TTX_NEGOTIATION_SATISFIED) {
     return creation_status;
   }
 
@@ -283,7 +287,7 @@ static ttx_binding_status create(
   ++observed.callbacks;
   callback(callback_context, temporary_abstract(&initial));
   observed.inside_callback = 0;
-  return TTX_BINDING_SATISFIED;
+  return TTX_NEGOTIATION_SATISFIED;
 }
 
 static const ttx_borrow_ops temporary_operations = {
@@ -311,8 +315,8 @@ static retention_statistics statistics(void) {
 }
 
 static void configure(
-    ttx_binding_status creation,
-    ttx_binding_status borrowing) {
+    ttx_negotiation_status creation,
+    ttx_negotiation_status borrowing) {
   assert(observed.live == 0);
   observed = (retention_statistics){0};
   creation_status = creation;
@@ -331,7 +335,7 @@ retention_fixture retention_provider_open(void) {
     integer_form = prepare_representation(&integer);
   }
 
-  configure(TTX_BINDING_SATISFIED, TTX_BINDING_SATISFIED);
+  configure(TTX_NEGOTIATION_SATISFIED, TTX_NEGOTIATION_SATISFIED);
   return (retention_fixture){
     factory_abstract(&observed), statistics, configure};
 }

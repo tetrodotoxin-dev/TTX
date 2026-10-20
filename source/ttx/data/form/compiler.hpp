@@ -4,6 +4,7 @@
 #pragma once
 
 #include "perimortem/core/algorithm/hash.hpp"
+#include "perimortem/core/data.hpp"
 #include "perimortem/core/math/scalar.hpp"
 #include "perimortem/core/storage/vector.hpp"
 #include "perimortem/memory/compile/vector.hpp"
@@ -426,7 +427,7 @@ class Compiler {
   using Element = Encoding::Element;
   using Elements = Vector<Element>;
   using Indices = Vector<Count>;
-  using View = Perimortem::Core::View::Vector<Element>;
+  using ElementsView = Perimortem::Core::View::Vector<Element>;
   using Writer = Perimortem::Core::Writer::Binary<
       Perimortem::Core::Data::ByteOrder::Little>;
   static constexpr Count Unseen = Count(-1);
@@ -510,12 +511,12 @@ class Compiler {
   // The runtime view borrows the actual initialized content. Constant
   // evaluation cannot reinterpret an object pointer, so only that path copies
   // the same representation into byte storage for the existing byte hasher.
-  static constexpr auto hash(View content) -> U64 {
+  static constexpr auto hash(ElementsView content) -> U64 {
     if consteval {
       Vector<U8> bytes;
       bytes.resize(content.get_size() * sizeof(Element));
       for (Count i = 0; i < content.get_size(); ++i) {
-        const auto word = __builtin_bit_cast(Octets, content[i]);
+        const auto word = Perimortem::Core::Data::bit_cast<Octets>(content[i]);
         for (Count j = 0; j < sizeof(Element); ++j) {
           bytes.get_data()[i * sizeof(Element) + j] = word.bytes[j];
         }
@@ -538,14 +539,14 @@ class Compiler {
     }
   }
 
-  static constexpr auto equal(View a, View b) -> Bool {
+  static constexpr auto equal(ElementsView a, ElementsView b) -> Bool {
     return a.get_size() == b.get_size() &&
            Perimortem::Core::Data::compare(
                a.get_data(), b.get_data(), a.get_size());
   }
 
   static constexpr auto span(const Elements& data, Count first, Count size)
-      -> View {
+      -> ElementsView {
     return data.get_view().slice(first, size);
   }
 
@@ -743,11 +744,10 @@ class Compiler {
       const Count code =
           type == Schema::Value::Pointer
               ? 0
-              : static_cast<U8>(type) |
-                    ((source->get_extent() > 1 &&
-                      source->get_byte_order() == Schema::ByteOrder::Big)
-                         ? 64
-                         : 0);
+              : U8(type) | ((source->get_extent() > 1 &&
+                             source->get_byte_order() == Schema::ByteOrder::Big)
+                                ? 64
+                                : 0);
       return Element(1, 0, size, code, pointer ? Element::Pointer : 0);
     }
 
@@ -1015,7 +1015,7 @@ class Compiler {
     Element head = value.get_result().is_set() ? describe(value.get_result())
                                                : Element(0, 0, 0, 0, Void);
     head.count = 0;
-    head.offset = static_cast<U32>(convention);
+    head.offset = U32(convention);
     head.distance = 0;
 
     const Count first = records.get_size();

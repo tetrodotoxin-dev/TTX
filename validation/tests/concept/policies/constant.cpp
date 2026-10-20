@@ -5,21 +5,21 @@
 
 #include "toolchain/validation/test.hpp"
 
+#include "perimortem/core/data.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
 #include "ttx/concept/policies/none.hpp"
 #include "ttx/concept/policies/unknown.hpp"
 #include "ttx/data/transfer.hpp"
 
-using namespace Perimortem;
-using namespace Ttx;
+using namespace Perimortem::Core;
+using namespace Perimortem::Serialization;
+using namespace Toolchain::Validation;
+using namespace Ttx::Concept;
+using namespace Ttx::Data;
+using namespace Ttx::Semantic;
 
-static Toolchain::Validation::Harness Constants = {.name = "TTX::Constant"};
-
-namespace {
-
-using Concept::Abstract;
-namespace Binding = Semantic::Negotiation::Binding;
+static Harness Constants = {.name = "TTX::Constant"};
 
 // This provider exposes one changing outgoing edge. The consumer keeps the
 // provider's identity while asking it again for each child observation.
@@ -27,28 +27,27 @@ struct Changing {
   ttx_abstract child;
   U8 value = 17;
 
-  static auto supports(void*, perimortem_uuid id) -> ttx_binding_status {
-    return Serialization::Formats::Uuid(id) == Abstract::contract_id
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_UNKNOWN;
+  static auto supports(void*, perimortem_uuid id) -> ttx_negotiation_status {
+    return Formats::Uuid(id) == Abstract::contract_id
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_UNKNOWN;
   }
 
   static auto bind(void* context, perimortem_uuid id, ttx_storage output)
-      -> ttx_binding_status {
-    if (supports(context, id) != TTX_BINDING_SATISFIED) {
-      return TTX_BINDING_UNKNOWN;
+      -> ttx_negotiation_status {
+    if (supports(context, id) != TTX_NEGOTIATION_SATISFIED) {
+      return TTX_NEGOTIATION_UNKNOWN;
     }
 
     Abstract::Api api = resolve(context);
-    return Ttx::Data::Transfer::copy(
-               Ttx::Data::Form::Storage::from(api),
-               Data::Form::Storage(output)) == Ttx::Data::Status::Success
-               ? TTX_BINDING_SATISFIED
-               : TTX_BINDING_REJECTED;
+    return Transfer::copy(Form::Storage::from(api), Form::Storage(output)) ==
+                   Status::Success
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   static auto data(void* context) -> perimortem_view_bytes {
-    return {&static_cast<Changing*>(context)->value, 1};
+    return {&Data::cast<Changing>(context)->value, 1};
   }
 
   static auto resolve(void* context) -> ttx_abstract {
@@ -56,10 +55,10 @@ struct Changing {
   }
 
   static auto lookup(void* context, perimortem_view_bytes) -> ttx_abstract {
-    return static_cast<Changing*>(context)->child;
+    return Data::cast<Changing>(context)->child;
   }
 
-  static void visit(void*, ttx_concept_visitor) {}
+  static auto visit(void*, ttx_concept_visitor) -> void {}
 
   static constexpr ttx_abstract_ops operations = {supports, bind,   data,
                                                   resolve,  lookup, visit};
@@ -71,38 +70,36 @@ struct Fixed {
   ttx_abstract target;
 
   static auto supports(void* context, perimortem_uuid id)
-      -> ttx_binding_status {
-    if (Serialization::Formats::Uuid(id) ==
-        Concept::Policies::Constant::contract_id) {
-      return TTX_BINDING_SATISFIED;
+      -> ttx_negotiation_status {
+    if (Formats::Uuid(id) == Policies::Constant::contract_id) {
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
-    const auto target = static_cast<Fixed*>(context)->target;
+    const auto target = Data::cast<Fixed>(context)->target;
     return target.operations->supports(target.context, id);
   }
 
   static auto bind(void* context, perimortem_uuid id, ttx_storage output)
-      -> ttx_binding_status {
-    const Serialization::Formats::Uuid contract(id);
+      -> ttx_negotiation_status {
+    const Formats::Uuid contract(id);
     if (contract == Abstract::contract_id ||
-        contract == Concept::Policies::Constant::contract_id ||
-        ((contract == Concept::Policies::None::contract_id ||
-          contract == Concept::Policies::Unknown::contract_id) &&
-         supports(context, id) == TTX_BINDING_SATISFIED)) {
+        contract == Policies::Constant::contract_id ||
+        ((contract == Policies::None::contract_id ||
+          contract == Policies::Unknown::contract_id) &&
+         supports(context, id) == TTX_NEGOTIATION_SATISFIED)) {
       Abstract::Api api = resolve(context);
-      return Ttx::Data::Transfer::copy(
-                 Ttx::Data::Form::Storage::from(api),
-                 Data::Form::Storage(output)) == Ttx::Data::Status::Success
-                 ? TTX_BINDING_SATISFIED
-                 : TTX_BINDING_REJECTED;
+      return Transfer::copy(Form::Storage::from(api), Form::Storage(output)) ==
+                     Status::Success
+                 ? TTX_NEGOTIATION_SATISFIED
+                 : TTX_NEGOTIATION_REJECTED;
     }
 
-    const auto target = static_cast<Fixed*>(context)->target;
+    const auto target = Data::cast<Fixed>(context)->target;
     return target.operations->bind(target.context, id, output);
   }
 
   static auto data(void* context) -> perimortem_view_bytes {
-    const auto target = static_cast<Fixed*>(context)->target;
+    const auto target = Data::cast<Fixed>(context)->target;
     return target.operations->get_data(target.context);
   }
 
@@ -112,12 +109,12 @@ struct Fixed {
 
   static auto lookup(void* context, perimortem_view_bytes route)
       -> ttx_abstract {
-    const auto target = static_cast<Fixed*>(context)->target;
+    const auto target = Data::cast<Fixed>(context)->target;
     return target.operations->resolve_concept(target.context, route);
   }
 
-  static void visit(void* context, ttx_concept_visitor callback) {
-    const auto target = static_cast<Fixed*>(context)->target;
+  static auto visit(void* context, ttx_concept_visitor callback) -> void {
+    const auto target = Data::cast<Fixed>(context)->target;
     target.operations->visit_concepts(target.context, callback);
   }
 
@@ -125,23 +122,20 @@ struct Fixed {
                                                   resolve,  lookup, visit};
 };
 
-}  // namespace
-
 VALIDATION_TEST(Constants, explicit_constant_policy) {
   Fixed rejected{ttx_none()};
   const Abstract permanent(Fixed::resolve(&rejected));
-  permanent.bind<Concept::Policies::None>().visit(
-      [&](Concept::Policies::None answer) {
+  permanent.bind<Policies::None>().visit(
+      [&](Policies::None answer) {
         EXPECT(
-            answer.get_abstract().supports<Concept::Policies::Constant>() ==
-            Binding::Status::Satisfied);
+            answer.get_abstract().supports<Policies::Constant>() ==
+            Negotiation::Status::Satisfied);
         EXPECT(answer.get_abstract() == permanent);
       },
 
-      [&](Binding::Status) { EXPECT(False); });
-  permanent.bind<Concept::Policies::Constant>().visit(
-      [](Concept::Policies::Constant) {},
-      [&](Binding::Status) { EXPECT(False); });
+      [&](Negotiation::Status) { EXPECT(False); });
+  permanent.bind<Policies::Constant>().visit(
+      [](Policies::Constant) {}, [&](Negotiation::Status) { EXPECT(False); });
   EXPECT(permanent.resolve() == permanent);
 
   Changing provider{ttx_unknown()};
@@ -150,8 +144,7 @@ VALIDATION_TEST(Constants, explicit_constant_policy) {
   const Abstract root(Changing::resolve(&parent));
   const auto first = root.resolve_concept("selected"_view);
   EXPECT(
-      first.supports<Concept::Policies::Constant>() ==
-      Binding::Status::Satisfied);
+      first.supports<Policies::Constant>() == Negotiation::Status::Satisfied);
   EXPECT_EQ(first.get_data()[0], U8(17));
   EXPECT(first.resolve_concept("child"_view) == Abstract(ttx_unknown()));
 
@@ -164,9 +157,7 @@ VALIDATION_TEST(Constants, explicit_constant_policy) {
 
   const auto child = second.resolve_concept("child"_view);
   EXPECT(child == Abstract(ttx_none()));
-  EXPECT(
-      child.supports<Concept::Policies::Constant>() ==
-      Binding::Status::Unknown);
+  EXPECT(child.supports<Policies::Constant>() == Negotiation::Status::Unknown);
 }
 
 // The shared None result leaves the original provider free to select a

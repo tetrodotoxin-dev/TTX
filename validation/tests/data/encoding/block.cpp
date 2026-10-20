@@ -8,9 +8,10 @@
 #include "perimortem/core/storage/vector.hpp"
 
 using namespace Perimortem::Core;
-using namespace Ttx::Data::Encoding;
+using namespace Toolchain::Validation;
+using namespace Ttx::Data;
 
-static Toolchain::Validation::Harness EncodingBlock = {
+static Harness EncodingBlock = {
   .name = "TTX::Data::Encoding::Block",
 };
 
@@ -29,7 +30,7 @@ static constexpr auto bits(View::Bytes bytes, Count first, Count width)
   return result;
 }
 
-static constexpr Perimortem::Core::Storage::Vector<U8, 16> constant = {
+static constexpr Storage::Vector<U8, 16> constant = {
   {
     0x81,
     0x42,
@@ -51,11 +52,13 @@ static constexpr Perimortem::Core::Storage::Vector<U8, 16> constant = {
 };
 
 static_assert(
-    Block::extract(View::Bytes(constant[0], constant.get_size()), 61, 35) ==
-    bits(View::Bytes(constant[0], constant.get_size()), 61, 35));
+    Encoding::Block::extract(
+        View::Bytes(constant[0], constant.get_size()),
+        61,
+        35) == bits(View::Bytes(constant[0], constant.get_size()), 61, 35));
 
 VALIDATION_TEST(EncodingBlock, field_boundaries) {
-  const Perimortem::Core::Storage::Vector<Count, 13> widths = {
+  const Storage::Vector<Count, 13> widths = {
     {
       1,
       6,
@@ -95,7 +98,8 @@ VALIDATION_TEST(EncodingBlock, field_boundaries) {
           const Count width = widths[width_index];
           if (width <= raw_size * 8 - first) {
             EXPECT_EQ(
-                Block::extract(bytes, first, width), bits(bytes, first, width));
+                Encoding::Block::extract(bytes, first, width),
+                bits(bytes, first, width));
           }
         }
       }

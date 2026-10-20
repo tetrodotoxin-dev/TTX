@@ -5,14 +5,15 @@
 
 #include "toolchain/validation/benchmark.hpp"
 
+#include "perimortem/core/data.hpp"
 #include "perimortem/core/diagnostics/log.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
 using namespace Perimortem::Core;
+using namespace Toolchain::Validation;
 using namespace Ttx::Data;
 
-static Toolchain::Validation::Harness TransferBenchmarks = {
-  .name = "TTX::Transfer"};
+static Harness TransferBenchmarks = {.name = "TTX::Transfer"};
 
 static constexpr auto integer =
     Form::Schema::primitive(Form::Schema::Value::U32);
@@ -24,10 +25,9 @@ alignas(64) static U32 destination[516] = {};
 // Both destinations meet the value's four byte alignment. Offsetting one by
 // four bytes changes its cache alignment while preserving its declared form.
 // Each sample repeats the complete checked transfer of 2048 bytes 1024 times.
-static void transfer(U32* destination) {
-  const ttx_storage input{&form, reinterpret_cast<U8*>(source), sizeof(source)};
-  const ttx_storage output{
-    &form, reinterpret_cast<U8*>(destination), sizeof(source)};
+static auto transfer(U32* destination) -> void {
+  const ttx_storage input{&form, Data::cast<U8>(source), sizeof(source)};
+  const ttx_storage output{&form, Data::cast<U8>(destination), sizeof(source)};
 
   for (Count index = 0; index != 1024; ++index) {
     if (ttx_transfer(&input, &output) != TTX_DATA_SUCCESS) {

@@ -6,6 +6,10 @@
 #include "ttx/semantic/negotiation/query.hpp"
 #include "validation/tests/semantic/fixtures/portable_provider.h"
 
+using namespace Perimortem::Serialization;
+using namespace Toolchain::Validation;
+using namespace Ttx::Semantic;
+
 TTX_DATA_RECORD(
     portable_counter,
     TTX_DATA_MEMBER(portable_counter, context),
@@ -13,8 +17,7 @@ TTX_DATA_RECORD(
 
 struct PortableCounter {
   using Api = portable_counter;
-  static constexpr Perimortem::Serialization::Formats::Uuid contract_id =
-      Perimortem::Serialization::Formats::Uuid(17, 23);
+  static constexpr Formats::Uuid contract_id = Formats::Uuid(17, 23);
   Api api;
 
   // Copies a negotiated record whose provider supplies callable code and its
@@ -35,15 +38,14 @@ TTX_DATA_RECORD(
 
 struct Wrong {
   using Api = WrongApi;
-  static constexpr Perimortem::Serialization::Formats::Uuid contract_id =
-      Perimortem::Serialization::Formats::Uuid(17, 23);
+  static constexpr Formats::Uuid contract_id = Formats::Uuid(17, 23);
   // Explicit construction marks the conversion that a successful bind would
   // select. This fixture requests an incompatible signature and expects that
   // bind to reject the record before reaching this constructor.
   explicit Wrong(Api) {}
 };
 
-static Toolchain::Validation::Harness PortableBinding = {
+static Harness PortableBinding = {
   .name = "TTX::PortableBinding",
 };
 
@@ -51,14 +53,13 @@ static Toolchain::Validation::Harness PortableBinding = {
 // drifted. Refuse the U64 declaration before calling anything, then negotiate
 // the actual U32 API and call the supplied function with its opaque context.
 VALIDATION_TEST(PortableBinding, literal_c_descriptor) {
-  using namespace Ttx::Semantic::Negotiation;
-  const Query query(portable_counter_open());
-  ASSERT(query.supports<PortableCounter>() == Binding::Status::Satisfied);
+  const Negotiation::Query query(portable_counter_open());
+  ASSERT(query.supports<PortableCounter>() == Negotiation::Status::Satisfied);
 
   const bool rejected = query.bind<Wrong>().visit(
       [](Wrong) { return false; },
-      [](Binding::Status failure) {
-        return failure == Binding::Status::Rejected;
+      [](Negotiation::Status failure) {
+        return failure == Negotiation::Status::Rejected;
       });
 
   ASSERT(rejected);
@@ -69,7 +70,7 @@ VALIDATION_TEST(PortableBinding, literal_c_descriptor) {
         return counter.api.add(counter.api.context, 2) == 42;
       },
 
-      [](Binding::Status) { return false; });
+      [](Negotiation::Status) { return false; });
   EXPECT(called);
   EXPECT_EQ(portable_counter_calls(), U32(1));
 }

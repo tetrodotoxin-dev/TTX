@@ -11,16 +11,16 @@
 #include "validation/tests/data/form/preparation.hpp"
 
 using namespace Perimortem::Core;
+using namespace Toolchain::Validation;
 using namespace Ttx::Data;
-using namespace Ttx::Data::Form;
-using Ttx::Data::Form::Schema;
-using Validation::DataTests::Preparation;
+using namespace Validation::DataTests;
 
-static Toolchain::Validation::Harness TtxCompiler = {
+static Harness TtxCompiler = {
   .name = "TTX::Data::Form::Compiler",
 };
 
-static constexpr auto integer = Schema::primitive(Schema::Value::U32);
+static constexpr auto integer =
+    Form::Schema::primitive(Form::Schema::Value::U32);
 
 // Both encodings describe four adjacent U32s. One stores four entries and the
 // other stores one repeated entry. Different root and leaf addresses establish
@@ -28,9 +28,9 @@ static constexpr auto integer = Schema::primitive(Schema::Value::U32);
 VALIDATION_TEST(TtxCompiler, composite_and_range) {
   Preparation prepare;
   auto foreign_integer = integer;
-  const Perimortem::Core::Storage::Vector<Schema::Position, 4> entries = {
+  const Storage::Vector<Form::Schema::Position, 4> entries = {
     {
-      Schema::Position(integer, 0),
+      Form::Schema::Position(integer, 0),
       {
         integer,
         4,
@@ -48,16 +48,17 @@ VALIDATION_TEST(TtxCompiler, composite_and_range) {
     },
   };
 
-  const auto flat = Schema::composite(entries.get_view().slice(0, 4), 16, 4);
-  const auto range = Schema::range(foreign_integer, 4, 4, 16, 4);
+  const auto flat =
+      Form::Schema::composite(entries.get_view().slice(0, 4), 16, 4);
+  const auto range = Form::Schema::range(foreign_integer, 4, 4, 16, 4);
 
   EXPECT(prepare(flat).compatible(prepare(range)));
   EXPECT(prepare(range).compatible(prepare(flat)));
 
   auto changed = foreign_integer;
-  changed.data.value.type = static_cast<U8>(Schema::Value::R32);
+  changed.data.value.type = U8(Form::Schema::Value::R32);
 
-  const auto incompatible = Schema::range(changed, 4, 4, 16, 4);
+  const auto incompatible = Form::Schema::range(changed, 4, 4, 16, 4);
   EXPECT_NOT(prepare(flat).compatible(prepare(incompatible)));
 }
 
@@ -66,9 +67,9 @@ VALIDATION_TEST(TtxCompiler, composite_and_range) {
 // coordinate lookup without compiling the Schema again.
 VALIDATION_TEST(TtxCompiler, schema_validation) {
   Preparation prepare;
-  Perimortem::Core::Storage::Vector<Schema::Position, 2> entries = {
+  Storage::Vector<Form::Schema::Position, 2> entries = {
     {
-      Schema::Position(integer, 0),
+      Form::Schema::Position(integer, 0),
       {
         integer,
         2,
@@ -76,7 +77,7 @@ VALIDATION_TEST(TtxCompiler, schema_validation) {
     },
   };
 
-  auto shape = Schema::composite(entries.get_view().slice(0, 2), 8, 4);
+  auto shape = Form::Schema::composite(entries.get_view().slice(0, 2), 8, 4);
   EXPECT(prepare.validate(shape) == Status::Invalid);
 
   entries[1].offset = 4;
@@ -85,7 +86,7 @@ VALIDATION_TEST(TtxCompiler, schema_validation) {
   entries[0].reference = &shape;
   EXPECT(prepare.validate(shape) == Status::Invalid);
 
-  const auto huge = Schema::range(integer, Count(-1), 4, Count(-1), 4);
+  const auto huge = Form::Schema::range(integer, Count(-1), 4, Count(-1), 4);
   EXPECT(prepare.validate(huge) == Status::Overflow);
 }
 
@@ -94,10 +95,10 @@ VALIDATION_TEST(TtxCompiler, schema_validation) {
 // different repetition factors and independently constructed leaf records.
 VALIDATION_TEST(TtxCompiler, factored_ranges) {
   Preparation prepare;
-  const auto other = Schema::primitive(Schema::Value::U32);
-  const auto pair = Schema::range(integer, 2, 4, 8, 4);
-  const auto nested = Schema::range(pair, 500000000, 8, 4000000000, 4);
-  const auto flat = Schema::range(other, 1000000000, 4, 4000000000, 4);
+  const auto other = Form::Schema::primitive(Form::Schema::Value::U32);
+  const auto pair = Form::Schema::range(integer, 2, 4, 8, 4);
+  const auto nested = Form::Schema::range(pair, 500000000, 8, 4000000000, 4);
+  const auto flat = Form::Schema::range(other, 1000000000, 4, 4000000000, 4);
 
   EXPECT(prepare(nested).compatible(prepare(flat)));
 }
@@ -107,9 +108,9 @@ VALIDATION_TEST(TtxCompiler, factored_ranges) {
 // measured separately by the compiler benchmarks.
 VALIDATION_TEST(TtxCompiler, wide_composite) {
   Preparation prepare;
-  const auto other = Schema::primitive(Schema::Value::U32);
-  const auto real = Schema::primitive(Schema::Value::R32);
-  Perimortem::Core::Storage::Vector<Schema::Position, 512> a, b;
+  const auto other = Form::Schema::primitive(Form::Schema::Value::U32);
+  const auto real = Form::Schema::primitive(Form::Schema::Value::R32);
+  Storage::Vector<Form::Schema::Position, 512> a, b;
   for (Count i = 0; i < 512; ++i) {
     a[i] = {
       i % 2 ? integer : real,
@@ -122,15 +123,17 @@ VALIDATION_TEST(TtxCompiler, wide_composite) {
     };
   }
 
-  const auto left = Schema::composite(a.get_view().slice(0, 512), 2048, 4);
-  const auto right = Schema::composite(b.get_view().slice(0, 512), 2048, 4);
+  const auto left =
+      Form::Schema::composite(a.get_view().slice(0, 512), 2048, 4);
+  const auto right =
+      Form::Schema::composite(b.get_view().slice(0, 512), 2048, 4);
 
   const auto& prepared_left = prepare(left);
   const auto& prepared_right = prepare(right);
   EXPECT(prepared_left.compatible(prepared_right));
   EXPECT_EQ(prepared_left.get_bytes().get_size(), Count(513 * 8));
   prepared_right.next(2044).visit(
-      [&](const Representation::Position& position) {
+      [&](const Form::Representation::Position& position) {
         EXPECT_EQ(position.offset, Count(2044));
       },
 
@@ -142,17 +145,16 @@ VALIDATION_TEST(TtxCompiler, wide_composite) {
 // The full matrix catches agreement that works only through a third shape.
 VALIDATION_TEST(TtxCompiler, empty_equivalence) {
   Preparation prepare;
-  const auto real = Schema::primitive(Schema::Value::R32);
-  const Perimortem::Core::Storage::Vector<Schema, 3> forms = {
+  const auto real = Form::Schema::primitive(Form::Schema::Value::R32);
+  const Storage::Vector<Form::Schema, 3> forms = {
     {
-      Schema::range(integer, 0, 4, 0, 4),
-      Schema::composite(
-          Perimortem::Core::View::Vector<Schema::Position>(), 0, 4),
-      Schema::range(real, 0, 4, 0, 4),
+      Form::Schema::range(integer, 0, 4, 0, 4),
+      Form::Schema::composite(View::Vector<Form::Schema::Position>(), 0, 4),
+      Form::Schema::range(real, 0, 4, 0, 4),
     },
   };
 
-  Perimortem::Core::Storage::Vector<const Representation*, 3> prepared = {
+  Storage::Vector<const Form::Representation*, 3> prepared = {
     {
       &prepare(forms[0]),
       &prepare(forms[1]),
@@ -176,17 +178,19 @@ VALIDATION_TEST(TtxCompiler, empty_equivalence) {
 // Explicitly placed compact children still agree with their repeated form.
 VALIDATION_TEST(TtxCompiler, padding_equivalence) {
   Preparation prepare;
-  const Perimortem::Core::Storage::Vector<Schema::Position, 1> child = {
+  const Storage::Vector<Form::Schema::Position, 1> child = {
     {
-      Schema::Position(integer, 0),
+      Form::Schema::Position(integer, 0),
     },
   };
 
-  const auto padded = Schema::composite(child.get_view().slice(0, 1), 8, 4);
-  const auto compact = Schema::composite(child.get_view().slice(0, 1), 4, 4);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> nested = {
+  const auto padded =
+      Form::Schema::composite(child.get_view().slice(0, 1), 8, 4);
+  const auto compact =
+      Form::Schema::composite(child.get_view().slice(0, 1), 4, 4);
+  const Storage::Vector<Form::Schema::Position, 2> nested = {
     {
-      Schema::Position(padded, 0),
+      Form::Schema::Position(padded, 0),
       {
         compact,
         8,
@@ -194,9 +198,9 @@ VALIDATION_TEST(TtxCompiler, padding_equivalence) {
     },
   };
 
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> flat = {
+  const Storage::Vector<Form::Schema::Position, 2> flat = {
     {
-      Schema::Position(compact, 0),
+      Form::Schema::Position(compact, 0),
       {
         compact,
         8,
@@ -204,20 +208,20 @@ VALIDATION_TEST(TtxCompiler, padding_equivalence) {
     },
   };
 
-  const Perimortem::Core::Storage::Vector<Schema, 3> forms = {
+  const Storage::Vector<Form::Schema, 3> forms = {
     {
-      Schema::composite(nested.get_view().slice(0, 2), 12, 4),
-      Schema::composite(flat.get_view().slice(0, 2), 12, 4),
-      Schema::range(compact, 2, 8, 12, 4),
+      Form::Schema::composite(nested.get_view().slice(0, 2), 12, 4),
+      Form::Schema::composite(flat.get_view().slice(0, 2), 12, 4),
+      Form::Schema::range(compact, 2, 8, 12, 4),
     },
   };
 
   EXPECT_NOT(prepare(forms[0]).compatible(prepare(forms[1])));
   EXPECT(prepare(forms[1]).compatible(prepare(forms[2])));
 
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> shifted = {
+  const Storage::Vector<Form::Schema::Position, 2> shifted = {
     {
-      Schema::Position(compact, 4),
+      Form::Schema::Position(compact, 4),
       {
         compact,
         8,
@@ -226,7 +230,7 @@ VALIDATION_TEST(TtxCompiler, padding_equivalence) {
   };
 
   const auto different =
-      Schema::composite(shifted.get_view().slice(0, 2), 12, 4);
+      Form::Schema::composite(shifted.get_view().slice(0, 2), 12, 4);
   EXPECT_NOT(prepare(forms[0]).compatible(prepare(different)));
 }
 
@@ -235,16 +239,18 @@ VALIDATION_TEST(TtxCompiler, padding_equivalence) {
 // their repeated descriptor and child body to the comparison.
 VALIDATION_TEST(TtxCompiler, repeated_padding) {
   Preparation prepare;
-  const Perimortem::Core::Storage::Vector<Schema::Position, 1> child = {
+  const Storage::Vector<Form::Schema::Position, 1> child = {
     {
-      Schema::Position(integer, 0),
+      Form::Schema::Position(integer, 0),
     },
   };
 
-  const auto padded = Schema::composite(child.get_view().slice(0, 1), 8, 4);
-  const auto compact = Schema::composite(child.get_view().slice(0, 1), 4, 4);
-  const auto a = Schema::range(padded, 1000000000, 8, 8000000000, 4);
-  const auto b = Schema::range(compact, 1000000000, 8, 8000000000, 4);
+  const auto padded =
+      Form::Schema::composite(child.get_view().slice(0, 1), 8, 4);
+  const auto compact =
+      Form::Schema::composite(child.get_view().slice(0, 1), 4, 4);
+  const auto a = Form::Schema::range(padded, 1000000000, 8, 8000000000, 4);
+  const auto b = Form::Schema::range(compact, 1000000000, 8, 8000000000, 4);
   EXPECT_NOT(prepare(a).compatible(prepare(b)));
 }
 
@@ -252,9 +258,9 @@ VALIDATION_TEST(TtxCompiler, repeated_padding) {
 // the wrapper adds no bytes. Comparison preserves that extra struct boundary.
 VALIDATION_TEST(TtxCompiler, nested_group_match) {
   Preparation prepare;
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> pair = {
+  const Storage::Vector<Form::Schema::Position, 2> pair = {
     {
-      Schema::Position(integer, 0),
+      Form::Schema::Position(integer, 0),
       {
         integer,
         4,
@@ -262,10 +268,10 @@ VALIDATION_TEST(TtxCompiler, nested_group_match) {
     },
   };
 
-  const auto group = Schema::composite(pair.get_view().slice(0, 2), 8, 4);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 2> fields = {
+  const auto group = Form::Schema::composite(pair.get_view().slice(0, 2), 8, 4);
+  const Storage::Vector<Form::Schema::Position, 2> fields = {
     {
-      Schema::Position(group, 0),
+      Form::Schema::Position(group, 0),
       {
         integer,
         8,
@@ -273,16 +279,18 @@ VALIDATION_TEST(TtxCompiler, nested_group_match) {
     },
   };
 
-  const auto flat = Schema::composite(fields.get_view().slice(0, 2), 12, 4);
-  const Perimortem::Core::Storage::Vector<Schema::Position, 1> wrapper = {
+  const auto flat =
+      Form::Schema::composite(fields.get_view().slice(0, 2), 12, 4);
+  const Storage::Vector<Form::Schema::Position, 1> wrapper = {
     {
-      Schema::Position(flat, 0),
+      Form::Schema::Position(flat, 0),
     },
   };
 
-  const auto nested = Schema::composite(wrapper.get_view().slice(0, 1), 12, 4);
+  const auto nested =
+      Form::Schema::composite(wrapper.get_view().slice(0, 1), 12, 4);
   EXPECT_NOT(prepare(nested).compatible(prepare(flat)));
 
-  const auto ungrouped = Schema::range(integer, 3, 4, 12, 4);
+  const auto ungrouped = Form::Schema::range(integer, 3, 4, 12, 4);
   EXPECT_NOT(prepare(nested).compatible(prepare(ungrouped)));
 }

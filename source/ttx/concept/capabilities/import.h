@@ -32,7 +32,7 @@ typedef struct ttx_import {
 
 typedef struct ttx_import_ops {
   ttx_abstract_ops abstract;
-  ttx_binding_status (*visit)(
+  ttx_negotiation_status (*visit)(
       void* context,
       const void* input,
       const ttx_representation* representation,
