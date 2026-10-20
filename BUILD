@@ -13,7 +13,7 @@ package(
     components = {
         "data": [],
         "semantic": ["data"],
-        "concept": [
+        "graph": [
             "data",
             "semantic",
         ],

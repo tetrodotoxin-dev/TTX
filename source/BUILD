@@ -7,7 +7,7 @@ package(default_visibility = ["//visibility:public"])
 _COMPONENTS = {
     "data": [],
     "semantic": ["data"],
-    "concept": [
+    "graph": [
         "data",
         "semantic",
     ],

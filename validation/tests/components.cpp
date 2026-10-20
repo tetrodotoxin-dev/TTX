@@ -5,12 +5,12 @@
 
 #include "perimortem/core/algorithm/search.hpp"
 
-#include "ttx/concept/abstract.hpp"
-#include "ttx/concept/policies/unknown.hpp"
+#include "ttx/graph/abstract.hpp"
+#include "ttx/graph/policies/unknown.hpp"
 
 using namespace Perimortem::Core;
 using namespace Toolchain::Validation;
-using namespace Ttx::Concept;
+using namespace Ttx::Graph;
 using namespace Ttx::Semantic;
 
 #if __has_include("perimortem/compression/deflate.hpp")

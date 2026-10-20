@@ -5,7 +5,7 @@
 
 #if __has_include(                           \
     "ttx/semantic/negotiation/query.hpp") || \
-    __has_include("ttx/concept/abstract.hpp")
+    __has_include("ttx/graph/abstract.hpp")
 #error The Data component exposed a higher layer.
 #endif
 

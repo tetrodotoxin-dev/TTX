@@ -4,8 +4,8 @@
 #include "ttx/data/transfer.hpp"
 #include "ttx/semantic/negotiation/query.hpp"
 
-#if __has_include("ttx/concept/abstract.h")
-#error The Semantic component exposed Concept.
+#if __has_include("ttx/graph/abstract.h")
+#error The Semantic component exposed Graph.
 #endif
 
 using namespace Perimortem::Core;

@@ -4,7 +4,7 @@
 #ifndef VALIDATION_BOOTSTRAP_PROVIDER_H
 #define VALIDATION_BOOTSTRAP_PROVIDER_H
 
-#include "ttx/concept/abstract.h"
+#include "ttx/graph/abstract.h"
 
 #define BOOTSTRAP_EXPORTS_HIGH 0x3d46d55e985b4c16ULL
 #define BOOTSTRAP_EXPORTS_LOW 0x86ee85a33be1458aULL

@@ -76,7 +76,7 @@ def check():
                     "--distdir=" + str(directory),
                 ], cwd=workspace, check=True)
             print(
-                linkage + " candidate SDK: Data, Semantic, Concept consumers "
+                linkage + " candidate SDK: Data, Semantic, Graph consumers "
                 "and contract tests passed.", flush=True)
 
 

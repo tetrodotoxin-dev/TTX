@@ -23,8 +23,8 @@ alias(
 )
 
 alias(
-    name = "concept",
-    actual = "@ttx//:concept",
+    name = "graph",
+    actual = "@ttx//:graph",
     visibility = ["//visibility:public"],
 )
 

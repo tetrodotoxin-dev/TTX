@@ -1,0 +1,20 @@
+// # Tetrodotoxin
+// Copyright (c) 2023-present Matt Kaes and contributors
+
+#ifndef VALIDATION_GRAPH_OBSERVATION_H
+#define VALIDATION_GRAPH_OBSERVATION_H
+
+#include "ttx/graph/abstract.h"
+
+typedef struct observation_subject {
+  const ttx_representation* abstract_form;
+  const ttx_representation* marker_form;
+  U8 value;
+  ttx_abstract selected;
+  ttx_negotiation_status answer;
+  Count binds;
+} observation_subject;
+
+C_LINKAGE ttx_abstract observation_abstract(observation_subject* subject);
+
+#endif

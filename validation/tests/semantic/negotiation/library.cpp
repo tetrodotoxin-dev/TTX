@@ -9,8 +9,8 @@
 #include "perimortem/core/diagnostics/log.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/concept/abstract.hpp"
 #include "ttx/data/transfer.hpp"
+#include "ttx/graph/abstract.hpp"
 #include "ttx/semantic/negotiation/library.h"
 #include "validation/providers/abstract/provider.h"
 
@@ -19,7 +19,7 @@ using namespace Perimortem::Memory;
 using namespace Perimortem::Serialization;
 using namespace Perimortem::System;
 using namespace Toolchain::Validation;
-using namespace Ttx::Concept;
+using namespace Ttx::Graph;
 using namespace Ttx::Data;
 using namespace Ttx::Semantic;
 

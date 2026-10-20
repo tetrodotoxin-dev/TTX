@@ -1,10 +1,10 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#ifndef VALIDATION_CONCEPT_COMPOSITION_H
-#define VALIDATION_CONCEPT_COMPOSITION_H
+#ifndef VALIDATION_GRAPH_COMPOSITION_H
+#define VALIDATION_GRAPH_COMPOSITION_H
 
-#include "ttx/concept/capabilities/retain.h"
+#include "ttx/graph/capabilities/retain.h"
 
 #define COMPOSITION_ID_HIGH 0x51e5f3f94e93471fULL
 #define EXPRESSION_ID_LOW 0xbb18658950679f12ULL

@@ -6,11 +6,11 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "ttx/concept/capabilities/callable.h"
-#include "ttx/concept/capabilities/retain.h"
-#include "ttx/concept/policies/none.h"
-#include "ttx/concept/policies/unknown.h"
 #include "ttx/data/transfer.h"
+#include "ttx/graph/capabilities/callable.h"
+#include "ttx/graph/capabilities/retain.h"
+#include "ttx/graph/policies/none.h"
+#include "ttx/graph/policies/unknown.h"
 #include "ttx/semantic/realization/invocation.h"
 #include "validation/providers/representation.h"
 
@@ -52,7 +52,7 @@ static ttx_abstract lookup(void* context, perimortem_view_bytes route) {
   return ttx_none();
 }
 
-static void visit(void* context, ttx_concept_visitor callback) {
+static void visit(void* context, ttx_graph_visitor callback) {
   (void)context;
   (void)callback;
 }

@@ -8,14 +8,14 @@
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/concept/abstract.hpp"
-#include "ttx/concept/policies/unknown.h"
 #include "ttx/data/transfer.hpp"
+#include "ttx/graph/abstract.hpp"
+#include "ttx/graph/policies/unknown.h"
 #include "ttx/semantic/negotiation/library.h"
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Serialization;
-using namespace Ttx::Concept;
+using namespace Ttx::Graph;
 using namespace Ttx::Data;
 
 TTX_DATA_RECORD(
@@ -63,7 +63,7 @@ struct Root {
     return ttx_unknown();
   }
 
-  static auto visit(void* context, ttx_concept_visitor callback) -> void {}
+  static auto visit(void* context, ttx_graph_visitor callback) -> void {}
 
   static constexpr ttx_abstract_ops operations = {supports, bind,   data,
                                                   resolve,  lookup, visit};

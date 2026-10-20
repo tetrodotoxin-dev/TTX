@@ -23,5 +23,5 @@ cc_binary(
 cc_binary(
     name = "cpp_consumer",
     srcs = ["consumer.cpp"],
-    deps = ["//:concept"],
+    deps = ["//:graph"],
 )

@@ -1,10 +1,10 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/concept/policies/none.hpp"
 #include "ttx/data/transfer.hpp"
+#include "ttx/graph/policies/none.hpp"
 
-using namespace Ttx::Concept;
+using namespace Ttx::Graph;
 using namespace Ttx::Data;
 
 S32 main() {

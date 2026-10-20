@@ -52,7 +52,7 @@ semantic graph:
   representations, with protocols for accessing and transferring data.
 - [Semantics](source/ttx/semantic) negotiates contracts and their representations,
   connecting the agreed behavior to interfaces that can perform the work.
-- [Concepts](source/ttx/concept) exposes full abstract interfaces and their
+- [Graph](source/ttx/graph) exposes full abstract interfaces and their
   composable relationships as a queryable graph. Each interface can offer
   capabilities and policies through further negotiation.
 

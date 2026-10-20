@@ -8,9 +8,9 @@
 
 #include "toolchain/export.h"
 
-#include "ttx/concept/policies/constant.h"
-#include "ttx/concept/policies/none.h"
 #include "ttx/data/transfer.h"
+#include "ttx/graph/policies/constant.h"
+#include "ttx/graph/policies/none.h"
 
 static const ttx_abstract_ops abstract_operations;
 static const ttx_retained_ops retained_operations;
@@ -141,7 +141,7 @@ static ttx_abstract lookup(void* context, perimortem_view_bytes route) {
              : ttx_none();
 }
 
-static void visit(void* context, ttx_concept_visitor callback) {
+static void visit(void* context, ttx_graph_visitor callback) {
   composition_subject* source = context;
   const composition_subject* subject = checked(source);
   ++subject->state->visits;

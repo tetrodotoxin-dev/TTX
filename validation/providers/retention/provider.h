@@ -4,7 +4,7 @@
 #ifndef VALIDATION_RETENTION_PROVIDER_H
 #define VALIDATION_RETENTION_PROVIDER_H
 
-#include "ttx/concept/capabilities/create.h"
+#include "ttx/graph/capabilities/create.h"
 
 typedef struct retention_statistics {
   Count callbacks;
