@@ -18,7 +18,8 @@ typedef struct expression {
 
 typedef struct expression_ops {
   U64 (*evaluate)(void*);
-  ttx_abstract_ops abstract;
+  ttx_abstract (*get_abstract)(void* context);
+  ttx_abstract (*other)(void* context);
 } expression_ops;
 
 typedef struct retained_expression {
@@ -28,7 +29,7 @@ typedef struct retained_expression {
 
 typedef struct retained_expression_ops {
   U64 (*evaluate)(void*);
-  ttx_retained_ops retained;
+  ttx_retained (*get_retained)(void* context);
 } retained_expression_ops;
 
 typedef struct composition_subject {
@@ -36,25 +37,27 @@ typedef struct composition_subject {
   U8 acquired;
 } composition_subject;
 
-typedef struct composition_forms {
-  const ttx_representation* abstract;
-  const ttx_representation* retain;
-  const ttx_representation* retained;
-  const ttx_representation* expression;
-  const ttx_representation* qualified;
-} composition_forms;
+// The typed binding uses a different layout and context from its graph node.
+// Only the expression operations interpret this record.
+typedef struct composition_expression {
+  U64 guard;
+  composition_subject* graph;
+} composition_expression;
 
 typedef struct composition_state {
   composition_subject weak;
   composition_subject retained;
-  composition_forms forms;
+  composition_subject weak_returned;
+  composition_subject retained_returned;
+  composition_expression weak_expression;
+  composition_expression retained_expression;
   U64 value, snapshot, references, acquisitions, releases, binds, visits;
   ttx_negotiation_status additional;
   U8 qualified;
+  U8 refuse_bindings;
 } composition_state;
 
-typedef ttx_abstract (
-    *composition_open_function)(composition_state*, composition_forms);
+typedef ttx_abstract (*composition_open_function)(composition_state*);
 typedef ttx_negotiation_status (
     *composition_acquire_function)(composition_state*, retained_expression*);
 #endif

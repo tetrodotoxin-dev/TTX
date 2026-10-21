@@ -29,33 +29,49 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(bootstrap_indexed, get));
 
 struct Root {
+  static auto state(void* context) -> ttx_abstract_state {
+    return TTX_ABSTRACT_PRESENT;
+  }
+
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     return Formats::Uuid(id) == Abstract::contract_id
                ? TTX_NEGOTIATION_SATISFIED
                : TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto resolve(void* context) -> ttx_abstract {
+  static auto get_abstract(void* context) -> ttx_abstract {
     return {context, &operations};
   }
 
-  static auto bind(void* context, perimortem_uuid id, ttx_storage target)
+  static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
-    if (supports(context, id) != TTX_NEGOTIATION_SATISFIED) {
-      return TTX_NEGOTIATION_UNKNOWN;
+    const auto status = supports(context, id);
+    if (status != TTX_NEGOTIATION_SATISFIED) {
+      return status;
     }
 
-    auto api = resolve(context);
-    return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
+    *Data::cast<ttx_abstract>(output) = get_abstract(context);
+    return TTX_NEGOTIATION_SATISFIED;
+  }
+
+  static auto query_bind(void* context, perimortem_uuid id, ttx_storage output)
+      -> ttx_negotiation_status {
+    const auto status = supports(context, id);
+    if (status != TTX_NEGOTIATION_SATISFIED) {
+      return status;
+    }
+
+    auto api = get_abstract(context);
+    return Transfer::copy(Form::Storage::from(api), Form::Storage(output)) ==
                    Status::Success
                ? TTX_NEGOTIATION_SATISFIED
                : TTX_NEGOTIATION_REJECTED;
-  }
-
-  static auto data(void* context) -> perimortem_view_bytes {
-    const auto bytes = "hello"_view;
-    return {bytes.get_data(), bytes.get_size()};
   }
 
   static auto lookup(void* context, perimortem_view_bytes route)
@@ -65,8 +81,8 @@ struct Root {
 
   static auto visit(void* context, ttx_graph_visitor callback) -> void {}
 
-  static constexpr ttx_abstract_ops operations = {supports, bind,   data,
-                                                  resolve,  lookup, visit};
+  static constexpr ttx_abstract_ops operations = {
+    supports, bind, lookup, visit, state};
 };
 
 struct Module {
@@ -80,7 +96,7 @@ auto visit(
     void* context,
     void* callback_context,
     void (*callback)(void*, ttx_abstract)) -> void {
-  callback(callback_context, Root::resolve(context));
+  callback(callback_context, Root::get_abstract(context));
 }
 
 auto count(void* context) -> U64 {
@@ -88,7 +104,7 @@ auto count(void* context) -> U64 {
 }
 
 auto get(void* context, U64 index) -> ttx_abstract {
-  return index == 0 ? Root::resolve(context) : ttx_unknown();
+  return index == 0 ? Root::get_abstract(context) : ttx_unknown();
 }
 
 auto supports(void* context, perimortem_uuid id) -> ttx_negotiation_status {
@@ -114,11 +130,11 @@ auto bind(void* context, perimortem_uuid id, ttx_storage target)
 
   const Formats::Uuid contract(id);
   if (contract == Abstract::contract_id) {
-    return Root::bind(&state.root, id, target);
+    return Root::query_bind(&state.root, id, target);
   }
 
   if (contract == Formats::Uuid(BOOTSTRAP_QUERY_HIGH, BOOTSTRAP_QUERY_LOW)) {
-    ttx_semantic_query api{&state.root, Root::bind, Root::supports};
+    ttx_semantic_query api{&state.root, Root::query_bind, Root::supports};
     return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
                    Status::Success
                ? TTX_NEGOTIATION_SATISFIED

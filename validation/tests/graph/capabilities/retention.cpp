@@ -11,7 +11,7 @@
 #include "ttx/graph/capabilities/create.hpp"
 #include "ttx/graph/capabilities/retain.hpp"
 #include "ttx/graph/policies/none.hpp"
-#include "ttx/semantic/realization/invocation.h"
+#include "ttx/semantic/realization/invocation.hpp"
 #include "validation/providers/retention/provider.h"
 #include "validation/support/library.hpp"
 
@@ -64,7 +64,7 @@ VALIDATION_TEST(Retention, create_retain_invoke_release) {
               [&](Negotiation::Status) { EXPECT(False); });
         },
 
-        [&](Negotiation::Status) { EXPECT(False); });
+        [&]() { EXPECT(False); });
   };
 
   factory.bind<Capabilities::Create>().visit(
@@ -75,7 +75,7 @@ VALIDATION_TEST(Retention, create_retain_invoke_release) {
             Negotiation::Status::Satisfied);
       },
 
-      [&](Negotiation::Status) { EXPECT(False); });
+      [&]() { EXPECT(False); });
 
   ASSERT(retained);
   EXPECT_EQ(foreign.api.statistics().callbacks, Count(1));
@@ -95,7 +95,7 @@ VALIDATION_TEST(Retention, create_retain_invoke_release) {
                   Negotiation::Status::Satisfied);
             },
 
-            [&](Negotiation::Status) { EXPECT(False); });
+            [&]() { EXPECT(False); });
         EXPECT_EQ(foreign.api.statistics().acquisitions, Count(1));
 
         copied.get_abstract().bind<Capabilities::Callable>().visit(
@@ -112,45 +112,47 @@ VALIDATION_TEST(Retention, create_retain_invoke_release) {
                     ASSERT(
                         description.get_representation().compatible(*api_form));
 
-                    ttx_invocation operation = {};
-                    const ttx_storage target = {
-                      api_form, Data::cast<U8>(&operation), sizeof(operation)};
+                    const auto binding =
+                        callable.get_abstract().bind<Realization::Invocation>(
+                            description.get_contract());
+                    ASSERT(binding);
+                    binding.visit(
+                        [&](Realization::Invocation invoked) {
+                          const auto operation = invoked.get_abi();
+                          const auto& integer =
+                              Form::Compiled<Form::Native<U64>::reference>::
+                                  get_representation();
+                          const Bool compatible =
+                              operation.inputs && operation.outputs &&
+                              integer.compatible(*operation.inputs) &&
+                              integer.compatible(*operation.outputs) &&
+                              integer.compatible(description.get_inputs()
+                                                     .get_representation()) &&
+                              integer.compatible(description.get_outputs()
+                                                     .get_representation());
+                          ASSERT(compatible);
 
-                    ASSERT_EQ(ttx_storage_check(target), TTX_DATA_SUCCESS);
+                          const U64 amount = 1;
+                          U64 outcome = 0;
+                          ASSERT_EQ(
+                              operation.invoke(
+                                  operation.context, &amount, &outcome),
+                              TTX_DATA_SUCCESS);
+                          EXPECT_EQ(outcome, U64(42));
+                          ASSERT_EQ(
+                              operation.invoke(
+                                  operation.context, &amount, &outcome),
+                              TTX_DATA_SUCCESS);
+                          EXPECT_EQ(outcome, U64(43));
+                        },
 
-                    const auto status = callable.get_abstract().bind_interface(
-                        description.get_contract(), Form::Storage(target));
-                    ASSERT(status == Negotiation::Status::Satisfied);
-                    ASSERT(operation.invoke);
-
-                    const auto& integer = Form::Compiled<
-                        Form::Native<U64>::reference>::get_representation();
-                    const Bool compatible =
-                        operation.inputs && operation.outputs &&
-                        integer.compatible(*operation.inputs) &&
-                        integer.compatible(*operation.outputs) &&
-                        integer.compatible(
-                            description.get_inputs().get_representation()) &&
-                        integer.compatible(
-                            description.get_outputs().get_representation());
-                    ASSERT(compatible);
-
-                    const U64 amount = 1;
-                    U64 outcome = 0;
-                    ASSERT_EQ(
-                        operation.invoke(operation.context, &amount, &outcome),
-                        TTX_DATA_SUCCESS);
-                    EXPECT_EQ(outcome, U64(42));
-                    ASSERT_EQ(
-                        operation.invoke(operation.context, &amount, &outcome),
-                        TTX_DATA_SUCCESS);
-                    EXPECT_EQ(outcome, U64(43));
+                        [&] { EXPECT(False); });
                   },
 
                   [&](Negotiation::Status) { EXPECT(False); });
             },
 
-            [&](Negotiation::Status) { EXPECT(False); });
+            [&]() { EXPECT(False); });
 
         // A second `retain` call creates its own release obligation even when
         // both Retained results use the same context. After releasing the first
@@ -163,7 +165,7 @@ VALIDATION_TEST(Retention, create_retain_invoke_release) {
                   [&](Negotiation::Status) { EXPECT(False); });
             },
 
-            [&](Negotiation::Status) { EXPECT(False); });
+            [&]() { EXPECT(False); });
         EXPECT(second);
         EXPECT_EQ(foreign.api.statistics().acquisitions, Count(2));
         copied.release();
@@ -205,7 +207,7 @@ VALIDATION_TEST(Retention, refused_creation_and_retention) {
               Negotiation::Status(failure));
         },
 
-        [&](Negotiation::Status) { EXPECT(False); });
+        [&]() { EXPECT(False); });
     EXPECT_EQ(foreign.api.statistics().callbacks, Count(0));
 
     foreign.api.configure(TTX_NEGOTIATION_SATISFIED, failure);
@@ -224,7 +226,7 @@ VALIDATION_TEST(Retention, refused_creation_and_retention) {
                 });
           },
 
-          [&](Negotiation::Status) { EXPECT(False); });
+          [&]() { EXPECT(False); });
     };
 
     factory.bind<Capabilities::Create>().visit(
@@ -235,7 +237,7 @@ VALIDATION_TEST(Retention, refused_creation_and_retention) {
               Negotiation::Status::Satisfied);
         },
 
-        [&](Negotiation::Status) { EXPECT(False); });
+        [&]() { EXPECT(False); });
     EXPECT_EQ(foreign.api.statistics().callbacks, Count(1));
     EXPECT_EQ(foreign.api.statistics().acquisitions, Count(0));
     EXPECT_EQ(foreign.api.statistics().releases, Count(0));

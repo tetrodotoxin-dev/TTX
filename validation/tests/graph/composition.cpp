@@ -22,45 +22,29 @@ using namespace Ttx::Graph;
 using namespace Ttx::Data;
 using namespace Ttx::Semantic;
 
-TTX_DATA_RECORD(
-    expression_ops,
-    TTX_DATA_MEMBER(expression_ops, evaluate),
-    TTX_DATA_MEMBER(expression_ops, abstract));
-TTX_DATA_RECORD(
-    expression,
-    TTX_DATA_MEMBER(expression, context),
-    TTX_DATA_MEMBER(expression, operations));
-TTX_DATA_RECORD(
-    retained_expression_ops,
-    TTX_DATA_MEMBER(retained_expression_ops, evaluate),
-    TTX_DATA_MEMBER(retained_expression_ops, retained));
-TTX_DATA_RECORD(
-    retained_expression,
-    TTX_DATA_MEMBER(retained_expression, context),
-    TTX_DATA_MEMBER(retained_expression, operations));
-
-// These contracts place evaluation before the embedded Abstract table. Each
-// consumer keeps the complete negotiated record and selects that member
-// explicitly.
+// Evaluation and graph reentry are independent supplied operations. These
+// fixture contracts need only a UUID and their agreed C records.
 class Expression {
  public:
   using Api = expression;
   static constexpr auto contract_id =
       Formats::Uuid(COMPOSITION_ID_HIGH, EXPRESSION_ID_LOW);
-  static auto accept(Api api) -> Bool {
-    return api.operations && api.operations->evaluate &&
-           Abstract::accept({api.context, &api.operations->abstract});
-  }
 
   // Explicit construction marks an unchecked conversion of the complete C
   // record. The provider supplies the evaluation and Abstract contracts.
   explicit Expression(Api api) : api(api) {}
 
+  auto get_abi() const -> Api { return api; }
+
   auto get_abstract() const -> Abstract {
-    return Abstract(api.context, api.operations->abstract);
+    return Abstract(api.operations->get_abstract(api.context));
   }
 
   auto evaluate() const -> U64 { return api.operations->evaluate(api.context); }
+
+  auto other() const -> Abstract {
+    return Abstract(api.operations->other(api.context));
+  }
 
  private:
   Api api;
@@ -71,17 +55,13 @@ class RetainedExpression {
   using Api = retained_expression;
   static constexpr auto contract_id =
       Formats::Uuid(COMPOSITION_ID_HIGH, RETAINED_EXPRESSION_ID_LOW);
-  static auto accept(Api api) -> Bool {
-    return api.operations && api.operations->evaluate &&
-           Policies::Retained::accept({api.context, &api.operations->retained});
-  }
 
   // Copies an acquired C record under its original release obligation.
   // Explicit construction marks this unchecked conversion from the C record.
   explicit RetainedExpression(Api api) : api(api) {}
 
   auto get_retained() const -> Policies::Retained {
-    return Policies::Retained({api.context, &api.operations->retained});
+    return Policies::Retained(api.operations->get_retained(api.context));
   }
 
   auto get_abstract() const -> Abstract {
@@ -122,23 +102,7 @@ VALIDATION_TEST(Composition, foreign_qualified_answer) {
   state.qualified = 1;
   state.additional = TTX_NEGOTIATION_UNKNOWN;
 
-  const composition_forms forms = composition_forms(
-      &Form::Compiled<
-           Form::Native<Abstract::Api>::reference>::get_representation()
-           .get_abi(),
-      &Form::Compiled<Form::Native<Capabilities::Retain::Api>::reference>::
-           get_representation()
-               .get_abi(),
-      &Form::Compiled<Form::Native<Policies::Retained::Api>::reference>::
-           get_representation()
-               .get_abi(),
-      &Form::Compiled<
-           Form::Native<Expression::Api>::reference>::get_representation()
-           .get_abi(),
-      &Form::Compiled<Form::Native<RetainedExpression::Api>::reference>::
-           get_representation()
-               .get_abi());
-  const Abstract weak(open(&state, forms));
+  const Abstract weak(open(&state));
   EXPECT(weak.supports<Expression>() == Negotiation::Status::Satisfied);
   EXPECT_EQ(state.acquisitions, U64(0));
 
@@ -190,10 +154,10 @@ VALIDATION_TEST(Composition, foreign_qualified_answer) {
                   Negotiation::Status::Rejected);
             },
 
-            [&](Negotiation::Status) { EXPECT(False); });
+            [&]() { EXPECT(False); });
       },
 
-      [&](Negotiation::Status) { EXPECT(False); });
+      [&]() { EXPECT(False); });
 
   U64 visited = 0;
   auto visit = [&](View::Bytes route, Abstract value) {
@@ -213,10 +177,7 @@ VALIDATION_TEST(Composition, foreign_qualified_answer) {
       answer.get_abstract().supports<Expression>() ==
       Negotiation::Status::Satisfied);
   answer.get_abstract().bind<RetainedExpression>().visit(
-      [&](RetainedExpression) { EXPECT(False); },
-      [&](Negotiation::Status failure) {
-        EXPECT(failure == Negotiation::Status::Rejected);
-      });
+      [&](RetainedExpression) { EXPECT(False); }, [&] {});
 
   answer.get_abstract().bind<Capabilities::Retain>().visit(
       [&](Capabilities::Retain request) {
@@ -236,8 +197,92 @@ VALIDATION_TEST(Composition, foreign_qualified_answer) {
             [&](Negotiation::Status) { EXPECT(False); });
       },
 
-      [&](Negotiation::Status) { EXPECT(False); });
+      [&]() { EXPECT(False); });
   EXPECT_EQ(state.references, U64(0));
   EXPECT_EQ(state.acquisitions, U64(2));
   EXPECT_EQ(state.releases, U64(2));
+}
+
+// Graph location survives binding through a typed context with a different
+// layout. Typed reads identify the fixture state reached after each round
+// trip. Context comparisons separately establish that the API records differ.
+VALIDATION_TEST(Composition, substituted_round_trip) {
+  auto library = Validation::Support::open_library("libcomposition.so"_view);
+  auto open = Data::cast<__remove_pointer(composition_open_function)>(
+      Validation::Support::find_symbol(library, "composition_open"_view));
+  auto acquire = Data::cast<__remove_pointer(composition_acquire_function)>(
+      Validation::Support::find_symbol(library, "composition_acquire"_view));
+
+  composition_state state{};
+  state.value = 42;
+  state.qualified = 1;
+
+  const Abstract discovery(open(&state));
+  retained_expression acquired{};
+  ASSERT_EQ(acquire(&state, &acquired), TTX_NEGOTIATION_SATISFIED);
+
+  const RetainedExpression retained(acquired);
+  const auto origin = retained.get_abstract();
+  auto returned = origin;
+
+  origin.bind<Capabilities::Retain>().visit(
+      [&](Capabilities::Retain request) {
+        EXPECT(request.get_abi().context != origin.get_abi().context);
+        EXPECT(
+            request.get_abstract().get_abi().context !=
+            request.get_abi().context);
+        request.get_abstract().bind<Expression>().visit(
+            [&](Expression value) { EXPECT_EQ(value.evaluate(), U64(42)); },
+            [&] { EXPECT(False); });
+      },
+
+      [&] { EXPECT(False); });
+
+  for (Count index = 0; index < 4; ++index) {
+    returned.bind<Expression>().visit(
+        [&](Expression value) {
+          EXPECT(value.get_abi().context != origin.get_abi().context);
+          EXPECT_EQ(value.evaluate(), state.snapshot);
+          returned = value.get_abstract();
+          EXPECT(returned.get_abi().context != value.get_abi().context);
+          EXPECT(returned.get_abi().context != origin.get_abi().context);
+          EXPECT(returned.get_state() == Abstract::State::Present);
+
+          returned.bind<Policies::Constant>().visit(
+              [&](Policies::Constant policy) {
+                returned = policy.get_abstract();
+              },
+
+              [&] { EXPECT(False); });
+
+          // The fixture's other operation returns None, while get_abstract
+          // reaches the retained expression. These two results exercise
+          // arbitrary typed reentry and the explicit return promise.
+          EXPECT(value.other().get_state() == Abstract::State::None);
+        },
+
+        [&] { EXPECT(False); });
+
+    ++state.snapshot;
+  }
+
+  // Constant fixes selection, while the provider can change the typed data.
+  // Later binding refusal leaves earlier supplied operations usable.
+  returned.bind<Expression>().visit(
+      [&](Expression value) {
+        EXPECT_EQ(value.evaluate(), U64(46));
+        state.refuse_bindings = 1;
+        EXPECT_NOT(value.get_abstract().bind<Expression>());
+        EXPECT_NOT(value.get_abstract().bind<Abstract>());
+        EXPECT(value.get_abstract().get_state() == Abstract::State::Present);
+        EXPECT_EQ(value.evaluate(), U64(46));
+      },
+
+      [&] { EXPECT(False); });
+
+  EXPECT_EQ(state.acquisitions, U64(1));
+  EXPECT_EQ(state.releases, U64(0));
+  retained.get_retained().release();
+  EXPECT_EQ(state.releases, U64(1));
+  EXPECT_EQ(state.references, U64(0));
 }

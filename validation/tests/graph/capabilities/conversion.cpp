@@ -8,13 +8,13 @@
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/data/transfer.hpp"
 #include "ttx/graph/capabilities/export.hpp"
 #include "ttx/graph/capabilities/import.hpp"
 #include "ttx/graph/capabilities/retain.hpp"
 #include "ttx/graph/policies/constant.hpp"
 #include "ttx/graph/policies/none.hpp"
 #include "ttx/graph/policies/unknown.h"
+#include "validation/tests/graph/fixtures/value.hpp"
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Serialization;
@@ -31,8 +31,17 @@ class Report {
   U8 value = 0;
   Negotiation::Status status = Negotiation::Status::Satisfied;
 
+  static auto state(void* context) -> ttx_abstract_state {
+    return TTX_ABSTRACT_PRESENT;
+  }
+
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     auto& report = *Data::cast<Report>(context);
     if (Formats::Uuid(id) == Abstract::contract_id) {
       return TTX_NEGOTIATION_SATISFIED;
@@ -43,7 +52,7 @@ class Report {
                : TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto bind(void* context, perimortem_uuid id, ttx_storage output)
+  static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
     const auto status = supports(context, id);
     if (status != TTX_NEGOTIATION_SATISFIED) {
@@ -51,24 +60,18 @@ class Report {
     }
 
     if (Formats::Uuid(id) == Abstract::contract_id) {
-      Abstract::Api api = resolve(context);
-      return Transfer::copy(Form::Storage::from(api), Form::Storage(output)) ==
-                     Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      Abstract::Api api = get_abstract(context);
+      *Data::cast<Abstract::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     Capabilities::Export::Api api = {context, &operations};
-    return Transfer::copy(Form::Storage::from(api), Form::Storage(output)) ==
-                   Status::Success
-               ? TTX_NEGOTIATION_SATISFIED
-               : TTX_NEGOTIATION_REJECTED;
+    *Data::cast<Capabilities::Export::Api>(output) = api;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
-  static auto data(void* context) -> perimortem_view_bytes { return {}; }
-
-  static auto resolve(void* context) -> ttx_abstract {
-    return {context, &operations.abstract};
+  static auto get_abstract(void* context) -> ttx_abstract {
+    return {context, &graph_operations};
   }
 
   static auto lookup(void* context, perimortem_view_bytes route)
@@ -82,13 +85,19 @@ class Report {
       -> ttx_negotiation_status {
     auto& report = *Data::cast<Report>(context);
     ++report.calls;
-    report.value = Abstract(subject).get_data()[0];
-    return TTX_NEGOTIATION_SATISFIED;
+    return Abstract(subject).bind<Validation::Value>().visit(
+        [&](Validation::Value value) -> ttx_negotiation_status {
+          report.value = value.read();
+          return TTX_NEGOTIATION_SATISFIED;
+        },
+
+        []() -> ttx_negotiation_status { return TTX_NEGOTIATION_REJECTED; });
   }
 
-  static constexpr ttx_export_ops operations = {
-    {supports, bind, data, resolve, lookup, visit},
-    expose};
+  static constexpr ttx_abstract_ops graph_operations = {
+    supports, bind, lookup, visit, state};
+
+  static constexpr ttx_export_ops operations = {get_abstract, expose};
 };
 
 // ImportedByte exposes a byte observation during the import callback. At the
@@ -101,12 +110,25 @@ class ImportedByte {
   Report* report;
   bool at_root;
 
-  static auto data(void* context) -> perimortem_view_bytes {
-    return {&Data::cast<ImportedByte>(context)->value, 1};
+  static auto read(void* context) -> U8 {
+    return Data::cast<ImportedByte>(context)->value;
+  }
+
+  static auto state(void* context) -> ttx_abstract_state {
+    return TTX_ABSTRACT_PRESENT;
   }
 
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
+    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+      return TTX_NEGOTIATION_SATISFIED;
+    }
+
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     auto& subject = *Data::cast<ImportedByte>(context);
     if (Formats::Uuid(id) == Abstract::contract_id) {
       return TTX_NEGOTIATION_SATISFIED;
@@ -117,23 +139,34 @@ class ImportedByte {
                : TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto bind(void* context, perimortem_uuid id, ttx_storage output)
+  static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
-    auto& subject = *Data::cast<ImportedByte>(context);
-    if (Formats::Uuid(id) == Abstract::contract_id) {
-      Abstract::Api api = resolve(context);
-      return Transfer::copy(Form::Storage::from(api), Form::Storage(output)) ==
-                     Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+      *Data::cast<value_api>(output) = {context, read};
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
-    return subject.report && subject.at_root
-               ? Report::bind(subject.report, id, output)
-               : TTX_NEGOTIATION_UNKNOWN;
+    auto& subject = *Data::cast<ImportedByte>(context);
+    if (Formats::Uuid(id) == Abstract::contract_id) {
+      Abstract::Api api = get_abstract(context);
+      *Data::cast<Abstract::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
+    }
+
+    if (subject.report && subject.at_root &&
+        Formats::Uuid(id) == Capabilities::Export::contract_id) {
+      const auto status = Report::supports(subject.report, id);
+      if (status == TTX_NEGOTIATION_SATISFIED) {
+        *Data::cast<ttx_export>(output) = {context, &export_operations};
+      }
+
+      return status;
+    }
+
+    return TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto resolve(void* context) -> ttx_abstract {
+  static auto get_abstract(void* context) -> ttx_abstract {
     return {context, &operations};
   }
 
@@ -142,14 +175,22 @@ class ImportedByte {
     auto& subject = *Data::cast<ImportedByte>(context);
     return subject.report && !subject.at_root &&
                    View::Bytes(route) == "report"_view
-               ? Report::resolve(subject.report)
+               ? Report::get_abstract(subject.report)
                : ttx_none();
   }
 
   static auto visit(void* context, ttx_graph_visitor callback) -> void {}
 
-  static constexpr ttx_abstract_ops operations = {supports, bind,   data,
-                                                  resolve,  lookup, visit};
+  static constexpr ttx_abstract_ops operations = {
+    supports, bind, lookup, visit, state};
+
+  static auto expose(void* context, ttx_abstract abstract)
+      -> ttx_negotiation_status {
+    auto& provider = *Data::cast<ImportedByte>(context);
+    return Report::expose(provider.report, abstract);
+  }
+
+  static constexpr ttx_export_ops export_operations = {get_abstract, expose};
 };
 
 class ByteImport {
@@ -160,8 +201,17 @@ class ByteImport {
   Count reads = 0;
   bool observing = false;
 
+  static auto state(void* context) -> ttx_abstract_state {
+    return TTX_ABSTRACT_PRESENT;
+  }
+
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Import::contract_id
@@ -169,31 +219,25 @@ class ByteImport {
                : TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto bind(void* context, perimortem_uuid id, ttx_storage output)
+  static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
     if (Formats::Uuid(id) == Abstract::contract_id) {
-      Abstract::Api api = resolve(context);
-      return Transfer::copy(Form::Storage::from(api), Form::Storage(output)) ==
-                     Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      Abstract::Api api = get_abstract(context);
+      *Data::cast<Abstract::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     if (Formats::Uuid(id) == Capabilities::Import::contract_id) {
       Capabilities::Import::Api api = {context, &operations};
-      return Transfer::copy(Form::Storage::from(api), Form::Storage(output)) ==
-                     Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      *Data::cast<Capabilities::Import::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     return TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto data(void* context) -> perimortem_view_bytes { return {}; }
-
-  static auto resolve(void* context) -> ttx_abstract {
-    return {context, &operations.abstract};
+  static auto get_abstract(void* context) -> ttx_abstract {
+    return {context, &graph_operations};
   }
 
   static auto lookup(void* context, perimortem_view_bytes route)
@@ -226,22 +270,32 @@ class ByteImport {
     ImportedByte result(
         *Data::cast<const U8>(input), subject.report, subject.at_root);
     subject.observing = true;
-    callback(callback_context, ImportedByte::resolve(&result));
+    callback(callback_context, ImportedByte::get_abstract(&result));
     subject.observing = false;
     return TTX_NEGOTIATION_SATISFIED;
   }
 
-  static constexpr ttx_import_ops operations = {
-    {supports, bind, data, resolve, lookup, visit_routes},
-    visit};
+  static constexpr ttx_abstract_ops graph_operations = {
+    supports, bind, lookup, visit_routes, state};
+
+  static constexpr ttx_import_ops operations = {get_abstract, visit};
 };
 
 class ByteExport {
  public:
   conversion_output output = {0, 0, 0, TTX_NEGOTIATION_SATISFIED};
 
+  static auto state(void* context) -> ttx_abstract_state {
+    return TTX_ABSTRACT_PRESENT;
+  }
+
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Export::contract_id
@@ -249,29 +303,25 @@ class ByteExport {
                : TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto bind(void* context, perimortem_uuid id, ttx_storage output)
+  static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
     if (Formats::Uuid(id) == Abstract::contract_id) {
-      Abstract::Api api = resolve(context);
-      return Transfer::copy(Form::Storage::from(api), Form::Storage(output)) ==
-                     Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      Abstract::Api api = get_abstract(context);
+      *Data::cast<Abstract::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     if (Formats::Uuid(id) == Capabilities::Export::contract_id) {
       Capabilities::Export::Api api = {context, &operations};
-      return Transfer::copy(Form::Storage::from(api), Form::Storage(output)) ==
-                     Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      *Data::cast<Capabilities::Export::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     return TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto resolve(void* context) -> ttx_abstract {
-    return {context, &operations.abstract};
+  static auto get_abstract(void* context) -> ttx_abstract {
+    return {context, &graph_operations};
   }
 
   static auto expose(void* context, ttx_abstract subject)
@@ -279,11 +329,10 @@ class ByteExport {
     return conversion_expose(&Data::cast<ByteExport>(context)->output, subject);
   }
 
-  static constexpr ttx_export_ops operations = {
-    {supports, bind, ByteImport::data, resolve, ByteImport::lookup,
-     ByteImport::visit_routes},
+  static constexpr ttx_abstract_ops graph_operations = {
+    supports, bind, ByteImport::lookup, ByteImport::visit_routes, state};
 
-    expose};
+  static constexpr ttx_export_ops operations = {get_abstract, expose};
 };
 
 VALIDATION_TEST(Conversion, scoped_input) {
@@ -298,7 +347,13 @@ VALIDATION_TEST(Conversion, scoped_input) {
     EXPECT(provider.observing);
     EXPECT(
         graph.supports<Capabilities::Retain>() == Negotiation::Status::Unknown);
-    copied = graph.get_data()[0];
+    copied = graph.bind<Validation::Value>().visit(
+        [](Validation::Value value) { return value.read(); },
+        [&] {
+          EXPECT(False);
+          return U8(0);
+        });
+
     ++calls;
   };
 

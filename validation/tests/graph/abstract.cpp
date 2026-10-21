@@ -12,6 +12,7 @@
 #include "ttx/graph/policies/ordered.hpp"
 #include "ttx/graph/policies/unknown.hpp"
 #include "validation/tests/graph/fixtures/observation.h"
+#include "validation/tests/graph/fixtures/value.hpp"
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Serialization;
@@ -25,29 +26,32 @@ static Harness Abstracts = {
 };
 
 VALIDATION_TEST(Abstracts, c_observations) {
-  observation_subject provider = observation_subject(
-      &Form::Compiled<
-           Form::Native<Abstract::Api>::reference>::get_representation()
-           .get_abi(),
-      &Form::Compiled<Form::Native<Policies::Constant::Api>::reference>::
-           get_representation()
-               .get_abi(),
-      0);
+  observation_subject provider{};
   const Abstract subject(observation_abstract(&provider));
-  subject.get_query().bind<Abstract>().visit(
+  subject.bind<Abstract>().visit(
       [&](Abstract acquired) { EXPECT(acquired == subject); },
-      [&](Negotiation::Status) { EXPECT(False); });
+      [&]() { EXPECT(False); });
   subject.bind<Policies::Constant>().visit(
-      [](Policies::Constant) {}, [&](Negotiation::Status) { EXPECT(False); });
+      [](Policies::Constant) {}, [&]() { EXPECT(False); });
 
-  // Copy the first byte before asking for another observation, which can
-  // replace the provider's buffer. Constant keeps the selection stable while
-  // these byte observations can still change.
-  const U8 first = subject.get_data().get_data()[0];
-  const U8 second = subject.get_data().get_data()[0];
+  // Constant keeps the graph selection stable while successive typed reads
+  // produce independent values from changing provider state.
+  const U8 first = subject.bind<Validation::Value>().visit(
+      [](Validation::Value value) { return value.read(); },
+      [&] {
+        EXPECT(False);
+        return U8(0);
+      });
+
+  const U8 second = subject.bind<Validation::Value>().visit(
+      [](Validation::Value value) { return value.read(); },
+      [&] {
+        EXPECT(False);
+        return U8(0);
+      });
+
   EXPECT_EQ(first, U8(1));
   EXPECT_EQ(second, U8(2));
-  EXPECT(subject.resolve().resolve() == subject);
 
   Count visited = 0;
   auto callback = [&](View::Bytes route, Abstract value) {
@@ -65,40 +69,50 @@ VALIDATION_TEST(Abstracts, c_observations) {
 }
 
 // Copying a const handle preserves its operations. It imposes no constness on
-// the provider, which makes a fresh byte observation on every call.
+// the provider, which makes a fresh typed read on every call.
 VALIDATION_TEST(Abstracts, copied_view) {
-  observation_subject provider = observation_subject(
-      &Form::Compiled<
-           Form::Native<Abstract::Api>::reference>::get_representation()
-           .get_abi(),
-      &Form::Compiled<Form::Native<Policies::Constant::Api>::reference>::
-           get_representation()
-               .get_abi(),
-      0);
+  observation_subject provider{};
   const Abstract subject(observation_abstract(&provider));
   const auto copy = subject;
   EXPECT(copy == subject);
-  EXPECT_EQ(subject.get_data()[0], U8(1));
-  EXPECT_EQ(copy.get_data()[0], U8(2));
-  EXPECT_EQ(subject.get_data()[0], U8(3));
+  EXPECT_EQ(
+      subject.bind<Validation::Value>().visit(
+          [](Validation::Value value) { return value.read(); },
+          [&] {
+            EXPECT(False);
+            return U8(0);
+          }),
+
+      U8(1));
+  EXPECT_EQ(
+      copy.bind<Validation::Value>().visit(
+          [](Validation::Value value) { return value.read(); },
+          [&] {
+            EXPECT(False);
+            return U8(0);
+          }),
+
+      U8(2));
+  EXPECT_EQ(
+      subject.bind<Validation::Value>().visit(
+          [](Validation::Value value) { return value.read(); },
+          [&] {
+            EXPECT(False);
+            return U8(0);
+          }),
+
+      U8(3));
 
   static_assert(sizeof(Abstract) == sizeof(ttx_abstract));
 }
 
 VALIDATION_TEST(Abstracts, fresh_abstract_binding) {
-  observation_subject provider = observation_subject(
-      &Form::Compiled<
-           Form::Native<Abstract::Api>::reference>::get_representation()
-           .get_abi(),
-      &Form::Compiled<Form::Native<Policies::Constant::Api>::reference>::
-           get_representation()
-               .get_abi(),
-      0);
+  observation_subject provider{};
   const Abstract subject(observation_abstract(&provider));
   const auto check = [&](Abstract expected) {
     subject.bind<Abstract>().visit(
         [&](Abstract answer) { EXPECT(answer == expected); },
-        [&](Negotiation::Status) { EXPECT(False); });
+        [&]() { EXPECT(False); });
   };
 
   provider.selected = ttx_none();
@@ -112,67 +126,65 @@ VALIDATION_TEST(Abstracts, fresh_abstract_binding) {
 
   for (auto status : failures) {
     provider.answer = status;
-    subject.bind<Abstract>().visit(
-        [&](Abstract) { EXPECT(False); },
-        [&](Negotiation::Status failure) {
-          EXPECT_EQ(ttx_negotiation_status(failure), status);
-        });
+    subject.bind<Abstract>().visit([&](Abstract) { EXPECT(False); }, [&] {});
   }
 
   EXPECT_EQ(provider.binds, Count(4));
 }
 
-// Resolution returns None, while support on the original Abstract can report
+// A route returns None, while support on the original Abstract can report
 // Rejected or Unknown. Binding still calls that original Abstract's operation.
-// Its policy governs negotiation independently of the result of resolution.
+// Its policy governs negotiation independently of the route result.
 VALIDATION_TEST(Abstracts, encountered_policy) {
   struct Policy {
     ttx_abstract target;
     ttx_negotiation_status answer;
     Count binds = 0;
 
+    static auto state(void* context) -> ttx_abstract_state {
+      return TTX_ABSTRACT_PRESENT;
+    }
+
     static auto supports(void* context, perimortem_uuid id)
         -> ttx_negotiation_status {
+      if (id.high == TTX_NONE_ID_HIGH &&
+          (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+        return TTX_NEGOTIATION_REJECTED;
+      }
+
       return Data::cast<Policy>(context)->answer;
     }
 
-    static auto bind(void* context, perimortem_uuid, ttx_storage)
+    static auto bind(void* context, perimortem_uuid id, void* output)
         -> ttx_negotiation_status {
       ++Data::cast<Policy>(context)->binds;
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    static auto data(void* context) -> perimortem_view_bytes { return {}; }
-
-    static auto resolve(void* context) -> ttx_abstract {
-      return Data::cast<Policy>(context)->target;
-    }
-
     static auto lookup(void* context, perimortem_view_bytes route)
         -> ttx_abstract {
-      return ttx_unknown();
+      return Data::cast<Policy>(context)->target;
     }
 
     static auto visit(void* context, ttx_graph_visitor callback) -> void {}
   } policy{ttx_none(), TTX_NEGOTIATION_REJECTED};
 
-  const ttx_abstract_ops operations = {Policy::supports, Policy::bind,
-                                       Policy::data,     Policy::resolve,
-                                       Policy::lookup,   Policy::visit};
+  const ttx_abstract_ops operations = {
+    Policy::supports, Policy::bind, Policy::lookup, Policy::visit,
+    Policy::state};
 
   const Abstract subject(&policy, operations);
-  EXPECT(subject.resolve() == Abstract(ttx_none()));
-  EXPECT(subject.supports<Policies::None>() == Negotiation::Status::Rejected);
+  EXPECT(subject.resolve_route("selected"_view) == Abstract(ttx_none()));
+  EXPECT(
+      subject.supports<Policies::Constant>() == Negotiation::Status::Rejected);
 
   policy.answer = TTX_NEGOTIATION_UNKNOWN;
-  EXPECT(subject.supports<Policies::None>() == Negotiation::Status::Unknown);
+  EXPECT(
+      subject.supports<Policies::Constant>() == Negotiation::Status::Unknown);
   EXPECT_EQ(policy.binds, Count(0));
 
-  subject.bind<Policies::None>().visit(
-      [&](Policies::None) { EXPECT(False); },
-      [&](Negotiation::Status failure) {
-        EXPECT(failure == Negotiation::Status::Rejected);
-      });
+  subject.bind<Policies::Constant>().visit(
+      [&](Policies::Constant) { EXPECT(False); }, [&] {});
 
   EXPECT_EQ(policy.binds, Count(1));
 }

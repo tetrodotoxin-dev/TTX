@@ -8,14 +8,12 @@
 
 namespace Ttx::Graph::Policies {
 
-// Constant promises that the Abstract and route which supplied this result
-// continue to select the same semantic value. The selected value's outgoing
-// routes and byte observations establish their own promises independently.
-//
-// The governing Abstract preserves this policy through further negotiation.
-// Storage and executable code remain available through the supplying access
-// contract. An acquired Retained result carries its separate release
-// obligation.
+// Constant lets a consumer reuse a graph selection while its supplying access
+// remains valid. It fixes the location from which it was bound, so repeating
+// the supplying route request selects that same position. Returning
+// through `get_abstract` preserves that position even when a binding produces
+// a different API record. The selected node's data and outgoing observations
+// can still change under their own contracts.
 class Constant {
  public:
   static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
@@ -27,11 +25,6 @@ class Constant {
   // construction makes the caller's interpretation visible. Construction
   // performs a record copy, with the policy guaranteed by its provider.
   explicit constexpr Constant(Api api) : api(api) {}
-
-  // Checks the required pointers through `Abstract::accept`. The caller must
-  // supply a readable table with the agreed representation. The provider
-  // guarantees the Constant policy itself.
-  static auto accept(Api api) -> Bool { return Abstract::accept(api); }
 
   constexpr auto get_abi() const -> Api { return api; }
 

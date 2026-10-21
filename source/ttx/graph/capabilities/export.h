@@ -6,8 +6,8 @@
 
 #include "ttx/graph/abstract.h"
 
-#define TTX_EXPORT_ID_HIGH 0x99ed754be007457fULL
-#define TTX_EXPORT_ID_LOW 0x9b8e5b6d2fedbcc4ULL
+#define TTX_EXPORT_ID_HIGH 0xe4b6a961b7f04bfeULL
+#define TTX_EXPORT_ID_LOW 0xa57c0c036810b0c5ULL
 
 // Uses an Abstract graph to produce a result in another system. The provider
 // selects the contracts and routes needed by its target. A graph can supply
@@ -26,11 +26,11 @@ typedef struct ttx_export {
 } ttx_export;
 
 typedef struct ttx_export_ops {
-  ttx_abstract_ops abstract;
+  // Supplies the graph location from which this contract was bound, with its
+  // own context and operations. Repeated bind/get_abstract round trips preserve
+  // that location even when the provider publishes different API records.
+  ttx_abstract (*get_abstract)(void* context);
   ttx_negotiation_status (*expose)(void* context, ttx_abstract abstract);
 } ttx_export_ops;
-
-C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_export_representation(
-    void);
 
 #endif

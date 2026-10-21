@@ -16,7 +16,7 @@ namespace Ttx::Graph::Capabilities {
 // Satisfied after that callback finishes.
 //
 // The callback is a callable passed by reference and invoked with an Abstract.
-// Its captured state carries the consumer's observations. The call returns the
+// Its captured state belongs to the consumer. The call returns the
 // provider's status and discards any value returned by the callback. The
 // input, Representation and callback remain available until the call returns.
 // The caller supplies a readable region with the represented extent and
@@ -36,24 +36,17 @@ class Import {
   using Api = ttx_import;
   using Operations = ttx_import_ops;
 
-  // Checks `visit`, context and the required Abstract operations for null.
-  // Any present table must be readable and match the established API
-  // representation. The supplying contract establishes Import's meaning.
-  static auto accept(Api api) -> Bool {
-    return api.operations && api.operations->visit &&
-           Abstract::accept(
-               ttx_abstract(api.context, &api.operations->abstract));
-  }
-
-  // Copies a record already supplied under the Import contract. The caller
-  // establishes its representation and required pointers. Explicit construction
-  // marks this unchecked conversion from the C record.
+  // Copies the complete C record supplied under the Import contract.
+  // Explicit construction preserves the provider's context and operations
+  // as one API, with their supplying access duration.
   explicit constexpr Import(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }
 
-  constexpr auto get_abstract() const -> Abstract {
-    return Abstract(api.context, api.operations->abstract);
+  // Returns to the graph location that supplied this binding. The provider
+  // supplies the complete Abstract and may use a different context and table.
+  auto get_abstract() const -> Abstract {
+    return Abstract(api.operations->get_abstract(api.context));
   }
 
   template <typename Function>
@@ -77,12 +70,3 @@ class Import {
 };
 
 }  // namespace Ttx::Graph::Capabilities
-
-TTX_DATA_RECORD(
-    ttx_import_ops,
-    TTX_DATA_MEMBER(ttx_import_ops, abstract),
-    TTX_DATA_MEMBER(ttx_import_ops, visit));
-TTX_DATA_RECORD(
-    ttx_import,
-    TTX_DATA_MEMBER(ttx_import, context),
-    TTX_DATA_MEMBER(ttx_import, operations));

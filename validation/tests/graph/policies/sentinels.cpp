@@ -11,6 +11,7 @@
 #include "ttx/graph/policies/unknown.hpp"
 
 using namespace Perimortem::Core;
+using namespace Perimortem::Serialization;
 using namespace Toolchain::Validation;
 using namespace Ttx::Graph;
 using namespace Ttx::Data;
@@ -28,32 +29,36 @@ struct RouteProvider {
   ttx_abstract selected;
   Count resolutions = 0;
   Count negotiations = 0;
+  Count classifications = 0;
 
   auto get_abi() -> ttx_abstract {
-    static const ttx_abstract_ops operations = {supports, bind,   data,
-                                                resolve,  lookup, visit};
+    static const ttx_abstract_ops operations = {
+      supports, bind, lookup, visit, state};
 
     return ttx_abstract(this, &operations);
   }
 
+  static auto state(void* context) -> ttx_abstract_state {
+    ++Data::cast<RouteProvider>(context)->classifications;
+    return TTX_ABSTRACT_PRESENT;
+  }
+
   static auto supports(void* context, perimortem_uuid contract)
+      -> ttx_negotiation_status {
+    if (contract.high == TTX_NONE_ID_HIGH &&
+        (contract.low == TTX_NONE_ID_LOW ||
+         contract.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
+    ++Data::cast<RouteProvider>(context)->negotiations;
+    return TTX_NEGOTIATION_UNKNOWN;
+  }
+
+  static auto bind(void* context, perimortem_uuid contract, void* output)
       -> ttx_negotiation_status {
     ++Data::cast<RouteProvider>(context)->negotiations;
     return TTX_NEGOTIATION_UNKNOWN;
-  }
-
-  static auto bind(
-      void* context,
-      perimortem_uuid contract,
-      ttx_storage requested) -> ttx_negotiation_status {
-    ++Data::cast<RouteProvider>(context)->negotiations;
-    return TTX_NEGOTIATION_UNKNOWN;
-  }
-
-  static auto data(void* context) -> perimortem_view_bytes { return {}; }
-
-  static auto resolve(void* context) -> ttx_abstract {
-    return Data::cast<RouteProvider>(context)->get_abi();
   }
 
   static auto lookup(void* context, perimortem_view_bytes route)
@@ -67,9 +72,58 @@ struct RouteProvider {
 
   static auto visit(void* context, ttx_graph_visitor callback) -> void {
     auto& provider = *Data::cast<RouteProvider>(context);
-    callback.callback(callback.context, provider.route, provider.selected);
+    callback.callback(
+        callback.callback_context, provider.route, provider.selected);
   }
 };
+
+// Classification identifies an ordinary node even when it supplies none of
+// the consumer's UUIDs. The operation makes one call through the published
+// context and table, with zero support or bind probes.
+VALIDATION_TEST(Sentinels, present_without_known_contracts) {
+  RouteProvider provider{"next"_view, ttx_unknown()};
+  const Abstract abstract(provider.get_abi());
+  EXPECT(abstract.get_state() == Abstract::State::Present);
+  EXPECT_EQ(provider.classifications, Count(1));
+  EXPECT_EQ(provider.negotiations, Count(0));
+  EXPECT_EQ(provider.resolutions, Count(0));
+
+  EXPECT(abstract.supports<Abstract>() == Negotiation::Status::Unknown);
+  EXPECT(abstract.supports<Policies::None>() == Negotiation::Status::Rejected);
+  EXPECT(
+      abstract.supports<Policies::Unknown>() == Negotiation::Status::Rejected);
+  EXPECT(
+      abstract.supports(Formats::Uuid(0, 2)) == Negotiation::Status::Unknown);
+  EXPECT_EQ(provider.classifications, Count(1));
+
+  EXPECT(
+      abstract.resolve_route("next"_view).get_state() ==
+      Abstract::State::Unknown);
+}
+
+// The reserved UUIDs identify exhaustive graph outcomes. Support for the
+// opposite axiom is Rejected, while an unrelated contract can remain Unknown.
+VALIDATION_TEST(Sentinels, reserved_states) {
+  static_assert(TTX_NONE_ID_HIGH == 0 && TTX_NONE_ID_LOW == 0);
+  static_assert(TTX_UNKNOWN_ID_HIGH == 0 && TTX_UNKNOWN_ID_LOW == 1);
+  const auto none = ttx_none();
+  const auto unknown = ttx_unknown();
+
+  EXPECT_EQ(none.operations->get_state(none.context), TTX_ABSTRACT_NONE);
+  EXPECT_EQ(
+      unknown.operations->get_state(unknown.context), TTX_ABSTRACT_UNKNOWN);
+  EXPECT(Abstract(none).get_state() == Abstract::State::None);
+  EXPECT(Abstract(unknown).get_state() == Abstract::State::Unknown);
+  EXPECT(
+      Abstract(none).supports<Policies::None>() ==
+      Negotiation::Status::Satisfied);
+  EXPECT(
+      Abstract(unknown).supports<Policies::None>() ==
+      Negotiation::Status::Rejected);
+  EXPECT(
+      Abstract(unknown).supports<Policies::Unknown>() ==
+      Negotiation::Status::Satisfied);
+}
 
 // None and Unknown must return themselves for every route. Empty, binary and
 // named routes exercise continued traversal after a terminal is reached.
@@ -79,7 +133,6 @@ VALIDATION_TEST(Sentinels, terminal_routes) {
   const U8 binary_route[] = {7, 0, 9};
 
   for (const auto terminal : terminals) {
-    EXPECT(terminal.resolve() == terminal);
     EXPECT(
         terminal.resolve_route(View::Bytes())
             .resolve_route(View::Bytes(binary_route))
@@ -130,7 +183,7 @@ VALIDATION_TEST(Sentinels, terminal_entry_position) {
               EXPECT(Abstract(policy.get_abi()) == terminal);
             },
 
-            [&](Negotiation::Status status) { EXPECT(False); });
+            [&]() { EXPECT(False); });
       } else {
         abstract.bind<Policies::Unknown>().visit(
             [&](Policies::Unknown policy) {
@@ -138,7 +191,7 @@ VALIDATION_TEST(Sentinels, terminal_entry_position) {
               EXPECT(Abstract(policy.get_abi()) == terminal);
             },
 
-            [&](Negotiation::Status status) { EXPECT(False); });
+            [&]() { EXPECT(False); });
       }
 
       EXPECT(bound);
@@ -178,147 +231,42 @@ VALIDATION_TEST(Sentinels, support_properties) {
   EXPECT(
       unknown.supports<Policies::Constant>() == Negotiation::Status::Unknown);
   EXPECT(none.supports<Policies::Constant>() == Negotiation::Status::Unknown);
-  EXPECT(none.supports<Policies::Unknown>() == Negotiation::Status::Unknown);
+  EXPECT(none.supports<Policies::Unknown>() == Negotiation::Status::Rejected);
 }
 
-// Keep the outer record and every table slot the same size. Only get_data's
-// return description differs. Binding rejects that form because the canonical
-// description includes the operation table's function signatures.
-struct WrongAbstractOperations {
-  decltype(ttx_abstract_ops::supports) supports;
-  decltype(ttx_abstract_ops::bind) bind;
-  U64 (*get_data)(void*);
-  decltype(ttx_abstract_ops::resolve) resolve;
-  decltype(ttx_abstract_ops::resolve_route) resolve_route;
-  decltype(ttx_abstract_ops::visit_routes) visit_routes;
-};
-
-struct WrongAbstract {
-  void* context;
-  const WrongAbstractOperations* operations;
-};
-
-TTX_DATA_RECORD(
-    WrongAbstractOperations,
-    TTX_DATA_MEMBER(WrongAbstractOperations, supports),
-    TTX_DATA_MEMBER(WrongAbstractOperations, bind),
-    TTX_DATA_MEMBER(WrongAbstractOperations, get_data),
-    TTX_DATA_MEMBER(WrongAbstractOperations, resolve),
-    TTX_DATA_MEMBER(WrongAbstractOperations, resolve_route),
-    TTX_DATA_MEMBER(WrongAbstractOperations, visit_routes));
-TTX_DATA_RECORD(
-    WrongAbstract,
-    TTX_DATA_MEMBER(WrongAbstract, context),
-    TTX_DATA_MEMBER(WrongAbstract, operations));
-
-VALIDATION_TEST(Sentinels, nested_table_abi) {
-  static_assert(sizeof(WrongAbstract) == sizeof(ttx_abstract));
-  static_assert(sizeof(WrongAbstractOperations) == sizeof(ttx_abstract_ops));
-  const auto& form = Form::Compiled<
-      Form::Native<WrongAbstract>::reference>::get_representation();
-  WrongAbstract output = WrongAbstract();
-  const Form::Storage target(
-      ttx_storage(&form.get_abi(), Data::cast<U8>(&output), sizeof(output)));
-  const auto query = Policies::None::get_none().get_abstract().get_query();
-  EXPECT(
-      query.bind(Abstract::contract_id, target) ==
-      Negotiation::Status::Rejected);
-  EXPECT(output.context == nullptr && output.operations == nullptr);
-  query.bind<Abstract>().visit(
-      [&](Abstract accepted) {
-        EXPECT(accepted == Policies::None::get_none().get_abstract());
-      },
-
-      [&](Negotiation::Status) { EXPECT(False); });
-}
-
-// Binding None or Unknown returns their governing Abstract operations. A
-// different requested representation is rejected before the output can be used.
+// Sentinel UUIDs return complete Abstract records through the established
+// Graph ABI. Refused and undetermined bindings produce an empty Option.
 VALIDATION_TEST(Sentinels, policy_binding) {
   const auto none = ttx_none();
-  ttx_abstract answer = ttx_abstract();
-  const auto& form = Form::Compiled<
-      Form::Native<Policies::None::Api>::reference>::get_representation();
-  const ttx_storage output =
-      ttx_storage(&form.get_abi(), Data::cast<U8>(&answer), sizeof(answer));
+  ttx_abstract output{};
   EXPECT_EQ(
-      none.operations->bind(none.context, Policies::None::contract_id, output),
+      none.operations->bind(none.context, Policies::None::contract_id, &output),
       TTX_NEGOTIATION_SATISFIED);
-
-  U32 untouched = 42;
-  const auto& operational =
-      Form::Compiled<Form::Native<U32>::reference>::get_representation();
-  const ttx_storage wrong = ttx_storage(
-      &operational.get_abi(), Data::cast<U8>(&untouched), sizeof(untouched));
-  EXPECT_EQ(
-      none.operations->bind(none.context, Policies::None::contract_id, wrong),
-      TTX_NEGOTIATION_REJECTED);
-  EXPECT_EQ(untouched, U32(42));
+  EXPECT(Abstract(output).get_state() == Abstract::State::None);
 
   const auto unknown = ttx_unknown();
   EXPECT_EQ(
       unknown.operations->bind(
-          unknown.context, Policies::Unknown::contract_id, output),
+          unknown.context, Policies::Unknown::contract_id, &output),
       TTX_NEGOTIATION_SATISFIED);
-  Abstract(none).bind<Policies::None>().visit(
-      [&](Policies::None) {}, [&](Negotiation::Status) { EXPECT(False); });
-  Abstract(none).bind<Policies::Constant>().visit(
-      [&](Policies::Constant) { EXPECT(False); },
-      [&](Negotiation::Status failure) {
-        EXPECT(failure == Negotiation::Status::Unknown);
-      });
+  EXPECT(Abstract(output).get_state() == Abstract::State::Unknown);
+  EXPECT(Abstract(none).bind<Policies::None>());
+  EXPECT_NOT(Abstract(none).bind<Policies::Constant>());
+  EXPECT_NOT(Abstract(none).bind<Policies::Unknown>());
 }
 
-// The Unknown sentinel binds its own Abstract with the same context and byte
-// observation. Further negotiation of Constant stays Unknown, preserving the
-// sentinel's policy through that bound API.
 VALIDATION_TEST(Sentinels, navigation_and_unknown) {
   const auto unknown = Abstract(ttx_unknown());
-  unknown.get_query().bind<Abstract>().visit(
+  unknown.bind<Abstract>().visit(
       [&](Abstract root) {
-        EXPECT(root.get_abi().context == unknown.get_abi().context);
-        EXPECT(root.get_data() == "Unknown"_view);
+        EXPECT(root.get_state() == Abstract::State::Unknown);
+        EXPECT(
+            root.resolve_route("remaining"_view).get_state() ==
+            Abstract::State::Unknown);
       },
 
-      [&](Negotiation::Status) { EXPECT(False); });
+      [&] { EXPECT(False); });
 
-  unknown.bind<Policies::Constant>().visit(
-      [&](Policies::Constant) { EXPECT(False); },
-      [&](Negotiation::Status failure) {
-        EXPECT(failure == Negotiation::Status::Unknown);
-      });
-
-  Policies::None::get_none().get_abstract().bind<Policies::Unknown>().visit(
-      [&](Policies::Unknown) { EXPECT(False); },
-      [&](Negotiation::Status failure) {
-        EXPECT(failure == Negotiation::Status::Unknown);
-      });
-}
-
-// Each tested Graph interface checks its required Abstract operations. A
-// provider reporting Satisfied with an empty record is rejected by those
-// checks.
-VALIDATION_TEST(Sentinels, empty_table_admission) {
-  Negotiation::Query query(ttx_semantic_query(
-      nullptr,
-      [](void*, perimortem_uuid, ttx_storage output) -> ttx_negotiation_status {
-        (void)output;
-        return TTX_NEGOTIATION_SATISFIED;
-      },
-
-      [](void*, perimortem_uuid) -> ttx_negotiation_status {
-        return TTX_NEGOTIATION_SATISFIED;
-      }));
-
-  query.bind<Policies::Constant>().visit(
-      [&](Policies::Constant) { EXPECT(False); },
-      [&](Negotiation::Status failure) {
-        EXPECT(failure == Negotiation::Status::Rejected);
-      });
-
-  query.bind<Abstract>().visit(
-      [&](Abstract) { EXPECT(False); },
-      [&](Negotiation::Status failure) {
-        EXPECT(failure == Negotiation::Status::Rejected);
-      });
+  EXPECT_NOT(unknown.bind<Policies::Constant>());
+  EXPECT_NOT(Abstract(ttx_none()).bind<Policies::Unknown>());
 }

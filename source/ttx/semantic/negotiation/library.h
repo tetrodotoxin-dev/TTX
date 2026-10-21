@@ -12,6 +12,12 @@
 // The export record, descriptor bytes and payload remain accessible while
 // the module is loaded. The host keeps the module loaded through every use of
 // its functions, including releases required by negotiated contracts.
+//
+//   Library symbol -> Storage -> Transfer -> Query -> Abstract
+//
+// Data Transfer works independently of Query. After a successful Transfer,
+// the consumer can call Query to obtain an Abstract or another entry contract
+// that supplies graph access.
 #define TTX_LIBRARY_ENTRY "ttx_entry"
 
 #endif

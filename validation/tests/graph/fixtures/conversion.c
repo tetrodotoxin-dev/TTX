@@ -3,6 +3,8 @@
 
 #include "validation/tests/graph/fixtures/conversion.h"
 
+#include "validation/tests/graph/fixtures/value.h"
+
 // This terminal copies a byte to its artifact storage. Reporting uses a
 // second Export provider supplied by the input graph, either on the root or a
 // route. It reads the result while the imported graph is still available.
@@ -13,13 +15,14 @@ ttx_negotiation_status conversion_expose(
     return output->status;
   }
 
-  const perimortem_view_bytes value =
-      subject.operations->get_data(subject.context);
-  if (value.size != 1) {
+  value_api value;
+  const perimortem_uuid value_id = {VALUE_ID_HIGH, VALUE_ID_LOW};
+  if (subject.operations->bind(subject.context, value_id, &value) !=
+      TTX_NEGOTIATION_SATISFIED) {
     return TTX_NEGOTIATION_REJECTED;
   }
 
-  output->value = value.data[0];
+  output->value = value.read(value.context);
   ++output->artifacts;
 
   ttx_abstract service = subject;
@@ -30,11 +33,8 @@ ttx_negotiation_status conversion_expose(
   }
 
   ttx_export report = {0};
-  const ttx_storage destination = {
-    ttx_export_representation(), (U8*)&report, sizeof(report)};
-
   const perimortem_uuid id = {TTX_EXPORT_ID_HIGH, TTX_EXPORT_ID_LOW};
-  if (service.operations->bind(service.context, id, destination) ==
+  if (service.operations->bind(service.context, id, &report) ==
       TTX_NEGOTIATION_SATISFIED) {
     // The reporting service is optional. Its refusal does not discard the
     // artifact already produced by this terminal.

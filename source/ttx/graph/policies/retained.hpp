@@ -25,25 +25,17 @@ class Retained {
   using Api = ttx_retained;
   using Operations = ttx_retained_ops;
 
-  // Returns true when the API record's context, table, `release` function and
-  // every Abstract function pointer are nonnull. Any present table must be
-  // readable and match the negotiated representation.
-  static auto accept(Api api) -> Bool {
-    return api.operations && api.operations->release &&
-           Abstract::accept(
-               ttx_abstract(api.context, &api.operations->abstract));
-  }
-
   // Copies a ttx_retained API record under the original result's release
-  // obligation. The caller checks the record's representation and required
-  // pointers before construction. Explicit construction marks this unchecked
-  // conversion from the C record.
+  // obligation. The provider supplies its complete operations. Explicit
+  // construction keeps that record paired with its original context.
   explicit constexpr Retained(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }
 
-  constexpr auto get_abstract() const -> Abstract {
-    return Abstract(api.context, api.operations->abstract);
+  // Supplies the retained Abstract with its own context and operations. A
+  // record obtained by binding returns to that binding's graph location.
+  auto get_abstract() const -> Abstract {
+    return Abstract(api.operations->get_abstract(api.context));
   }
 
   auto release() const -> void {
@@ -56,12 +48,3 @@ class Retained {
 };
 
 }  // namespace Ttx::Graph::Policies
-
-TTX_DATA_RECORD(
-    ttx_retained_ops,
-    TTX_DATA_MEMBER(ttx_retained_ops, abstract),
-    TTX_DATA_MEMBER(ttx_retained_ops, release));
-TTX_DATA_RECORD(
-    ttx_retained,
-    TTX_DATA_MEMBER(ttx_retained, context),
-    TTX_DATA_MEMBER(ttx_retained, operations));

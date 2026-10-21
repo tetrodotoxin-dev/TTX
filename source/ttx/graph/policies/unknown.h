@@ -13,9 +13,6 @@
 //
 // To try again, the consumer resolves the same route on the original Abstract.
 // The provider evaluates that new request under its current policy.
-#define TTX_UNKNOWN_ID_HIGH 0x84c6c053b3254f7aULL
-#define TTX_UNKNOWN_ID_LOW 0xa873409b31bcf608ULL
-
 C_LINKAGE EXPORTED(TTX)
 ttx_abstract ttx_unknown(void);
 

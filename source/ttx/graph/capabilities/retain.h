@@ -6,12 +6,12 @@
 
 #include "ttx/graph/policies/retained.h"
 
-#define TTX_RETAIN_ID_HIGH 0xd576263608ac45a2ULL
-#define TTX_RETAIN_ID_LOW 0x9e605b7d64c8a413ULL
+#define TTX_RETAIN_ID_HIGH 0xe028b547172140acULL
+#define TTX_RETAIN_ID_LOW 0xac4e943287c34557ULL
 
 // Retain asks the provider to supply an Abstract that remains usable after
-// the current observation ends. The returned Retained interface carries the
-// consumer's release obligation. The provider can keep the original state
+// its current access duration ends. The returned Retained interface carries
+// the consumer's release obligation. The provider can keep the original state
 // available or supply different state that preserves the Abstract's policies.
 //
 // On success, `retain` writes a complete ttx_retained record to `output` and
@@ -28,11 +28,11 @@ typedef struct ttx_retain {
 } ttx_retain;
 
 typedef struct ttx_retain_ops {
-  ttx_abstract_ops abstract;
+  // Supplies the graph location from which this contract was bound, with its
+  // own context and operations. Repeated bind/get_abstract round trips preserve
+  // that location even when the provider publishes different API records.
+  ttx_abstract (*get_abstract)(void* context);
   ttx_negotiation_status (*retain)(void* context, ttx_retained* output);
 } ttx_retain_ops;
-
-C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_retain_representation(
-    void);
 
 #endif

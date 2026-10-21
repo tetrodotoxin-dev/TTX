@@ -7,8 +7,8 @@
 #include "ttx/data/form/representation.h"
 #include "ttx/graph/abstract.h"
 
-#define TTX_CALLABLE_ID_HIGH 0x84c6c053b3254f7aULL
-#define TTX_CALLABLE_ID_LOW 0xa873409b31bcf605ULL
+#define TTX_CALLABLE_ID_HIGH 0xd88ed3a6efcc4325ULL
+#define TTX_CALLABLE_ID_LOW 0xb077eec273f28b13ULL
 
 // Describes one argument or result and its byte offset in the call frame.
 // The Abstract explains how to interpret that value. For example, Boolean and
@@ -31,9 +31,10 @@ typedef struct ttx_callable_frame {
 
 // Names an operation and describes the API record used to call it. The consumer
 // selects an API it can call, compares that API's Representation with api, then
-// binds contract using its required Representation. Input and output frames
-// give the storage layouts and Abstracts describing each value's meaning.
-// Fields follow argument order, with offsets locating their bytes in the frame.
+// binds the UUID to obtain that contract's complete C record. Input and output
+// frames give the storage layouts and Abstracts describing each value's
+// meaning. Fields follow argument order, with offsets locating their bytes in
+// the frame.
 //
 // The provider supplies readable canonical API and frame Representations,
 // valid field arrays and usable Abstracts through the description's access
@@ -53,7 +54,10 @@ typedef struct ttx_callable_description {
 // refuses it. The caller consumes output only when `describe` returns
 // Satisfied.
 typedef struct ttx_callable_operations {
-  ttx_abstract_ops abstract;
+  // Supplies the graph location from which this contract was bound, with its
+  // own context and operations. Repeated bind/get_abstract round trips preserve
+  // that location even when the provider publishes different API records.
+  ttx_abstract (*get_abstract)(void* context);
   ttx_negotiation_status (
       *describe)(void* context, ttx_callable_description* output);
 } ttx_callable_operations;
@@ -62,8 +66,5 @@ typedef struct ttx_callable {
   void* context;
   const ttx_callable_operations* operations;
 } ttx_callable;
-
-C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_callable_representation(
-    void);
 
 #endif

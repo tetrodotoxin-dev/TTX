@@ -29,7 +29,7 @@
 // transferring the complete record. The consumer uses that record only after
 // Satisfied. Unknown and Rejected leave the destination unusable even if the
 // provider changed its bytes. Both operations finish synchronously. A later
-// call makes a new observation under the provider's policy. Each status
+// call makes a new request under the provider's policy. Each status
 // completes that call. Obtaining another result requires another request.
 //
 // The provider can construct the record, reuse stored functions with a suitable

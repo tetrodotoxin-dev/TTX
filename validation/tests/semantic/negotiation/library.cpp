@@ -73,11 +73,18 @@ VALIDATION_TEST(NativeEntry, storage_to_query_to_abstract) {
                       ASSERT_EQ(
                           entry.bind(entry.context, id, requested),
                           TTX_NEGOTIATION_SATISFIED);
-                      ASSERT(Abstract::accept(api));
                       EXPECT(api.context != entry.context);
+                      EXPECT_EQ(
+                          api.operations->get_state(api.context),
+                          TTX_ABSTRACT_PRESENT);
 
-                      const auto bytes = api.operations->get_data(api.context);
-                      EXPECT(View::Bytes(bytes) == "hello"_view);
+                      ttx_abstract bound{};
+                      ASSERT_EQ(
+                          api.operations->bind(api.context, id, &bound),
+                          TTX_NEGOTIATION_SATISFIED);
+                      EXPECT_EQ(
+                          bound.operations->get_state(bound.context),
+                          TTX_ABSTRACT_PRESENT);
                     },
 
                     fail);
@@ -100,6 +107,10 @@ VALIDATION_TEST(NativeEntry, independent_paths_and_formats) {
   ASSERT_EQ(ttx_transfer(published, &target), TTX_DATA_SUCCESS);
 
   const Negotiation::Query query(entry);
+  const Formats::Uuid previous_abstract(
+      0x7cc2e50a46ab4ed7ULL, 0xa2ca04e84f415161ULL);
+  EXPECT(query.supports(previous_abstract) == Negotiation::Status::Unknown);
+
   const Formats::Uuid exports(BOOTSTRAP_EXPORTS_HIGH, BOOTSTRAP_EXPORTS_LOW);
   EXPECT(query.supports(exports) == Negotiation::Status::Satisfied);
 
@@ -112,7 +123,7 @@ VALIDATION_TEST(NativeEntry, independent_paths_and_formats) {
   callback_api.visit(
       callback_api.context, &visits, [](void* context, ttx_abstract api) {
         auto& count = *Data::cast<Count>(context);
-        if (Abstract(api).get_data() == "hello"_view) {
+        if (Abstract(api).get_state() == Abstract::State::Present) {
           ++count;
         }
       });
@@ -124,7 +135,9 @@ VALIDATION_TEST(NativeEntry, independent_paths_and_formats) {
       query.bind(exports, Form::Storage::from(indexed)) ==
       Negotiation::Status::Satisfied);
   ASSERT_EQ(indexed.count(indexed.context), U64(1));
-  EXPECT(Abstract(indexed.get(indexed.context, 0)).get_data() == "hello"_view);
+  EXPECT(
+      Abstract(indexed.get(indexed.context, 0)).get_state() ==
+      Abstract::State::Present);
 
   ttx_semantic_query next{};
   ASSERT(
@@ -133,7 +146,9 @@ VALIDATION_TEST(NativeEntry, independent_paths_and_formats) {
           Form::Storage::from(next)) == Negotiation::Status::Satisfied);
   EXPECT(next.context != entry.context);
   Negotiation::Query(next).bind<Abstract>().visit(
-      [&](Abstract api) { EXPECT(api.get_data() == "hello"_view); },
+      [&](Abstract api) {
+        EXPECT(api.get_state() == Abstract::State::Present);
+      },
 
       [&](Negotiation::Status) { EXPECT(False); });
 
@@ -163,4 +178,61 @@ VALIDATION_TEST(NativeEntry, incompatible_bootstrap) {
   short_source.size = sizeof(entry) - 1;
   EXPECT_EQ(ttx_transfer(&short_source, &target), TTX_DATA_BOUNDS);
   EXPECT(!entry.bind && !entry.supports && !entry.context);
+}
+
+// Keep the outer record and every table slot the same size. Only get_state's
+// return description differs. Binding rejects that form because the canonical
+// description includes the operation table's function signatures.
+struct WrongAbstractOperations {
+  decltype(ttx_abstract_ops::supports) supports;
+  decltype(ttx_abstract_ops::bind) bind;
+  decltype(ttx_abstract_ops::resolve_route) resolve_route;
+  decltype(ttx_abstract_ops::visit_routes) visit_routes;
+  U64 (*get_state)(void*);
+};
+
+struct WrongAbstract {
+  void* context;
+  const WrongAbstractOperations* operations;
+};
+
+TTX_DATA_RECORD(
+    WrongAbstractOperations,
+    TTX_DATA_MEMBER(WrongAbstractOperations, supports),
+    TTX_DATA_MEMBER(WrongAbstractOperations, bind),
+    TTX_DATA_MEMBER(WrongAbstractOperations, resolve_route),
+    TTX_DATA_MEMBER(WrongAbstractOperations, visit_routes),
+    TTX_DATA_MEMBER(WrongAbstractOperations, get_state));
+TTX_DATA_RECORD(
+    WrongAbstract,
+    TTX_DATA_MEMBER(WrongAbstract, context),
+    TTX_DATA_MEMBER(WrongAbstract, operations));
+
+VALIDATION_TEST(NativeEntry, nested_table_abi) {
+  static_assert(sizeof(WrongAbstract) == sizeof(ttx_abstract));
+  static_assert(sizeof(WrongAbstractOperations) == sizeof(ttx_abstract_ops));
+  const auto& form = Form::Compiled<
+      Form::Native<WrongAbstract>::reference>::get_representation();
+  WrongAbstract output = WrongAbstract();
+  const Form::Storage target(
+      ttx_storage(&form.get_abi(), Data::cast<U8>(&output), sizeof(output)));
+  auto library =
+      Validation::Support::open_library("libabstract_subject.so"_view);
+  const auto* published = Data::cast<const ttx_storage>(
+      Validation::Support::find_symbol(library, "ttx_entry"_view));
+  ttx_semantic_query entry{};
+  const auto entry_storage = Form::Storage::from(entry).get_abi();
+  ASSERT_EQ(ttx_transfer(published, &entry_storage), TTX_DATA_SUCCESS);
+
+  const Negotiation::Query query(entry);
+  EXPECT(
+      query.bind(Abstract::contract_id, target) ==
+      Negotiation::Status::Rejected);
+  EXPECT(output.context == nullptr && output.operations == nullptr);
+  query.bind<Abstract>().visit(
+      [&](Abstract accepted) {
+        EXPECT(accepted.get_state() == Abstract::State::Present);
+      },
+
+      [&](Negotiation::Status) { EXPECT(False); });
 }

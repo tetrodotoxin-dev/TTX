@@ -4,6 +4,7 @@
 #pragma once
 
 #include "perimortem/core/data.hpp"
+#include "perimortem/core/storage/option.hpp"
 #include "perimortem/core/storage/vector.hpp"
 #include "perimortem/core/view/bytes.hpp"
 #include "perimortem/serialization/formats/uuid.hpp"
@@ -18,34 +19,31 @@ namespace Ttx::Graph {
 // graph. The C++ interface stores the C API record and forwards each call to
 // its supplied function with the context published alongside it.
 //
-// Abstract-to-Abstract graph operations are observations. Binding enters a
-// typed API with its complete contract. Terminal operations use known types,
-// such as a Cursor returning a Token. A typed operation can return an Abstract
-// anywhere in the graph, where observations resume. Each later binding is a
-// separate request. The graph contract and examples are in abstract.h.
+// Graph navigation is independent of the consumer's native type system.
+// Binding supplies a typed API whose terminal operations follow that contract.
+// Returning an Abstract makes graph observations available again at the
+// location chosen by the provider. A contract offering `get_abstract` preserves
+// the location from which it was bound. The full graph contract is in
+// abstract.h.
 //
-// The supplying contract keeps the context and table accessible through use.
-// Copying an Abstract preserves that access duration. A plain Abstract result
-// requires no release. An operation transferring a release obligation returns
+// The supplying contract defines the context and table access duration.
+// Copies of an Abstract share that duration. A plain Abstract result requires
+// no release. An operation transferring a release obligation returns
 // Retained or a stronger contract that exposes the obligation.
 class Abstract {
  public:
+  enum class State : U8 {
+    None = TTX_ABSTRACT_NONE,
+    Unknown = TTX_ABSTRACT_UNKNOWN,
+    Present = TTX_ABSTRACT_PRESENT,
+  };
+
   static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
       TTX_ABSTRACT_ID_HIGH,
       TTX_ABSTRACT_ID_LOW);
   using Api = ttx_abstract;
   using Operations = ttx_abstract_ops;
   using Visitor = Graph::Visitor<Abstract>;
-
-  // Checks the context, table and required operation pointers for null. The
-  // caller establishes the representation and readability of any present table.
-  // The provider supplies the semantic guarantees and duration of access.
-  static auto accept(Api api) -> Bool {
-    return api.context && api.operations && api.operations->supports &&
-           api.operations->bind && api.operations->get_data &&
-           api.operations->resolve && api.operations->resolve_route &&
-           api.operations->visit_routes;
-  }
 
   // Stores the context pointer and the address of the operation table. The
   // caller supplies a complete Abstract interface and keeps its context and
@@ -60,14 +58,17 @@ class Abstract {
 
   constexpr auto get_abi() const -> Api { return api; }
 
-  constexpr auto get_query() const -> Semantic::Negotiation::Query {
-    return Semantic::Negotiation::Query(ttx_semantic_query(
-        api.context, api.operations->bind, api.operations->supports));
+  // Reports the graph result independently of any application UUID. Present
+  // permits further navigation under this Abstract's policy, even when every
+  // application contract requested so far was refused or undetermined.
+  auto get_state() const -> State {
+    return State(api.operations->get_state(api.context));
   }
 
   auto supports(Perimortem::Serialization::Formats::Uuid contract) const
       -> Semantic::Negotiation::Status {
-    return get_query().supports(contract);
+    return Semantic::Negotiation::Status(
+        api.operations->supports(api.context, contract));
   }
 
   template <typename Contract>
@@ -75,45 +76,26 @@ class Abstract {
     return supports(Contract::contract_id);
   }
 
-  auto bind_interface(
-      Perimortem::Serialization::Formats::Uuid contract,
-      Data::Form::Storage destination) const -> Semantic::Negotiation::Status {
-    return get_query().bind(contract, destination);
-  }
-
+  // A successful UUID request supplies the complete Contract::Api record.
+  // The provider establishes its operations and policies. The empty Option
+  // represents either an undetermined or refused request.
   template <typename Contract>
-  auto bind() const -> Perimortem::Core::Storage::
-      Result<Contract, Semantic::Negotiation::Status> {
-    return get_query().template bind<Contract>();
+  auto bind() const -> Perimortem::Core::Storage::Option<Contract> {
+    return bind<Contract>(Contract::contract_id);
   }
 
-  // Provides direct byte access under the already established Abstract
-  // contract. This typed read can supply bytes alongside `resolve_route`,
-  // or exchange bytes for sockets and streams.
-  //
-  // The bytes have no Abstract contract to inspect and no implied format or
-  // Constant promise. Repeated calls can read changing data even when a
-  // semantic edge on the same Abstract is Constant.
-  //
-  // The returned view survives until the next byte read or graph observation
-  // on this Abstract, or the end of the supplying lifetime. Consumers needing
-  // longer retention can copy the bytes or negotiate a contract that provides
-  // it.
-  auto get_data() const -> Perimortem::Core::View::Bytes {
-    const auto data = api.operations->get_data(api.context);
-    return Perimortem::Core::View::Bytes(data);
-  }
+  // The caller selects the C record specified by this UUID. This overload
+  // supports contracts whose UUID is discovered while navigating the graph.
+  template <typename Contract>
+  auto bind(Perimortem::Serialization::Formats::Uuid contract) const
+      -> Perimortem::Core::Storage::Option<Contract> {
+    typename Contract::Api output{};
+    const auto status = api.operations->bind(api.context, contract, &output);
+    if (status == TTX_NEGOTIATION_SATISFIED) {
+      return Contract(output);
+    }
 
-  // Returns the Abstract represented by this observation. The provider decides
-  // which domain layers resolution removes and may return the current view.
-  // For an unchanged observation state, resolution is idempotent:
-  //
-  //   abstract.resolve() == abstract.resolve().resolve()
-  //
-  // Equality identifies the context and operation table. Semantic equivalence
-  // follows the policies supplied by the provider.
-  auto resolve() const -> Abstract {
-    return Abstract(api.operations->resolve(api.context));
+    return {};
   }
 
   // Traverses a route through the provider's policy. The returned Abstract
@@ -153,6 +135,9 @@ class Abstract {
     api.operations->visit_routes(api.context, callback);
   }
 
+  // Compares the published context and table pointers. The `get_abstract` round
+  // trip preserves semantic graph location, which can have different API
+  // records.
   constexpr auto operator==(const Abstract& other) const -> Bool {
     return api.context == other.api.context &&
            api.operations == other.api.operations;
@@ -185,6 +170,9 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(perimortem_view_bytes, data),
     TTX_DATA_MEMBER(perimortem_view_bytes, size));
 
+// Semantic bootstrap checks Abstract's complete C ABI against this description.
+// Typed Graph bindings use the UUID and fixed C contract directly.
+//
 // Declare the root schema first so recursive signatures can refer back to it.
 // Native reads argument and result types from the C fields and supplies their
 // calling convention. The root's fields are defined after the operation and
@@ -204,17 +192,16 @@ class Ttx::Data::Form::Native<ttx_abstract> {
 
 TTX_DATA_RECORD(
     ttx_graph_visitor,
-    TTX_DATA_MEMBER(ttx_graph_visitor, context),
+    TTX_DATA_MEMBER(ttx_graph_visitor, callback_context),
     TTX_DATA_MEMBER(ttx_graph_visitor, callback));
 
 TTX_DATA_RECORD(
     ttx_abstract_ops,
     TTX_DATA_MEMBER(ttx_abstract_ops, supports),
     TTX_DATA_MEMBER(ttx_abstract_ops, bind),
-    TTX_DATA_MEMBER(ttx_abstract_ops, get_data),
-    TTX_DATA_MEMBER(ttx_abstract_ops, resolve),
     TTX_DATA_MEMBER(ttx_abstract_ops, resolve_route),
-    TTX_DATA_MEMBER(ttx_abstract_ops, visit_routes));
+    TTX_DATA_MEMBER(ttx_abstract_ops, visit_routes),
+    TTX_DATA_MEMBER(ttx_abstract_ops, get_state));
 
 inline constexpr Ttx::Data::Form::Schema
     Ttx::Data::Form::Native<ttx_abstract>::schema = [] {

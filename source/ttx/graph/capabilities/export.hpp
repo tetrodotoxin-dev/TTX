@@ -27,24 +27,17 @@ class Export {
   using Api = ttx_export;
   using Operations = ttx_export_ops;
 
-  // Checks `expose`, context and the required Abstract operations for null.
-  // Any present table must be readable and match the established API
-  // representation. The supplying contract establishes Export's meaning.
-  static auto accept(Api api) -> Bool {
-    return api.operations && api.operations->expose &&
-           Abstract::accept(
-               ttx_abstract(api.context, &api.operations->abstract));
-  }
-
-  // Copies a record already supplied under the Export contract. The caller
-  // establishes its representation and required pointers. Explicit construction
-  // marks this unchecked conversion from the C record.
+  // Copies the complete C record supplied under the Export contract.
+  // Explicit construction preserves the provider's context and operations
+  // as one API, with their supplying access duration.
   explicit constexpr Export(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }
 
-  constexpr auto get_abstract() const -> Abstract {
-    return Abstract(api.context, api.operations->abstract);
+  // Returns to the graph location that supplied this binding. The provider
+  // supplies the complete Abstract and may use a different context and table.
+  auto get_abstract() const -> Abstract {
+    return Abstract(api.operations->get_abstract(api.context));
   }
 
   auto expose(Abstract abstract) const -> Semantic::Negotiation::Status {
@@ -58,12 +51,3 @@ class Export {
 };
 
 }  // namespace Ttx::Graph::Capabilities
-
-TTX_DATA_RECORD(
-    ttx_export_ops,
-    TTX_DATA_MEMBER(ttx_export_ops, abstract),
-    TTX_DATA_MEMBER(ttx_export_ops, expose));
-TTX_DATA_RECORD(
-    ttx_export,
-    TTX_DATA_MEMBER(ttx_export, context),
-    TTX_DATA_MEMBER(ttx_export, operations));

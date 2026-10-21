@@ -17,7 +17,7 @@
 //
 // Binding supplies the governing Abstract whose visitation has these rules.
 // The visited Abstracts keep the access guarantees of their own contracts.
-#define TTX_ORDERED_ID_HIGH 0x5a3855f4ad5243e7ULL
-#define TTX_ORDERED_ID_LOW 0xb049c60e356b0067ULL
+#define TTX_ORDERED_ID_HIGH 0x18d9128fd58c47aaULL
+#define TTX_ORDERED_ID_LOW 0xb314f094135cfb5dULL
 
 #endif

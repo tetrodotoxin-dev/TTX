@@ -24,6 +24,8 @@ static const ttx_retain_ops temporary_operations, retained_retain_operations;
 static const ttx_retained_ops retained_operations;
 static const ttx_callable_operations callable_operations;
 static const ttx_create_ops factory_operations;
+static const ttx_abstract_ops temporary_graph_operations,
+    retained_graph_operations, factory_graph_operations;
 
 // The creation callback receives a temporary_value on the stack. `retain`
 // copies its value into an allocated retained_value with a reference count.
@@ -41,9 +43,9 @@ static U8 is(perimortem_uuid id, U64 high, U64 low) {
   return id.high == high && id.low == low;
 }
 
-static perimortem_view_bytes data(void* context) {
+static ttx_abstract_state graph_state(void* context) {
   (void)context;
-  return (perimortem_view_bytes){0};
+  return TTX_ABSTRACT_PRESENT;
 }
 
 static ttx_abstract lookup(void* context, perimortem_view_bytes route) {
@@ -58,12 +60,17 @@ static void visit(void* context, ttx_graph_visitor callback) {
 }
 
 static ttx_abstract temporary_abstract(void* context) {
-  return (ttx_abstract){context, &temporary_operations.abstract};
+  return (ttx_abstract){context, &temporary_graph_operations};
 }
 
 static ttx_negotiation_status temporary_supports(
     void* context,
     perimortem_uuid id) {
+  if (id.high == TTX_NONE_ID_HIGH &&
+      (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+    return TTX_NEGOTIATION_REJECTED;
+  }
+
   (void)context;
   return is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW) ||
                  is(id, TTX_RETAIN_ID_HIGH, TTX_RETAIN_ID_LOW)
@@ -72,37 +79,36 @@ static ttx_negotiation_status temporary_supports(
 }
 
 static ttx_negotiation_status
-    temporary_bind(void* context, perimortem_uuid id, ttx_storage target) {
+    temporary_bind(void* context, perimortem_uuid id, void* output) {
   if (is(id, TTX_RETAIN_ID_HIGH, TTX_RETAIN_ID_LOW)) {
     ttx_retain api = {context, &temporary_operations};
-    const ttx_storage input = {
-      ttx_retain_representation(), (U8*)&api, sizeof(api)};
-
-    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_NEGOTIATION_SATISFIED
-               : TTX_NEGOTIATION_REJECTED;
+    ttx_retain* result = output;
+    *result = api;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   if (is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW)) {
     ttx_abstract api = temporary_abstract(context);
-    const ttx_storage input = {
-      ttx_abstract_representation(), (U8*)&api, sizeof(api)};
-
-    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_NEGOTIATION_SATISFIED
-               : TTX_NEGOTIATION_REJECTED;
+    ttx_abstract* result = output;
+    *result = api;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   return TTX_NEGOTIATION_UNKNOWN;
 }
 
 static ttx_abstract retained_abstract(void* context) {
-  return (ttx_abstract){context, &retained_operations.abstract};
+  return (ttx_abstract){context, &retained_graph_operations};
 }
 
 static ttx_negotiation_status retained_supports(
     void* context,
     perimortem_uuid id) {
+  if (id.high == TTX_NONE_ID_HIGH &&
+      (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+    return TTX_NEGOTIATION_REJECTED;
+  }
+
   (void)context;
   return temporary_supports(context, id) == TTX_NEGOTIATION_SATISFIED ||
                  is(id, TTX_RETAINED_ID_HIGH, TTX_RETAINED_ID_LOW) ||
@@ -128,57 +134,42 @@ HIDDEN ttx_data_status
 }
 
 static ttx_negotiation_status
-    retained_bind(void* context, perimortem_uuid id, ttx_storage target) {
+    retained_bind(void* context, perimortem_uuid id, void* output) {
   if (is(id, TTX_RETAIN_ID_HIGH, TTX_RETAIN_ID_LOW)) {
     ttx_retain api = {context, &retained_retain_operations};
-    const ttx_storage input = {
-      ttx_retain_representation(), (U8*)&api, sizeof(api)};
-
-    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_NEGOTIATION_SATISFIED
-               : TTX_NEGOTIATION_REJECTED;
+    ttx_retain* result = output;
+    *result = api;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   if (is(id, TTX_RETAINED_ID_HIGH, TTX_RETAINED_ID_LOW)) {
     ttx_retained api = {context, &retained_operations};
-    const ttx_storage input = {
-      ttx_retained_representation(), (U8*)&api, sizeof(api)};
-
-    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_NEGOTIATION_SATISFIED
-               : TTX_NEGOTIATION_REJECTED;
+    ttx_retained* result = output;
+    *result = api;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   if (is(id, TTX_CALLABLE_ID_HIGH, TTX_CALLABLE_ID_LOW)) {
     ttx_callable api = {context, &callable_operations};
-    const ttx_storage input = {
-      ttx_callable_representation(), (U8*)&api, sizeof(api)};
-
-    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_NEGOTIATION_SATISFIED
-               : TTX_NEGOTIATION_REJECTED;
+    ttx_callable* result = output;
+    *result = api;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   if (is(id, increment_id.high, increment_id.low)) {
     ttx_invocation api = {
       context, integer_form, integer_form, retention_invoke};
 
-    const ttx_storage input = {
-      ttx_invocation_representation(), (U8*)&api, sizeof(api)};
-
-    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_NEGOTIATION_SATISFIED
-               : TTX_NEGOTIATION_REJECTED;
+    ttx_invocation* result = output;
+    *result = api;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   if (is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW)) {
     ttx_abstract api = retained_abstract(context);
-    const ttx_storage input = {
-      ttx_abstract_representation(), (U8*)&api, sizeof(api)};
-
-    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_NEGOTIATION_SATISFIED
-               : TTX_NEGOTIATION_REJECTED;
+    ttx_abstract* result = output;
+    *result = api;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   return TTX_NEGOTIATION_UNKNOWN;
@@ -233,12 +224,17 @@ static ttx_negotiation_status describe(
 }
 
 static ttx_abstract factory_abstract(void* context) {
-  return (ttx_abstract){context, &factory_operations.abstract};
+  return (ttx_abstract){context, &factory_graph_operations};
 }
 
 static ttx_negotiation_status factory_supports(
     void* context,
     perimortem_uuid id) {
+  if (id.high == TTX_NONE_ID_HIGH &&
+      (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+    return TTX_NEGOTIATION_REJECTED;
+  }
+
   (void)context;
   return is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW) ||
                  is(id, TTX_CREATE_ID_HIGH, TTX_CREATE_ID_LOW)
@@ -247,25 +243,19 @@ static ttx_negotiation_status factory_supports(
 }
 
 static ttx_negotiation_status
-    factory_bind(void* context, perimortem_uuid id, ttx_storage target) {
+    factory_bind(void* context, perimortem_uuid id, void* output) {
   if (is(id, TTX_CREATE_ID_HIGH, TTX_CREATE_ID_LOW)) {
     ttx_create api = {context, &factory_operations};
-    const ttx_storage input = {
-      ttx_create_representation(), (U8*)&api, sizeof(api)};
-
-    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_NEGOTIATION_SATISFIED
-               : TTX_NEGOTIATION_REJECTED;
+    ttx_create* result = output;
+    *result = api;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   if (is(id, TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW)) {
     ttx_abstract api = factory_abstract(context);
-    const ttx_storage input = {
-      ttx_abstract_representation(), (U8*)&api, sizeof(api)};
-
-    return ttx_transfer(&input, &target) == TTX_DATA_SUCCESS
-               ? TTX_NEGOTIATION_SATISFIED
-               : TTX_NEGOTIATION_REJECTED;
+    ttx_abstract* result = output;
+    *result = api;
+    return TTX_NEGOTIATION_SATISFIED;
   }
 
   return TTX_NEGOTIATION_UNKNOWN;
@@ -290,25 +280,28 @@ static ttx_negotiation_status create(
   return TTX_NEGOTIATION_SATISFIED;
 }
 
+static const ttx_abstract_ops temporary_graph_operations = {
+  temporary_supports, temporary_bind, lookup, visit, graph_state};
+
+static const ttx_abstract_ops retained_graph_operations = {
+  retained_supports, retained_bind, lookup, visit, graph_state};
+
+static const ttx_abstract_ops factory_graph_operations = {
+  factory_supports, factory_bind, lookup, visit, graph_state};
+
 static const ttx_retain_ops temporary_operations = {
-  {temporary_supports, temporary_bind, data, temporary_abstract, lookup, visit},
-  retain_temporary};
+  temporary_abstract, retain_temporary};
 
 static const ttx_retained_ops retained_operations = {
-  {retained_supports, retained_bind, data, retained_abstract, lookup, visit},
-  release};
+  retained_abstract, release};
 
 static const ttx_retain_ops retained_retain_operations = {
-  {retained_supports, retained_bind, data, retained_abstract, lookup, visit},
-  acquire};
+  retained_abstract, acquire};
 
 static const ttx_callable_operations callable_operations = {
-  {retained_supports, retained_bind, data, retained_abstract, lookup, visit},
-  describe};
+  retained_abstract, describe};
 
-static const ttx_create_ops factory_operations = {
-  {factory_supports, factory_bind, data, factory_abstract, lookup, visit},
-  create};
+static const ttx_create_ops factory_operations = {factory_abstract, create};
 
 static retention_statistics statistics(void) {
   return observed;

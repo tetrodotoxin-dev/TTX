@@ -6,8 +6,8 @@
 
 #include "ttx/graph/abstract.h"
 
-#define TTX_IMPORT_ID_HIGH 0x73d6db5cd5954412ULL
-#define TTX_IMPORT_ID_LOW 0xb8020612f7ea0361ULL
+#define TTX_IMPORT_ID_HIGH 0x9ba836087deb4829ULL
+#define TTX_IMPORT_ID_LOW 0x9ed9407f66ea20deULL
 
 // Exposes the capability to interpret data described by the supplied
 // Representation and supply an Abstract for the imported graph. The provider
@@ -31,7 +31,10 @@ typedef struct ttx_import {
 } ttx_import;
 
 typedef struct ttx_import_ops {
-  ttx_abstract_ops abstract;
+  // Supplies the graph location from which this contract was bound, with its
+  // own context and operations. Repeated bind/get_abstract round trips preserve
+  // that location even when the provider publishes different API records.
+  ttx_abstract (*get_abstract)(void* context);
   ttx_negotiation_status (*visit)(
       void* context,
       const void* input,
@@ -39,8 +42,5 @@ typedef struct ttx_import_ops {
       void* callback_context,
       void (*callback)(void* context, ttx_abstract abstract));
 } ttx_import_ops;
-
-C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_import_representation(
-    void);
 
 #endif

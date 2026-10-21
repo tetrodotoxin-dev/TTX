@@ -24,11 +24,6 @@ class Ordered {
   // performs a record copy, with the policy guaranteed by its provider.
   explicit constexpr Ordered(Api api) : api(api) {}
 
-  // Checks the required pointers through `Abstract::accept`. The caller must
-  // supply a readable table with the agreed representation. The provider
-  // guarantees the Ordered policy itself.
-  static auto accept(Api api) -> Bool { return Abstract::accept(api); }
-
   constexpr auto get_abi() const -> Api { return api; }
 
   constexpr auto get_abstract() const -> Abstract { return Abstract(api); }

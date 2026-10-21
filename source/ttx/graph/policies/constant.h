@@ -6,15 +6,13 @@
 
 #include "ttx/graph/abstract.h"
 
-// Constant promises that the Abstract and route which supplied this result
-// continue to select the same semantic value. The selected value's outgoing
-// routes and byte observations establish their own promises independently.
-//
-// The governing Abstract preserves this policy through further negotiation.
-// Storage and executable code remain available through the supplying access
-// contract. An acquired Retained result carries its separate release
-// obligation.
-#define TTX_CONSTANT_ID_HIGH 0x84c6c053b3254f7aULL
-#define TTX_CONSTANT_ID_LOW 0xa873409b31bcf606ULL
+// Constant lets a consumer reuse a graph selection while its supplying access
+// remains valid. It fixes the location from which it was bound, so repeating
+// the supplying route request selects that same position. Returning
+// through `get_abstract` preserves that position even when a binding produces
+// a different API record. The selected node's data and outgoing observations
+// can still change under their own contracts.
+#define TTX_CONSTANT_ID_HIGH 0x3642dd24fadd44ebULL
+#define TTX_CONSTANT_ID_LOW 0x97aa4a2e729c28b7ULL
 
 #endif

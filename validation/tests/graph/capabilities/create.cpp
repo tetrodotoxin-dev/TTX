@@ -7,10 +7,10 @@
 
 #include "perimortem/core/data.hpp"
 
-#include "ttx/data/transfer.hpp"
 #include "ttx/graph/capabilities/retain.hpp"
 #include "ttx/graph/policies/none.hpp"
 #include "ttx/graph/policies/unknown.h"
+#include "validation/tests/graph/fixtures/value.hpp"
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Serialization;
@@ -26,8 +26,17 @@ class ScopedCreate {
   Negotiation::Status status = Negotiation::Status::Satisfied;
   bool observing = false;
 
+  static auto state(void* context) -> ttx_abstract_state {
+    return TTX_ABSTRACT_PRESENT;
+  }
+
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Create::contract_id
@@ -35,31 +44,25 @@ class ScopedCreate {
                : TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto bind(void* context, perimortem_uuid id, ttx_storage target)
+  static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
     if (Formats::Uuid(id) == Capabilities::Create::contract_id) {
       Capabilities::Create::Api api = {context, &operations};
-      return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
-                     Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      *Data::cast<Capabilities::Create::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     if (Formats::Uuid(id) == Abstract::contract_id) {
-      Abstract::Api api = resolve(context);
-      return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
-                     Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      Abstract::Api api = get_abstract(context);
+      *Data::cast<Abstract::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     return TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto data(void* context) -> perimortem_view_bytes { return {}; }
-
-  static auto resolve(void* context) -> ttx_abstract {
-    return {context, &operations.abstract};
+  static auto get_abstract(void* context) -> ttx_abstract {
+    return {context, &graph_operations};
   }
 
   static auto lookup(void* context, perimortem_view_bytes route)
@@ -72,36 +75,52 @@ class ScopedCreate {
   struct Created {
     U8 value = 42;
 
+    static auto state(void* context) -> ttx_abstract_state {
+      return TTX_ABSTRACT_PRESENT;
+    }
+
     static auto supports(void* context, perimortem_uuid id)
         -> ttx_negotiation_status {
+      if (Formats::Uuid(id) == Validation::Value::contract_id) {
+        return TTX_NEGOTIATION_SATISFIED;
+      }
+
+      if (id.high == TTX_NONE_ID_HIGH &&
+          (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+        return TTX_NEGOTIATION_REJECTED;
+      }
+
       return Formats::Uuid(id) == Abstract::contract_id
                  ? TTX_NEGOTIATION_SATISFIED
                  : TTX_NEGOTIATION_UNKNOWN;
     }
 
-    static auto bind(void* context, perimortem_uuid id, ttx_storage target)
+    static auto bind(void* context, perimortem_uuid id, void* output)
         -> ttx_negotiation_status {
+      if (Formats::Uuid(id) == Validation::Value::contract_id) {
+        *Data::cast<value_api>(output) = {context, read};
+        return TTX_NEGOTIATION_SATISFIED;
+      }
+
       if (supports(context, id) != TTX_NEGOTIATION_SATISFIED) {
         return TTX_NEGOTIATION_UNKNOWN;
       }
 
-      Abstract::Api api = resolve(context);
-      return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
-                     Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      Abstract::Api api = get_abstract(context);
+      *Data::cast<Abstract::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
-    static auto data(void* context) -> perimortem_view_bytes {
-      return {&Data::cast<Created>(context)->value, 1};
+    static auto read(void* context) -> U8 {
+      return Data::cast<Created>(context)->value;
     }
 
-    static auto resolve(void* context) -> ttx_abstract {
+    static auto get_abstract(void* context) -> ttx_abstract {
       return {context, &operations};
     }
 
-    static constexpr ttx_abstract_ops operations = {supports, bind,   data,
-                                                    resolve,  lookup, visit};
+    static constexpr ttx_abstract_ops operations = {
+      supports, bind, lookup, visit, state};
   };
 
   static auto create(
@@ -116,14 +135,15 @@ class ScopedCreate {
 
     Created created;
     subject.observing = true;
-    callback(callback_context, Created::resolve(&created));
+    callback(callback_context, Created::get_abstract(&created));
     subject.observing = false;
     return TTX_NEGOTIATION_SATISFIED;
   }
 
-  static constexpr ttx_create_ops operations = {
-    {supports, bind, data, resolve, lookup, visit},
-    create};
+  static constexpr ttx_abstract_ops graph_operations = {
+    supports, bind, lookup, visit, state};
+
+  static constexpr ttx_create_ops operations = {get_abstract, create};
 };
 
 // The created value lives on the provider's stack. Consuming it during the
@@ -131,7 +151,7 @@ class ScopedCreate {
 // storage.
 VALIDATION_TEST(Creation, scoped_answer) {
   ScopedCreate provider;
-  Abstract(ScopedCreate::resolve(&provider))
+  Abstract(ScopedCreate::get_abstract(&provider))
       .bind<Capabilities::Create>()
       .visit(
           [&](Capabilities::Create create) {
@@ -146,7 +166,13 @@ VALIDATION_TEST(Creation, scoped_answer) {
               EXPECT(
                   subject.supports<Capabilities::Retain>() ==
                   Negotiation::Status::Unknown);
-              copied = subject.get_data()[0];
+              copied = subject.bind<Validation::Value>().visit(
+                  [](Validation::Value value) { return value.read(); },
+                  [&] {
+                    EXPECT(False);
+                    return U8(0);
+                  });
+
               ++visits;
             };
 
@@ -171,5 +197,5 @@ VALIDATION_TEST(Creation, scoped_answer) {
             EXPECT_EQ(visits, Count(1));
           },
 
-          [&](Negotiation::Status) { EXPECT(False); });
+          [&]() { EXPECT(False); });
 }

@@ -6,8 +6,8 @@
 
 #include "ttx/graph/abstract.h"
 
-#define TTX_RETAINED_ID_HIGH 0xcd1fc9de2b8a4663ULL
-#define TTX_RETAINED_ID_LOW 0x890b83ffde67368bULL
+#define TTX_RETAINED_ID_HIGH 0x36e9d1a476ab4efcULL
+#define TTX_RETAINED_ID_LOW 0x950306045c56e03dULL
 
 // Retained keeps an Abstract accessible until the consumer calls `release`.
 // The provider keeps that Abstract's context, operation table and referenced
@@ -31,11 +31,10 @@ typedef struct ttx_retained {
 } ttx_retained;
 
 typedef struct ttx_retained_ops {
-  ttx_abstract_ops abstract;
+  // Supplies the retained Abstract with its own context and operations. A
+  // record obtained by binding returns to that binding's graph location.
+  ttx_abstract (*get_abstract)(void* context);
   void (*release)(void* context);
 } ttx_retained_ops;
-
-C_LINKAGE EXPORTED(TTX) const ttx_representation* ttx_retained_representation(
-    void);
 
 #endif

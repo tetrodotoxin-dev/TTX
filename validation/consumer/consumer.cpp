@@ -15,9 +15,13 @@ S32 main() {
   }
 
   const auto none = Policies::None::get_none();
-  if (!Abstract::accept(none.get_abstract().get_abi())) {
+  if (none.get_abstract().get_state() != Abstract::State::None) {
     return 2;
   }
 
-  return output == 73 ? 0 : 3;
+  if (none.get_abstract().get_state() != Abstract::State::None) {
+    return 3;
+  }
+
+  return output == 73 ? 0 : 4;
 }

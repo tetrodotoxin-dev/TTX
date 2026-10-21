@@ -13,7 +13,7 @@ namespace Ttx::Graph::Capabilities {
 // supply. `describe` returns a Result containing the operation's UUID, its API
 // Representation and its input and output frames. The caller selects an API it
 // can use, checks that API's Representation against the description, and binds
-// the UUID with its required Representation before calling the operation.
+// the UUID to obtain its complete C record before calling the operation.
 //
 // Each frame describes its storage and lists fields in argument order. A
 // field's Abstract supplies its meaning and its offset locates the value in
@@ -21,10 +21,10 @@ namespace Ttx::Graph::Capabilities {
 // contracts.
 //
 // Description and Frame copy their records. Their Representations, field
-// arrays and Abstracts remain accessible for the supplying observation.
-// A consumer keeping those observations copies their data or negotiates the
-// retention it needs. An Unknown failure leaves the description undetermined.
-// Rejected explicitly refuses it.
+// arrays and Abstracts remain accessible for the supplying contract's access
+// duration. A consumer keeping the description copies its data or negotiates
+// the retention it needs. An Unknown failure leaves the description
+// undetermined. Rejected explicitly refuses it.
 class Callable {
  public:
   static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
@@ -33,24 +33,17 @@ class Callable {
   using Api = ttx_callable;
   using Operations = ttx_callable_operations;
 
-  // Checks `describe`, context and the required Abstract operations for null.
-  // Any present table must be readable and match the established API
-  // representation. The supplying contract establishes Callable's meaning.
-  static auto accept(Api api) -> Bool {
-    return api.operations && api.operations->describe &&
-           Abstract::accept(
-               ttx_abstract(api.context, &api.operations->abstract));
-  }
-
-  // Copies a record already supplied under the Callable contract. The caller
-  // establishes its representation and required pointers. Explicit construction
-  // marks this unchecked conversion from the C record.
+  // Copies the complete C record supplied under the Callable contract.
+  // Explicit construction preserves the provider's context and operations
+  // as one API, with their supplying access duration.
   explicit constexpr Callable(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }
 
-  constexpr auto get_abstract() const -> Abstract {
-    return Abstract(api.context, api.operations->abstract);
+  // Returns to the graph location that supplied this binding. The provider
+  // supplies the complete Abstract and may use a different context and table.
+  auto get_abstract() const -> Abstract {
+    return Abstract(api.operations->get_abstract(api.context));
   }
 
   // Frame exposes argument or result storage and its ordered field meanings.
@@ -85,7 +78,7 @@ class Callable {
   // Description supplies the UUID and API form for negotiation, then the
   // payload forms and field Abstracts for preparing a call. Its referenced
   // descriptions and fields remain accessible under the supplying contract.
-  // Binding the operation's UUID and API form establishes the callable record.
+  // Binding the operation's UUID supplies its complete callable record.
   class Description {
    public:
     // The caller ensures the canonical forms, field arrays and Abstracts are
@@ -136,31 +129,3 @@ class Callable {
 };
 
 }  // namespace Ttx::Graph::Capabilities
-
-TTX_DATA_RECORD(
-    ttx_callable_field,
-    TTX_DATA_MEMBER(ttx_callable_field, abstract),
-    TTX_DATA_MEMBER(ttx_callable_field, offset));
-
-TTX_DATA_RECORD(
-    ttx_callable_frame,
-    TTX_DATA_MEMBER(ttx_callable_frame, representation),
-    TTX_DATA_MEMBER(ttx_callable_frame, fields),
-    TTX_DATA_MEMBER(ttx_callable_frame, count));
-
-TTX_DATA_RECORD(
-    ttx_callable_description,
-    TTX_DATA_MEMBER(ttx_callable_description, contract),
-    TTX_DATA_MEMBER(ttx_callable_description, api),
-    TTX_DATA_MEMBER(ttx_callable_description, inputs),
-    TTX_DATA_MEMBER(ttx_callable_description, outputs));
-
-TTX_DATA_RECORD(
-    ttx_callable_operations,
-    TTX_DATA_MEMBER(ttx_callable_operations, abstract),
-    TTX_DATA_MEMBER(ttx_callable_operations, describe));
-
-TTX_DATA_RECORD(
-    ttx_callable,
-    TTX_DATA_MEMBER(ttx_callable, context),
-    TTX_DATA_MEMBER(ttx_callable, operations));

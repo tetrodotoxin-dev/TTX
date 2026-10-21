@@ -7,12 +7,12 @@
 #include "perimortem/core/data.hpp"
 #include "perimortem/memory/allocator/global.hpp"
 
-#include "ttx/data/transfer.hpp"
 #include "ttx/graph/capabilities/create.hpp"
 #include "ttx/graph/capabilities/retain.hpp"
 #include "ttx/graph/policies/constant.hpp"
 #include "ttx/graph/policies/none.hpp"
 #include "ttx/graph/policies/unknown.h"
+#include "validation/tests/graph/fixtures/value.hpp"
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Memory;
@@ -37,13 +37,25 @@ class Retained {
   Count references = 1;
   U8 value;
 
-  static auto data(void* context) -> perimortem_view_bytes {
-    auto& subject = *Data::cast<Retained>(context);
-    return {&subject.value, 1};
+  static auto read(void* context) -> U8 {
+    return Data::cast<Retained>(context)->value;
+  }
+
+  static auto state(void* context) -> ttx_abstract_state {
+    return TTX_ABSTRACT_PRESENT;
   }
 
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
+    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+      return TTX_NEGOTIATION_SATISFIED;
+    }
+
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Policies::Retained::contract_id ||
@@ -54,46 +66,46 @@ class Retained {
                : TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto bind(void* context, perimortem_uuid id, ttx_storage requested)
+  static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
+    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+      *Data::cast<value_api>(output) = {context, read};
+      return TTX_NEGOTIATION_SATISFIED;
+    }
+
     auto& subject = *Data::cast<Retained>(context);
     ++subject.counts.binds;
 
     const Formats::Uuid contract(id);
-    const Form::Storage target(requested);
     if (contract == Policies::Retained::contract_id) {
       Policies::Retained::Api api = {context, &retained_operations};
-      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      *Data::cast<Policies::Retained::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     if (contract == Capabilities::Retain::contract_id) {
       Capabilities::Retain::Api api = {context, &retain_operations};
-      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      *Data::cast<Capabilities::Retain::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     if (contract == Capabilities::Create::contract_id) {
       Capabilities::Create::Api api = {context, &create_operations};
-      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      *Data::cast<Capabilities::Create::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     if (contract == Abstract::contract_id ||
         contract == Policies::Constant::contract_id) {
-      Abstract::Api api = resolve(context);
-      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      Abstract::Api api = get_abstract(context);
+      *Data::cast<Abstract::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     return TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto resolve(void* context) -> ttx_abstract {
+  static auto get_abstract(void* context) -> ttx_abstract {
     return {context, &abstract_operations};
   }
 
@@ -120,7 +132,7 @@ class Retained {
       void (*callback)(void*, ttx_abstract)) -> ttx_negotiation_status {
     auto& subject = *Data::cast<Retained>(context);
     ++subject.counts.created;
-    callback(callback_context, resolve(context));
+    callback(callback_context, get_abstract(context));
     return TTX_NEGOTIATION_SATISFIED;
   }
 
@@ -135,16 +147,14 @@ class Retained {
   }
 
   static constexpr ttx_abstract_ops abstract_operations = {
-    supports, bind, data, resolve, lookup, visit};
+    supports, bind, lookup, visit, state};
 
   static constexpr ttx_retained_ops retained_operations = {
-    abstract_operations, release};
+    get_abstract, release};
 
-  static constexpr ttx_retain_ops retain_operations = {
-    abstract_operations, retain};
+  static constexpr ttx_retain_ops retain_operations = {get_abstract, retain};
 
-  static constexpr ttx_create_ops create_operations = {
-    abstract_operations, create};
+  static constexpr ttx_create_ops create_operations = {get_abstract, create};
 };
 
 static_assert(alignof(Retained) <= Allocator::Global::allocation_alignment);
@@ -155,13 +165,25 @@ class Discovery {
   U8 value = 7;
   Negotiation::Status answer = Negotiation::Status::Satisfied;
 
-  static auto data(void* context) -> perimortem_view_bytes {
-    auto& subject = *Data::cast<Discovery>(context);
-    return {&subject.value, 1};
+  static auto read(void* context) -> U8 {
+    return Data::cast<Discovery>(context)->value;
+  }
+
+  static auto state(void* context) -> ttx_abstract_state {
+    return TTX_ABSTRACT_PRESENT;
   }
 
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
+    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+      return TTX_NEGOTIATION_SATISFIED;
+    }
+
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     const Formats::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Retain::contract_id
@@ -169,29 +191,31 @@ class Discovery {
                : TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto bind(void* context, perimortem_uuid id, ttx_storage requested)
+  static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
+    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+      *Data::cast<value_api>(output) = {context, read};
+      return TTX_NEGOTIATION_SATISFIED;
+    }
+
     const Formats::Uuid contract(id);
-    const Form::Storage target(requested);
     if (contract == Capabilities::Retain::contract_id) {
       Capabilities::Retain::Api api = {context, &operations};
-      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      *Data::cast<Capabilities::Retain::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     if (contract == Abstract::contract_id) {
-      Abstract::Api api = resolve(context);
-      return Transfer::copy(Form::Storage::from(api), target) == Status::Success
-                 ? TTX_NEGOTIATION_SATISFIED
-                 : TTX_NEGOTIATION_REJECTED;
+      Abstract::Api api = get_abstract(context);
+      *Data::cast<Abstract::Api>(output) = api;
+      return TTX_NEGOTIATION_SATISFIED;
     }
 
     return TTX_NEGOTIATION_UNKNOWN;
   }
 
-  static auto resolve(void* context) -> ttx_abstract {
-    return {context, &operations.abstract};
+  static auto get_abstract(void* context) -> ttx_abstract {
+    return {context, &graph_operations};
   }
 
   static auto lookup(void* context, perimortem_view_bytes route)
@@ -220,9 +244,10 @@ class Discovery {
     return TTX_NEGOTIATION_SATISFIED;
   }
 
-  static constexpr ttx_retain_ops operations = {
-    {supports, bind, data, resolve, lookup, visit},
-    retain};
+  static constexpr ttx_abstract_ops graph_operations = {
+    supports, bind, lookup, visit, state};
+
+  static constexpr ttx_retain_ops operations = {get_abstract, retain};
 };
 
 VALIDATION_TEST(Retention, independent_context) {
@@ -230,7 +255,7 @@ VALIDATION_TEST(Retention, independent_context) {
   Storage::Option<Policies::Retained> retained;
   {
     Discovery source = Discovery(counts);
-    const auto weak = Abstract(Discovery::resolve(&source));
+    const auto weak = Abstract(Discovery::get_abstract(&source));
     weak.bind<Capabilities::Retain>().visit(
         [&](Capabilities::Retain request) {
           EXPECT_EQ(counts.acquisitions, Count(0));
@@ -242,12 +267,20 @@ VALIDATION_TEST(Retention, independent_context) {
               [&](Negotiation::Status) { EXPECT(False); });
         },
 
-        [&](Negotiation::Status) { EXPECT(False); });
+        [&]() { EXPECT(False); });
 
     source.value = 12;
     retained.visit(
         [&](Policies::Retained acquired) {
-          EXPECT_EQ(acquired.get_abstract().get_data()[0], U8(7));
+          EXPECT_EQ(
+              acquired.get_abstract().bind<Validation::Value>().visit(
+                  [](Validation::Value value) { return value.read(); },
+                  [&] {
+                    EXPECT(False);
+                    return U8(0);
+                  }),
+
+              U8(7));
         },
 
         [&] { EXPECT(False); });
@@ -266,7 +299,15 @@ VALIDATION_TEST(Retention, independent_context) {
               const auto binds = counts.binds;
               for (Count i = 0; i != 100; ++i) {
                 auto callback = [&](Abstract answer) {
-                  EXPECT_EQ(answer.get_data()[0], U8(7));
+                  EXPECT_EQ(
+                      answer.bind<Validation::Value>().visit(
+                          [](Validation::Value value) { return value.read(); },
+                          [&] {
+                            EXPECT(False);
+                            return U8(0);
+                          }),
+
+                      U8(7));
                 };
 
                 EXPECT(
@@ -278,7 +319,7 @@ VALIDATION_TEST(Retention, independent_context) {
               EXPECT_EQ(counts.binds, binds);
             },
 
-            [&](Negotiation::Status) { EXPECT(False); });
+            [&]() { EXPECT(False); });
         EXPECT_EQ(counts.created, Count(100));
         EXPECT_EQ(counts.acquisitions, Count(1));
         EXPECT_EQ(counts.released, Count(0));
@@ -294,14 +335,25 @@ VALIDATION_TEST(Retention, independent_context) {
                     EXPECT(
                         second.get_abstract().supports<Policies::Constant>() ==
                         Negotiation::Status::Satisfied);
-                    EXPECT_EQ(second.get_abstract().get_data()[0], U8(7));
+                    EXPECT_EQ(
+                        second.get_abstract().bind<Validation::Value>().visit(
+                            [](Validation::Value value) {
+                              return value.read();
+                            },
+
+                            [&] {
+                              EXPECT(False);
+                              return U8(0);
+                            }),
+
+                        U8(7));
                     second.release();
                   },
 
                   [&](Negotiation::Status) { EXPECT(False); });
             },
 
-            [&](Negotiation::Status) { EXPECT(False); });
+            [&]() { EXPECT(False); });
       },
 
       [&] { EXPECT(False); });
@@ -311,8 +363,16 @@ VALIDATION_TEST(Retention, independent_context) {
 VALIDATION_TEST(Retention, scoped_and_refused) {
   Observations counts;
   Discovery source = Discovery(counts);
-  const auto weak = Abstract(Discovery::resolve(&source));
-  EXPECT_EQ(weak.get_data()[0], U8(7));
+  const auto weak = Abstract(Discovery::get_abstract(&source));
+  EXPECT_EQ(
+      weak.bind<Validation::Value>().visit(
+          [](Validation::Value value) { return value.read(); },
+          [&] {
+            EXPECT(False);
+            return U8(0);
+          }),
+
+      U8(7));
 
   const Negotiation::Status answers[] = {
     Negotiation::Status::Unknown, Negotiation::Status::Rejected};
@@ -329,41 +389,7 @@ VALIDATION_TEST(Retention, scoped_and_refused) {
         }
       },
 
-      [&](Negotiation::Status) { EXPECT(False); });
+      [&]() { EXPECT(False); });
   EXPECT_EQ(counts.acquisitions, Count(0));
   EXPECT_EQ(counts.released, Count(0));
-}
-
-// The provider returns a Retained record with a release function and an
-// incomplete Abstract table. The C++ `retain` method calls that release
-// function with the returned context before reporting Rejected.
-VALIDATION_TEST(Retention, malformed_answer_return) {
-  struct Provider {
-    Count releases = 0;
-
-    static auto release(void* context) -> void {
-      ++Data::cast<Provider>(context)->releases;
-    }
-
-    static auto retain(void* context, ttx_retained* output)
-        -> ttx_negotiation_status {
-      static const ttx_retained_ops malformed = {{}, release};
-      *output = {context, &malformed};
-      return TTX_NEGOTIATION_SATISFIED;
-    }
-  } provider;
-
-  // None's Abstract functions ignore context, so this Retain interface can
-  // reuse them with the fixture's Provider pointer. Its retain function returns
-  // a different table with missing Abstract operations to exercise cleanup.
-  const ttx_retain_ops operations = {*ttx_none().operations, Provider::retain};
-  const Capabilities::Retain request({&provider, &operations});
-  ASSERT(Capabilities::Retain::accept(request.get_abi()));
-  request.retain().visit(
-      [&](Policies::Retained) { EXPECT(False); },
-      [&](Negotiation::Status failure) {
-        EXPECT(failure == Negotiation::Status::Rejected);
-      });
-
-  EXPECT_EQ(provider.releases, Count(1));
 }
