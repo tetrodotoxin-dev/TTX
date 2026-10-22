@@ -19,7 +19,7 @@ namespace Ttx::Graph::Policies {
 // result with its own release obligation.
 class Retained {
  public:
-  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+  static constexpr auto contract_id = Perimortem::Core::Identity::Uuid(
       TTX_RETAINED_ID_HIGH,
       TTX_RETAINED_ID_LOW);
   using Api = ttx_retained;

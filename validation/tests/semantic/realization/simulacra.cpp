@@ -16,7 +16,6 @@
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Memory;
-using namespace Perimortem::Serialization;
 using namespace Perimortem::System;
 using namespace Toolchain::Validation;
 using namespace Ttx::Data;
@@ -38,7 +37,7 @@ static Harness TtxSimulacra = {
 class Counter {
  public:
   static constexpr auto contract_id =
-      Formats::Uuid(COUNTER_ID_HIGH, COUNTER_ID_LOW);
+      Identity::Uuid(COUNTER_ID_HIGH, COUNTER_ID_LOW);
   using Api = counter_api;
 
   static auto accept(Api api) -> Bool { return api.add && api.read; }
@@ -114,7 +113,7 @@ VALIDATION_TEST(TtxSimulacra, support_without_abi) {
 VALIDATION_TEST(TtxSimulacra, different_meaning_same_representation) {
   Foreign foreign;
   counter_api api = {};
-  const Formats::Uuid other(COUNTER_ID_HIGH, COUNTER_ID_LOW + 1);
+  const Identity::Uuid other(COUNTER_ID_HIGH, COUNTER_ID_LOW + 1);
   const Negotiation::Query query(foreign.api.query);
   EXPECT(query.supports(other) == Negotiation::Status::Unknown);
   EXPECT(

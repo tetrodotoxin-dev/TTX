@@ -14,7 +14,6 @@
 #include "ttx/semantic/negotiation/library.h"
 
 using namespace Perimortem::Core;
-using namespace Perimortem::Serialization;
 using namespace Ttx::Graph;
 using namespace Ttx::Data;
 
@@ -40,7 +39,7 @@ struct Root {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    return Formats::Uuid(id) == Abstract::contract_id
+    return Identity::Uuid(id) == Abstract::contract_id
                ? TTX_NEGOTIATION_SATISFIED
                : TTX_NEGOTIATION_UNKNOWN;
   }
@@ -108,13 +107,13 @@ auto get(void* context, U64 index) -> ttx_abstract {
 }
 
 auto supports(void* context, perimortem_uuid id) -> ttx_negotiation_status {
-  const Formats::Uuid contract(id);
+  const Identity::Uuid contract(id);
   return contract == Abstract::contract_id ||
                  contract ==
-                     Formats::Uuid(
+                     Identity::Uuid(
                          BOOTSTRAP_EXPORTS_HIGH, BOOTSTRAP_EXPORTS_LOW) ||
                  contract ==
-                     Formats::Uuid(BOOTSTRAP_QUERY_HIGH, BOOTSTRAP_QUERY_LOW)
+                     Identity::Uuid(BOOTSTRAP_QUERY_HIGH, BOOTSTRAP_QUERY_LOW)
              ? TTX_NEGOTIATION_SATISFIED
              : TTX_NEGOTIATION_UNKNOWN;
 }
@@ -128,12 +127,12 @@ auto bind(void* context, perimortem_uuid id, ttx_storage target)
   auto& state = *Data::cast<Module>(context);
   ++state.requests;
 
-  const Formats::Uuid contract(id);
+  const Identity::Uuid contract(id);
   if (contract == Abstract::contract_id) {
     return Root::query_bind(&state.root, id, target);
   }
 
-  if (contract == Formats::Uuid(BOOTSTRAP_QUERY_HIGH, BOOTSTRAP_QUERY_LOW)) {
+  if (contract == Identity::Uuid(BOOTSTRAP_QUERY_HIGH, BOOTSTRAP_QUERY_LOW)) {
     ttx_semantic_query api{&state.root, Root::query_bind, Root::supports};
     return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
                    Status::Success
@@ -142,7 +141,7 @@ auto bind(void* context, perimortem_uuid id, ttx_storage target)
   }
 
   if (contract ==
-      Formats::Uuid(BOOTSTRAP_EXPORTS_HIGH, BOOTSTRAP_EXPORTS_LOW)) {
+      Identity::Uuid(BOOTSTRAP_EXPORTS_HIGH, BOOTSTRAP_EXPORTS_LOW)) {
     bootstrap_exports api{&state.root, visit};
     if (Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
         Status::Success) {

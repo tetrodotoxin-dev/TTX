@@ -16,7 +16,6 @@
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Memory;
-using namespace Perimortem::Serialization;
 using namespace Perimortem::System;
 using namespace Toolchain::Validation;
 using namespace Ttx::Data;
@@ -44,8 +43,8 @@ static constexpr auto inputs = Form::Schema::composite(
     positions,
     sizeof(invocation_input),
     alignof(invocation_input));
-static constexpr Formats::Uuid operation =
-    Formats::Uuid(INVOCATION_METHOD_HIGH, INVOCATION_METHOD_LOW);
+static constexpr Identity::Uuid operation =
+    Identity::Uuid(INVOCATION_METHOD_HIGH, INVOCATION_METHOD_LOW);
 
 class ForeignInvocation {
  public:

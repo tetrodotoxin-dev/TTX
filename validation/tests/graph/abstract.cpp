@@ -15,7 +15,6 @@
 #include "validation/tests/graph/fixtures/value.hpp"
 
 using namespace Perimortem::Core;
-using namespace Perimortem::Serialization;
 using namespace Toolchain::Validation;
 using namespace Ttx::Graph;
 using namespace Ttx::Data;
@@ -197,20 +196,20 @@ VALIDATION_TEST(Abstracts, qualified_question) {
   struct Subject {
     Count probes = 0;
 
-    static auto contract() -> Formats::Uuid {
-      return Formats::Uuid(0x274605faccbb48b0ULL, 0x89c84603372550d1ULL);
+    static auto contract() -> Identity::Uuid {
+      return Identity::Uuid(0x274605faccbb48b0ULL, 0x89c84603372550d1ULL);
     }
 
     static auto supports(void* context, perimortem_uuid id)
         -> ttx_negotiation_status {
       ++Data::cast<Subject>(context)->probes;
-      return Formats::Uuid(id) == contract() ? TTX_NEGOTIATION_SATISFIED
-                                             : TTX_NEGOTIATION_UNKNOWN;
+      return Identity::Uuid(id) == contract() ? TTX_NEGOTIATION_SATISFIED
+                                              : TTX_NEGOTIATION_UNKNOWN;
     }
 
     static auto bind(void* context, perimortem_uuid id, ttx_storage target)
         -> ttx_negotiation_status {
-      if (Formats::Uuid(id) != contract()) {
+      if (Identity::Uuid(id) != contract()) {
         return TTX_NEGOTIATION_UNKNOWN;
       }
 

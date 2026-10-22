@@ -17,7 +17,6 @@
 #include "validation/tests/graph/fixtures/value.hpp"
 
 using namespace Perimortem::Core;
-using namespace Perimortem::Serialization;
 using namespace Toolchain::Validation;
 using namespace Ttx::Graph;
 using namespace Ttx::Data;
@@ -45,11 +44,11 @@ class Report {
     }
 
     auto& report = *Data::cast<Report>(context);
-    if (Formats::Uuid(id) == Abstract::contract_id) {
+    if (Identity::Uuid(id) == Abstract::contract_id) {
       return TTX_NEGOTIATION_SATISFIED;
     }
 
-    return Formats::Uuid(id) == Capabilities::Export::contract_id
+    return Identity::Uuid(id) == Capabilities::Export::contract_id
                ? ttx_negotiation_status(report.status)
                : TTX_NEGOTIATION_UNKNOWN;
   }
@@ -61,7 +60,7 @@ class Report {
       return status;
     }
 
-    if (Formats::Uuid(id) == Abstract::contract_id) {
+    if (Identity::Uuid(id) == Abstract::contract_id) {
       Abstract::Api api = get_abstract(context);
       *Data::cast<Abstract::Api>(output) = api;
       return TTX_NEGOTIATION_SATISFIED;
@@ -126,7 +125,7 @@ class ImportedByte {
 
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
-    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+    if (Identity::Uuid(id) == Validation::Value::contract_id) {
       return TTX_NEGOTIATION_SATISFIED;
     }
 
@@ -136,7 +135,7 @@ class ImportedByte {
     }
 
     auto& subject = *Data::cast<ImportedByte>(context);
-    if (Formats::Uuid(id) == Abstract::contract_id) {
+    if (Identity::Uuid(id) == Abstract::contract_id) {
       return TTX_NEGOTIATION_SATISFIED;
     }
 
@@ -152,20 +151,20 @@ class ImportedByte {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+    if (Identity::Uuid(id) == Validation::Value::contract_id) {
       *Data::cast<value_api>(output) = {context, read};
       return TTX_NEGOTIATION_SATISFIED;
     }
 
     auto& subject = *Data::cast<ImportedByte>(context);
-    if (Formats::Uuid(id) == Abstract::contract_id) {
+    if (Identity::Uuid(id) == Abstract::contract_id) {
       Abstract::Api api = get_abstract(context);
       *Data::cast<Abstract::Api>(output) = api;
       return TTX_NEGOTIATION_SATISFIED;
     }
 
     if (subject.report && subject.at_root &&
-        Formats::Uuid(id) == Capabilities::Export::contract_id) {
+        Identity::Uuid(id) == Capabilities::Export::contract_id) {
       const auto status = Report::supports(subject.report, id);
       if (status == TTX_NEGOTIATION_SATISFIED) {
         *Data::cast<ttx_export>(output) = {context, &export_operations};
@@ -223,7 +222,7 @@ class ByteImport {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    const Formats::Uuid contract(id);
+    const Identity::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Import::contract_id
                ? TTX_NEGOTIATION_SATISFIED
@@ -237,13 +236,13 @@ class ByteImport {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    if (Formats::Uuid(id) == Abstract::contract_id) {
+    if (Identity::Uuid(id) == Abstract::contract_id) {
       Abstract::Api api = get_abstract(context);
       *Data::cast<Abstract::Api>(output) = api;
       return TTX_NEGOTIATION_SATISFIED;
     }
 
-    if (Formats::Uuid(id) == Capabilities::Import::contract_id) {
+    if (Identity::Uuid(id) == Capabilities::Import::contract_id) {
       Capabilities::Import::Api api = {context, &operations};
       *Data::cast<Capabilities::Import::Api>(output) = api;
       return TTX_NEGOTIATION_SATISFIED;
@@ -312,7 +311,7 @@ class ByteExport {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    const Formats::Uuid contract(id);
+    const Identity::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Export::contract_id
                ? TTX_NEGOTIATION_SATISFIED
@@ -326,13 +325,13 @@ class ByteExport {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    if (Formats::Uuid(id) == Abstract::contract_id) {
+    if (Identity::Uuid(id) == Abstract::contract_id) {
       Abstract::Api api = get_abstract(context);
       *Data::cast<Abstract::Api>(output) = api;
       return TTX_NEGOTIATION_SATISFIED;
     }
 
-    if (Formats::Uuid(id) == Capabilities::Export::contract_id) {
+    if (Identity::Uuid(id) == Capabilities::Export::contract_id) {
       Capabilities::Export::Api api = {context, &operations};
       *Data::cast<Capabilities::Export::Api>(output) = api;
       return TTX_NEGOTIATION_SATISFIED;

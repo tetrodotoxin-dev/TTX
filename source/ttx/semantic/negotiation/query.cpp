@@ -3,11 +3,11 @@
 
 #include "ttx/semantic/negotiation/query.hpp"
 
-using namespace Perimortem::Serialization;
+using namespace Perimortem::Core;
 using namespace Ttx::Data;
 using namespace Ttx::Semantic;
 
-auto Negotiation::Query::supports(Formats::Uuid contract) const
+auto Negotiation::Query::supports(Identity::Uuid contract) const
     -> Negotiation::Status {
   if (!api.supports) {
     return Negotiation::Status::Rejected;
@@ -20,7 +20,7 @@ auto Negotiation::Query::supports(Formats::Uuid contract) const
              : Negotiation::Status::Rejected;
 }
 
-auto Negotiation::Query::bind(Formats::Uuid contract, Form::Storage requested)
+auto Negotiation::Query::bind(Identity::Uuid contract, Form::Storage requested)
     const -> Negotiation::Status {
   if (!api.bind || ttx_storage_check(requested.get_abi()) != TTX_DATA_SUCCESS) {
     return Negotiation::Status::Rejected;

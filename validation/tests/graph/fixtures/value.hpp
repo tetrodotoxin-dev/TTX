@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "perimortem/serialization/formats/uuid.hpp"
+#include "perimortem/core/identity/uuid.hpp"
 
 #include "validation/tests/graph/fixtures/value.h"
 
@@ -16,7 +16,7 @@ class Value {
  public:
   using Api = value_api;
   static constexpr auto contract_id =
-      Perimortem::Serialization::Formats::Uuid(VALUE_ID_HIGH, VALUE_ID_LOW);
+      Perimortem::Core::Identity::Uuid(VALUE_ID_HIGH, VALUE_ID_LOW);
 
   explicit constexpr Value(Api api) : api(api) {}
 

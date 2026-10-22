@@ -16,7 +16,6 @@
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Memory;
-using namespace Perimortem::Serialization;
 using namespace Toolchain::Memory;
 using namespace Toolchain::Validation;
 using namespace Ttx::Graph;
@@ -47,7 +46,7 @@ class Retained {
 
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
-    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+    if (Identity::Uuid(id) == Validation::Value::contract_id) {
       return TTX_NEGOTIATION_SATISFIED;
     }
 
@@ -56,7 +55,7 @@ class Retained {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    const Formats::Uuid contract(id);
+    const Identity::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Policies::Retained::contract_id ||
                    contract == Capabilities::Retain::contract_id ||
@@ -73,7 +72,7 @@ class Retained {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+    if (Identity::Uuid(id) == Validation::Value::contract_id) {
       *Data::cast<value_api>(output) = {context, read};
       return TTX_NEGOTIATION_SATISFIED;
     }
@@ -81,7 +80,7 @@ class Retained {
     auto& subject = *Data::cast<Retained>(context);
     ++subject.counts.binds;
 
-    const Formats::Uuid contract(id);
+    const Identity::Uuid contract(id);
     if (contract == Policies::Retained::contract_id) {
       Policies::Retained::Api api = {context, &retained_operations};
       *Data::cast<Policies::Retained::Api>(output) = api;
@@ -180,7 +179,7 @@ class Discovery {
 
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
-    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+    if (Identity::Uuid(id) == Validation::Value::contract_id) {
       return TTX_NEGOTIATION_SATISFIED;
     }
 
@@ -189,7 +188,7 @@ class Discovery {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    const Formats::Uuid contract(id);
+    const Identity::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Retain::contract_id
                ? TTX_NEGOTIATION_SATISFIED
@@ -203,12 +202,12 @@ class Discovery {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+    if (Identity::Uuid(id) == Validation::Value::contract_id) {
       *Data::cast<value_api>(output) = {context, read};
       return TTX_NEGOTIATION_SATISFIED;
     }
 
-    const Formats::Uuid contract(id);
+    const Identity::Uuid contract(id);
     if (contract == Capabilities::Retain::contract_id) {
       Capabilities::Retain::Api api = {context, &operations};
       *Data::cast<Capabilities::Retain::Api>(output) = api;

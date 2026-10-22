@@ -14,9 +14,8 @@ namespace Ttx::Graph::Policies {
 // visitation order is incidental under every policy of that Abstract.
 class Ordered {
  public:
-  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
-      TTX_ORDERED_ID_HIGH,
-      TTX_ORDERED_ID_LOW);
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_ORDERED_ID_HIGH, TTX_ORDERED_ID_LOW);
   using Api = ttx_abstract;
 
   // Copies an Abstract already supplied under the Ordered contract. Explicit

@@ -27,7 +27,7 @@ namespace Ttx::Graph::Capabilities {
 // undetermined. Rejected explicitly refuses it.
 class Callable {
  public:
-  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+  static constexpr auto contract_id = Perimortem::Core::Identity::Uuid(
       TTX_CALLABLE_ID_HIGH,
       TTX_CALLABLE_ID_LOW);
   using Api = ttx_callable;
@@ -87,8 +87,8 @@ class Callable {
     explicit constexpr Description(ttx_callable_description description)
         : description(description) {}
 
-    auto get_contract() const -> Perimortem::Serialization::Formats::Uuid {
-      return Perimortem::Serialization::Formats::Uuid(description.contract);
+    auto get_contract() const -> Perimortem::Core::Identity::Uuid {
+      return Perimortem::Core::Identity::Uuid(description.contract);
     }
 
     auto get_representation() const -> Data::Form::Representation {

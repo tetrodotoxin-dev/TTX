@@ -13,7 +13,6 @@
 #include "validation/tests/graph/fixtures/value.hpp"
 
 using namespace Perimortem::Core;
-using namespace Perimortem::Serialization;
 using namespace Toolchain::Validation;
 using namespace Ttx::Graph;
 using namespace Ttx::Data;
@@ -37,7 +36,7 @@ class ScopedCreate {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    const Formats::Uuid contract(id);
+    const Identity::Uuid contract(id);
     return contract == Abstract::contract_id ||
                    contract == Capabilities::Create::contract_id
                ? TTX_NEGOTIATION_SATISFIED
@@ -51,13 +50,13 @@ class ScopedCreate {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    if (Formats::Uuid(id) == Capabilities::Create::contract_id) {
+    if (Identity::Uuid(id) == Capabilities::Create::contract_id) {
       Capabilities::Create::Api api = {context, &operations};
       *Data::cast<Capabilities::Create::Api>(output) = api;
       return TTX_NEGOTIATION_SATISFIED;
     }
 
-    if (Formats::Uuid(id) == Abstract::contract_id) {
+    if (Identity::Uuid(id) == Abstract::contract_id) {
       Abstract::Api api = get_abstract(context);
       *Data::cast<Abstract::Api>(output) = api;
       return TTX_NEGOTIATION_SATISFIED;
@@ -86,7 +85,7 @@ class ScopedCreate {
 
     static auto supports(void* context, perimortem_uuid id)
         -> ttx_negotiation_status {
-      if (Formats::Uuid(id) == Validation::Value::contract_id) {
+      if (Identity::Uuid(id) == Validation::Value::contract_id) {
         return TTX_NEGOTIATION_SATISFIED;
       }
 
@@ -95,14 +94,14 @@ class ScopedCreate {
         return TTX_NEGOTIATION_REJECTED;
       }
 
-      return Formats::Uuid(id) == Abstract::contract_id
+      return Identity::Uuid(id) == Abstract::contract_id
                  ? TTX_NEGOTIATION_SATISFIED
                  : TTX_NEGOTIATION_UNKNOWN;
     }
 
     static auto bind(void* context, perimortem_uuid id, void* output)
         -> ttx_negotiation_status {
-      if (Formats::Uuid(id) == Validation::Value::contract_id) {
+      if (Identity::Uuid(id) == Validation::Value::contract_id) {
         *Data::cast<value_api>(output) = {context, read};
         return TTX_NEGOTIATION_SATISFIED;
       }

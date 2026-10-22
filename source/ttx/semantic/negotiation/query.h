@@ -4,7 +4,7 @@
 #ifndef TTX_SEMANTIC_NEGOTIATION_QUERY_H
 #define TTX_SEMANTIC_NEGOTIATION_QUERY_H
 
-#include "perimortem/serialization/formats/uuid.h"
+#include "perimortem/core/identity/uuid.h"
 
 #include "ttx/data/form/storage.h"
 #include "ttx/semantic/negotiation/status.h"

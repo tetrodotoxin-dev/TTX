@@ -6,7 +6,7 @@
 #include "ttx/semantic/negotiation/query.hpp"
 #include "validation/tests/semantic/fixtures/portable_provider.h"
 
-using namespace Perimortem::Serialization;
+using namespace Perimortem::Core;
 using namespace Toolchain::Validation;
 using namespace Ttx::Semantic;
 
@@ -17,7 +17,7 @@ TTX_DATA_RECORD(
 
 struct PortableCounter {
   using Api = portable_counter;
-  static constexpr Formats::Uuid contract_id = Formats::Uuid(17, 23);
+  static constexpr Identity::Uuid contract_id = Identity::Uuid(17, 23);
   Api api;
 
   // Copies a negotiated record whose provider supplies callable code and its
@@ -38,7 +38,7 @@ TTX_DATA_RECORD(
 
 struct Wrong {
   using Api = WrongApi;
-  static constexpr Formats::Uuid contract_id = Formats::Uuid(17, 23);
+  static constexpr Identity::Uuid contract_id = Identity::Uuid(17, 23);
   // Explicit construction marks the conversion that a successful bind would
   // select. This fixture requests an incompatible signature and expects that
   // bind to reject the record before reaching this constructor.

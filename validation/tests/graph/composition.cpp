@@ -16,7 +16,6 @@
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Memory;
-using namespace Perimortem::Serialization;
 using namespace Toolchain::Validation;
 using namespace Ttx::Graph;
 using namespace Ttx::Data;
@@ -28,7 +27,7 @@ class Expression {
  public:
   using Api = expression;
   static constexpr auto contract_id =
-      Formats::Uuid(COMPOSITION_ID_HIGH, EXPRESSION_ID_LOW);
+      Identity::Uuid(COMPOSITION_ID_HIGH, EXPRESSION_ID_LOW);
 
   // Explicit construction marks an unchecked conversion of the complete C
   // record. The provider supplies the evaluation and Abstract contracts.
@@ -54,7 +53,7 @@ class RetainedExpression {
  public:
   using Api = retained_expression;
   static constexpr auto contract_id =
-      Formats::Uuid(COMPOSITION_ID_HIGH, RETAINED_EXPRESSION_ID_LOW);
+      Identity::Uuid(COMPOSITION_ID_HIGH, RETAINED_EXPRESSION_ID_LOW);
 
   // Copies an acquired C record under its original release obligation.
   // Explicit construction marks this unchecked conversion from the C record.
@@ -116,8 +115,8 @@ VALIDATION_TEST(Composition, foreign_qualified_answer) {
 
   state.value = 99;
 
-  const Formats::Uuid additional =
-      Formats::Uuid(COMPOSITION_ID_HIGH, ADDITIONAL_ID_LOW);
+  const Identity::Uuid additional =
+      Identity::Uuid(COMPOSITION_ID_HIGH, ADDITIONAL_ID_LOW);
   answer.get_abstract().bind<Expression>().visit(
       [&](Expression expression) {
         EXPECT(

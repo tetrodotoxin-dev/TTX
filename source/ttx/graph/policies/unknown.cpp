@@ -4,7 +4,6 @@
 #include "ttx/graph/policies/unknown.hpp"
 
 using namespace Perimortem::Core;
-using namespace Perimortem::Serialization;
 using namespace Ttx::Graph;
 
 // UnknownProvider supplies the shared Unknown result. Its own routes stay on
@@ -14,8 +13,8 @@ class UnknownProvider {
  public:
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
-    const Formats::Uuid contract(id);
-    if (contract == Formats::Uuid(TTX_NONE_ID_HIGH, TTX_NONE_ID_LOW)) {
+    const Identity::Uuid contract(id);
+    if (contract == Identity::Uuid(TTX_NONE_ID_HIGH, TTX_NONE_ID_LOW)) {
       return TTX_NEGOTIATION_REJECTED;
     }
 

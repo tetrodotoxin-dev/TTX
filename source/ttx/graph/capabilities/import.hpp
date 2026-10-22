@@ -30,9 +30,8 @@ namespace Ttx::Graph::Capabilities {
 // explicitly refuses it.
 class Import {
  public:
-  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
-      TTX_IMPORT_ID_HIGH,
-      TTX_IMPORT_ID_LOW);
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_IMPORT_ID_HIGH, TTX_IMPORT_ID_LOW);
   using Api = ttx_import;
   using Operations = ttx_import_ops;
 

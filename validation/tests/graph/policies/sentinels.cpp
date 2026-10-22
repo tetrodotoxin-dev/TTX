@@ -11,7 +11,6 @@
 #include "ttx/graph/policies/unknown.hpp"
 
 using namespace Perimortem::Core;
-using namespace Perimortem::Serialization;
 using namespace Toolchain::Validation;
 using namespace Ttx::Graph;
 using namespace Ttx::Data;
@@ -92,7 +91,7 @@ VALIDATION_TEST(Sentinels, present_without_known_contracts) {
   EXPECT(
       abstract.supports<Policies::Unknown>() == Negotiation::Status::Rejected);
   EXPECT(
-      abstract.supports(Formats::Uuid(0, 2)) == Negotiation::Status::Unknown);
+      abstract.supports(Identity::Uuid(0, 2)) == Negotiation::Status::Unknown);
   EXPECT_EQ(provider.classifications, Count(1));
 
   EXPECT(

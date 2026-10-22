@@ -57,24 +57,57 @@ def check():
             r"\Amodule\([\s\S]*?\)", 'module(name="ttx_consumer")',
             (repository / "MODULE.bazel").read_text(), count=1)
 
+        # The consumer selects Perimortem's matching published variant for all
+        # its targets, including support code and the separately built providers.
+        dependencies, imports = re.subn(
+            r'use_repo\(\s*sdks,\s*"perimortem",\s*"perimortem_static",?\s*\)',
+            '', dependencies, count=1)
+        if imports != 1:
+            raise ValueError("Expected the source module's Perimortem imports")
+
         for linkage in ["static", "shared"]:
             module = dependencies + "\n" + (templates / "MODULE.tpl").read_text()
             for key, value in {"archives": repr(pins), "linkage": linkage,
-                               "version": version}.items():
+                               "version": version,
+                               "perimortem": "perimortem_static" if linkage == "static" else "perimortem"}.items():
                 module = module.replace("{" + key + "}", value)
             (workspace / "MODULE.bazel").write_text(module)
-            for target in [
+            targets = [
                 "//validation/consumer:c_consumer",
                 "//validation/consumer:data_consumer",
                 "//validation/consumer:semantic_consumer",
                 "//validation/consumer:cpp_consumer",
                 "//:tests",
-            ]:
+            ]
+            for target in targets:
                 subprocess.run([
                     "bazel", "--batch", "--output_base=" + str(Path(temporary) / "bazel"),
                     "run", target, "--config=release",
                     "--distdir=" + str(directory),
                 ], cwd=workspace, check=True)
+
+            executables = subprocess.check_output([
+                "bazel", "--batch", "--output_base=" + str(Path(temporary) / "bazel"),
+                "cquery", "set(" + " ".join(targets) + ")", "--config=release",
+                "--distdir=" + str(directory), "--output=starlark",
+                '--starlark:expr=providers(target)["DefaultInfo"].files_to_run.executable.path',
+            ], cwd=workspace, text=True).splitlines()
+            if len(executables) != len(targets):
+                raise ValueError("Expected one executable for each SDK consumer")
+            for executable in executables:
+                binary = workspace / ".bin/bin" / executable.split("/bin/", 1)[1]
+                dynamic = subprocess.check_output(
+                    ["readelf", "-d", str(binary)], text=True)
+                required = re.findall(r"\(NEEDED\)[^\n]*\[([^\]]+)\]", dynamic)
+                if linkage == "static":
+                    for library in ["libttx.so", "libperimortem.so"]:
+                        if library in required:
+                            raise ValueError("Static SDK consumer requires " + library)
+                elif "libttx.so" not in required:
+                    raise ValueError("Shared SDK consumer must use libttx.so")
+                print(
+                    f"{linkage} {binary.name}: {binary.stat().st_size:,} bytes; "
+                    f"runtime dependencies: {', '.join(required)}", flush=True)
             print(
                 linkage + " candidate SDK: Data, Semantic, Graph consumers "
                 "and contract tests passed.", flush=True)

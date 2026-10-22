@@ -8,8 +8,11 @@
 #error The Semantic component exposed Graph.
 #endif
 
+#if __has_include("perimortem/serialization/formats/uuid.hpp")
+#error The Semantic component exposed Perimortem Serialization.
+#endif
+
 using namespace Perimortem::Core;
-using namespace Perimortem::Serialization;
 using namespace Ttx::Data;
 using namespace Ttx::Semantic;
 
@@ -23,7 +26,9 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(Reading, context),
     TTX_DATA_MEMBER(Reading, read));
 
-static constexpr Formats::Uuid contract(0x41ea753933a846cc, 0xba63a4301103d22e);
+static constexpr Identity::Uuid contract(
+    0x41ea753933a846cc,
+    0xba63a4301103d22e);
 
 static auto read(void* context) -> U32 {
   return *Data::cast<U32>(context);
@@ -31,8 +36,8 @@ static auto read(void* context) -> U32 {
 
 static auto supports(void* context, perimortem_uuid id)
     -> ttx_negotiation_status {
-  return Formats::Uuid(id) == contract ? TTX_NEGOTIATION_SATISFIED
-                                       : TTX_NEGOTIATION_UNKNOWN;
+  return Identity::Uuid(id) == contract ? TTX_NEGOTIATION_SATISFIED
+                                        : TTX_NEGOTIATION_UNKNOWN;
 }
 
 static auto bind(void* context, perimortem_uuid id, ttx_storage requested)

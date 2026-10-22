@@ -6,8 +6,8 @@
 
 #include "toolchain/toolchain.h"
 
+#include "perimortem/core/identity/uuid.h"
 #include "perimortem/core/view/bytes.h"
-#include "perimortem/serialization/formats/uuid.h"
 
 #include "ttx/data/form/representation.h"
 #include "ttx/semantic/negotiation/status.h"

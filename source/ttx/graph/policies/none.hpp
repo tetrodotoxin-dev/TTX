@@ -14,9 +14,8 @@ namespace Ttx::Graph::Policies {
 // contract also establishes Constant.
 class None {
  public:
-  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
-      TTX_NONE_ID_HIGH,
-      TTX_NONE_ID_LOW);
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_NONE_ID_HIGH, TTX_NONE_ID_LOW);
   using Api = ttx_abstract;
 
   // Copies an Abstract already supplied under the None contract. Explicit

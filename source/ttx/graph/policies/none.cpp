@@ -4,7 +4,6 @@
 #include "ttx/graph/policies/none.hpp"
 
 using namespace Perimortem::Core;
-using namespace Perimortem::Serialization;
 using namespace Ttx::Graph;
 
 // NoneProvider supplies the shared None result. Its own routes stay on
@@ -14,8 +13,8 @@ class NoneProvider {
  public:
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
-    const Formats::Uuid contract(id);
-    if (contract == Formats::Uuid(TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW)) {
+    const Identity::Uuid contract(id);
+    if (contract == Identity::Uuid(TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW)) {
       return TTX_NEGOTIATION_REJECTED;
     }
 

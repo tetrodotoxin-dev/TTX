@@ -3,8 +3,8 @@
 
 #pragma once
 
+#include "perimortem/core/identity/uuid.hpp"
 #include "perimortem/core/storage/result.hpp"
-#include "perimortem/serialization/formats/uuid.hpp"
 
 #include "ttx/data/form/storage.hpp"
 #include "ttx/semantic/negotiation/query.h"
@@ -38,8 +38,8 @@ class Query {
     return api.bind != nullptr && api.supports != nullptr;
   }
 
-  EXPORTED(TTX) auto supports(
-      Perimortem::Serialization::Formats::Uuid contract) const -> Status;
+  EXPORTED(TTX) auto supports(Perimortem::Core::Identity::Uuid contract) const
+      -> Status;
 
   template <typename Contract>
   auto supports() const -> Status {
@@ -47,7 +47,7 @@ class Query {
   }
 
   EXPORTED(TTX) auto bind(
-      Perimortem::Serialization::Formats::Uuid contract,
+      Perimortem::Core::Identity::Uuid contract,
       Data::Form::Storage requested) const -> Status;
 
   template <typename Contract>
@@ -64,7 +64,7 @@ class Query {
   // complete API record. The provider establishes its semantic guarantees
   // regardless of whether the C++ interface supplies this additional check.
   template <typename Interface>
-  auto bind(Perimortem::Serialization::Formats::Uuid contract) const
+  auto bind(Perimortem::Core::Identity::Uuid contract) const
       -> Perimortem::Core::Storage::Result<Interface, Status> {
     typename Interface::Api api = {};
     const auto requested = Data::Form::Storage::from(api);

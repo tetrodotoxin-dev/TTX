@@ -17,7 +17,7 @@ namespace Ttx::Graph::Policies {
 // their own contracts.
 class Constant {
  public:
-  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+  static constexpr auto contract_id = Perimortem::Core::Identity::Uuid(
       TTX_CONSTANT_ID_HIGH,
       TTX_CONSTANT_ID_LOW);
   using Api = ttx_abstract;

@@ -23,9 +23,8 @@ namespace Ttx::Graph::Capabilities {
 // keeps the returned Abstract available until the matching release.
 class Retain {
  public:
-  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
-      TTX_RETAIN_ID_HIGH,
-      TTX_RETAIN_ID_LOW);
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_RETAIN_ID_HIGH, TTX_RETAIN_ID_LOW);
   using Api = ttx_retain;
   using Operations = ttx_retain_ops;
 

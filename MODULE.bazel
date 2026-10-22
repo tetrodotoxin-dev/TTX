@@ -9,27 +9,39 @@ bazel_dep(name = "rules_pkg", version = "1.3.0")
 bazel_dep(name = "tetro_toolchain", version = "0.4.1")
 archive_override(
     module_name = "tetro_toolchain",
-    sha256 = "e29656570179a94c3bc5f42ba8ce73166c8b2cac7d3f0095efeaea2438eedd9f",
+    sha256 = "9b501a36786fdb96f0708135cff7a62a1178fef66d245a4acae22dd2dd657ae6",
     urls = ["https://github.com/tetrodotoxin-dev/Toolchain/releases/download/v0.4.1/tetro_toolchain-0.4.1-source.tar.gz"],
 )
 
 register_toolchains("@tetro_toolchain//:cc_toolchain_for_linux_x86_64", "@tetro_toolchain//:cc_toolchain_for_wasm32", "@tetro_toolchain//:cc_toolchain_for_wasm32_runner", "@tetro_toolchain//:cc_toolchain_for_windows_x64")
 
 sdks = use_extension("@tetro_toolchain//source/bazel:sdk.bzl", "dependencies")
+
+_PERIMORTEM_ARCHIVES = {
+    "headers": "a5a474fa6548f0e0bb810213bd76760b8ad9d602ee99d35b6f3f884f85f05f98",
+    "linux-x86_64-v3-static": "a81ebd1c1194012f3149e88a0e52228e341fecc4125279b195ad3b58e4124e5e",
+    "linux-x86_64-v3-shared": "f1cec0d68f49dd1e682188cefca7589f245ea91bf786dada57899eac2a124dab",
+    "windows-x86_64-msvc-static": "0e5b4c45a96a85806a3596aef75493894f0eec0a74e7df16657f2c4d7c13cbbb",
+    "windows-x86_64-msvc-shared": "ea1f94b27941ec054ec055f8540952b894cbd1435279c974e599df60304d494a",
+    "wasm32-emscripten-static": "cd12c04c5e418599bd4d08e54116afbaba99f571f340db68f2bd158dc62dd677",
+    "wasm32-emscripten-shared": "ba1bf3dc7bdf7d9fbfd4071761d342fa03f378225b55e1e60d78d67765408534",
+}
+
 sdks.release(
     name = "perimortem",
-    archives = {
-        "headers": "9b9086d847123369b199b751bc2382ef50fc85e25a65757203e03644fac263b0",
-        "linux-x86_64-v3-static": "42933b95dc074cc683d99af5f2ecfe1cacb908bf6d36cccd8805bead53bc0985",
-        "linux-x86_64-v3-shared": "68009c2b53c80320c124009b6202dc9482dd350f02a13a901b5f85861f6eb848",
-        "windows-x86_64-msvc-static": "99866d90501a92d2ae5589407f27774ea4dbdc9e4ed06135eb74a4f3840f63f7",
-        "windows-x86_64-msvc-shared": "b1b9ab7540b22fe94b30a4488e6428356b0fde4c7678c7a202858f25cfcdc11d",
-        "wasm32-emscripten-static": "d1d5ec06ec9017472fea98e4d9985fd0794607984803de4103c2eb98c54e2842",
-        "wasm32-emscripten-shared": "b8027f125ab0a7b6b9daaf8cc156f67f11ede217c3710941e1507ebb2bad94a1",
-    },
+    archives = _PERIMORTEM_ARCHIVES,
     linkage = "shared",
     project = "Perimortem",
     version = "0.4.0",
     deps = [],
 )
-use_repo(sdks, "perimortem")
+sdks.release(
+    name = "perimortem_static",
+    archives = _PERIMORTEM_ARCHIVES,
+    library = "perimortem",
+    linkage = "static",
+    project = "Perimortem",
+    version = "0.4.0",
+    deps = [],
+)
+use_repo(sdks, "perimortem", "perimortem_static")

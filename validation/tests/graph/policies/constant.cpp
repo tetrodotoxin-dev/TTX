@@ -13,7 +13,6 @@
 #include "validation/tests/graph/fixtures/value.hpp"
 
 using namespace Perimortem::Core;
-using namespace Perimortem::Serialization;
 using namespace Toolchain::Validation;
 using namespace Ttx::Graph;
 using namespace Ttx::Data;
@@ -33,7 +32,7 @@ struct Changing {
 
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
-    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+    if (Identity::Uuid(id) == Validation::Value::contract_id) {
       return TTX_NEGOTIATION_SATISFIED;
     }
 
@@ -42,14 +41,14 @@ struct Changing {
       return TTX_NEGOTIATION_REJECTED;
     }
 
-    return Formats::Uuid(id) == Abstract::contract_id
+    return Identity::Uuid(id) == Abstract::contract_id
                ? TTX_NEGOTIATION_SATISFIED
                : TTX_NEGOTIATION_UNKNOWN;
   }
 
   static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
-    if (Formats::Uuid(id) == Validation::Value::contract_id) {
+    if (Identity::Uuid(id) == Validation::Value::contract_id) {
       *Data::cast<value_api>(output) = {context, read};
       return TTX_NEGOTIATION_SATISFIED;
     }
@@ -95,7 +94,7 @@ struct Fixed {
 
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
-    if (Formats::Uuid(id) == Policies::Constant::contract_id) {
+    if (Identity::Uuid(id) == Policies::Constant::contract_id) {
       return TTX_NEGOTIATION_SATISFIED;
     }
 
@@ -105,7 +104,7 @@ struct Fixed {
 
   static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
-    const Formats::Uuid contract(id);
+    const Identity::Uuid contract(id);
     if (contract == Abstract::contract_id ||
         contract == Policies::Constant::contract_id ||
         ((contract == Policies::None::contract_id ||

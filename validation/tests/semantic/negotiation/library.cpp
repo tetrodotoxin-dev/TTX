@@ -16,7 +16,6 @@
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Memory;
-using namespace Perimortem::Serialization;
 using namespace Perimortem::System;
 using namespace Toolchain::Validation;
 using namespace Ttx::Graph;
@@ -107,11 +106,11 @@ VALIDATION_TEST(NativeEntry, independent_paths_and_formats) {
   ASSERT_EQ(ttx_transfer(published, &target), TTX_DATA_SUCCESS);
 
   const Negotiation::Query query(entry);
-  const Formats::Uuid previous_abstract(
+  const Identity::Uuid previous_abstract(
       0x7cc2e50a46ab4ed7ULL, 0xa2ca04e84f415161ULL);
   EXPECT(query.supports(previous_abstract) == Negotiation::Status::Unknown);
 
-  const Formats::Uuid exports(BOOTSTRAP_EXPORTS_HIGH, BOOTSTRAP_EXPORTS_LOW);
+  const Identity::Uuid exports(BOOTSTRAP_EXPORTS_HIGH, BOOTSTRAP_EXPORTS_LOW);
   EXPECT(query.supports(exports) == Negotiation::Status::Satisfied);
 
   bootstrap_exports callback_api{};
@@ -142,7 +141,7 @@ VALIDATION_TEST(NativeEntry, independent_paths_and_formats) {
   ttx_semantic_query next{};
   ASSERT(
       query.bind(
-          Formats::Uuid(BOOTSTRAP_QUERY_HIGH, BOOTSTRAP_QUERY_LOW),
+          Identity::Uuid(BOOTSTRAP_QUERY_HIGH, BOOTSTRAP_QUERY_LOW),
           Form::Storage::from(next)) == Negotiation::Status::Satisfied);
   EXPECT(next.context != entry.context);
   Negotiation::Query(next).bind<Abstract>().visit(
@@ -157,7 +156,7 @@ VALIDATION_TEST(NativeEntry, independent_paths_and_formats) {
       query.bind(exports, Form::Storage::from(wrong)) ==
       Negotiation::Status::Rejected);
   EXPECT(
-      query.bind(Formats::Uuid(0, 0), Form::Storage::from(wrong)) ==
+      query.bind(Identity::Uuid(0, 0), Form::Storage::from(wrong)) ==
       Negotiation::Status::Unknown);
   EXPECT(!wrong.context && !wrong.operations);
 }

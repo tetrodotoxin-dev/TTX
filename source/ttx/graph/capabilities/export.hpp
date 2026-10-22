@@ -21,9 +21,8 @@ namespace Ttx::Graph::Capabilities {
 // observations it reports through the supplied graph.
 class Export {
  public:
-  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
-      TTX_EXPORT_ID_HIGH,
-      TTX_EXPORT_ID_LOW);
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_EXPORT_ID_HIGH, TTX_EXPORT_ID_LOW);
   using Api = ttx_export;
   using Operations = ttx_export_ops;
 

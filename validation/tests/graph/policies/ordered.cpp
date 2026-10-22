@@ -12,7 +12,6 @@
 #include "ttx/graph/policies/unknown.hpp"
 
 using namespace Perimortem::Core;
-using namespace Perimortem::Serialization;
 using namespace Toolchain::Validation;
 using namespace Ttx::Graph;
 
@@ -35,7 +34,7 @@ struct Sequence {
 
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
-    const Formats::Uuid contract(id);
+    const Identity::Uuid contract(id);
     if (contract == Policies::None::contract_id ||
         contract == Policies::Unknown::contract_id) {
       return TTX_NEGOTIATION_REJECTED;

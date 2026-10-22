@@ -28,9 +28,8 @@ namespace Ttx::Graph::Capabilities {
 // explicitly refuses it.
 class Create {
  public:
-  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
-      TTX_CREATE_ID_HIGH,
-      TTX_CREATE_ID_LOW);
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_CREATE_ID_HIGH, TTX_CREATE_ID_LOW);
   using Api = ttx_create;
   using Operations = ttx_create_ops;
 

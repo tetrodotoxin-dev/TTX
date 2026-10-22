@@ -4,10 +4,10 @@
 #pragma once
 
 #include "perimortem/core/data.hpp"
+#include "perimortem/core/identity/uuid.hpp"
 #include "perimortem/core/storage/option.hpp"
 #include "perimortem/core/storage/vector.hpp"
 #include "perimortem/core/view/bytes.hpp"
-#include "perimortem/serialization/formats/uuid.hpp"
 
 #include "ttx/graph/abstract.h"
 #include "ttx/graph/visitor.hpp"
@@ -38,7 +38,7 @@ class Abstract {
     Present = TTX_ABSTRACT_PRESENT,
   };
 
-  static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(
+  static constexpr auto contract_id = Perimortem::Core::Identity::Uuid(
       TTX_ABSTRACT_ID_HIGH,
       TTX_ABSTRACT_ID_LOW);
   using Api = ttx_abstract;
@@ -65,7 +65,7 @@ class Abstract {
     return State(api.operations->get_state(api.context));
   }
 
-  auto supports(Perimortem::Serialization::Formats::Uuid contract) const
+  auto supports(Perimortem::Core::Identity::Uuid contract) const
       -> Semantic::Negotiation::Status {
     return Semantic::Negotiation::Status(
         api.operations->supports(api.context, contract));
@@ -87,7 +87,7 @@ class Abstract {
   // The caller selects the C record specified by this UUID. This overload
   // supports contracts whose UUID is discovered while navigating the graph.
   template <typename Contract>
-  auto bind(Perimortem::Serialization::Formats::Uuid contract) const
+  auto bind(Perimortem::Core::Identity::Uuid contract) const
       -> Perimortem::Core::Storage::Option<Contract> {
     typename Contract::Api output{};
     const auto status = api.operations->bind(api.context, contract, &output);

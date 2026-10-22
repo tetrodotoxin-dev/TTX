@@ -18,7 +18,7 @@ _COMPONENT_DEPS = {
         "@perimortem//:core",
         "@perimortem//:memory",
     ],
-    "semantic": ["@perimortem//:serialization"],
+    "semantic": ["@perimortem//:core"],
 }
 
 _LIBRARY = dict(
@@ -32,7 +32,6 @@ _LIBRARY = dict(
     deps = [
         "@perimortem//:core",
         "@perimortem//:memory",
-        "@perimortem//:serialization",
     ],
 )
 
@@ -44,7 +43,10 @@ library(
     components = _COMPONENTS,
     includes = _LIBRARY["includes"],
     module = "ttx",
-    deps = _LIBRARY["deps"],
+    deps = [
+        "@perimortem_static//:core",
+        "@perimortem_static//:memory",
+    ],
 )
 
 library(
