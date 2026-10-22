@@ -22,7 +22,7 @@ static Harness Sentinels = {
 };
 
 // RouteProvider publishes one route to an independently supplied Abstract.
-// Its UUID requests stay Unknown, allowing the tests to verify that traversal
+// Ordinary UUID requests stay Unknown, so the tests verify that traversal
 // reaches the next provider using only the published Abstract operations.
 struct RouteProvider {
   View::Bytes route;
@@ -57,8 +57,7 @@ struct RouteProvider {
 
   static auto bind(void* context, perimortem_uuid contract, void* output)
       -> ttx_negotiation_status {
-    ++Data::cast<RouteProvider>(context)->negotiations;
-    return TTX_NEGOTIATION_UNKNOWN;
+    return supports(context, contract);
   }
 
   static auto lookup(void* context, perimortem_view_bytes route)
@@ -101,28 +100,42 @@ VALIDATION_TEST(Sentinels, present_without_known_contracts) {
       Abstract::State::Unknown);
 }
 
-// The reserved UUIDs identify exhaustive graph outcomes. Support for the
-// opposite axiom is Rejected, while an unrelated contract can remain Unknown.
+// Reserved UUID requests follow the classified graph state through both
+// support queries and bindings. Ordinary contract requests remain independent.
 VALIDATION_TEST(Sentinels, reserved_states) {
   static_assert(TTX_NONE_ID_HIGH == 0 && TTX_NONE_ID_LOW == 0);
   static_assert(TTX_UNKNOWN_ID_HIGH == 0 && TTX_UNKNOWN_ID_LOW == 1);
-  const auto none = ttx_none();
-  const auto unknown = ttx_unknown();
+  RouteProvider present{"next"_view, ttx_none()};
+  const ttx_abstract values[] = {ttx_none(), ttx_unknown(), present.get_abi()};
+  const perimortem_uuid ids[] = {
+    Policies::None::contract_id, Policies::Unknown::contract_id};
 
-  EXPECT_EQ(none.operations->get_state(none.context), TTX_ABSTRACT_NONE);
-  EXPECT_EQ(
-      unknown.operations->get_state(unknown.context), TTX_ABSTRACT_UNKNOWN);
-  EXPECT(Abstract(none).get_state() == Abstract::State::None);
-  EXPECT(Abstract(unknown).get_state() == Abstract::State::Unknown);
-  EXPECT(
-      Abstract(none).supports<Policies::None>() ==
-      Negotiation::Status::Satisfied);
-  EXPECT(
-      Abstract(unknown).supports<Policies::None>() ==
-      Negotiation::Status::Rejected);
-  EXPECT(
-      Abstract(unknown).supports<Policies::Unknown>() ==
-      Negotiation::Status::Satisfied);
+  const ttx_negotiation_status expected[][2] = {
+    {TTX_NEGOTIATION_SATISFIED, TTX_NEGOTIATION_REJECTED},
+    {TTX_NEGOTIATION_REJECTED, TTX_NEGOTIATION_SATISFIED},
+    {TTX_NEGOTIATION_REJECTED, TTX_NEGOTIATION_REJECTED},
+  };
+
+  for (Count state = 0; state < 3; ++state) {
+    const auto api = values[state];
+    EXPECT_EQ(
+        api.operations->get_state(api.context), ttx_abstract_state(state));
+    for (Count request = 0; request < 2; ++request) {
+      EXPECT_EQ(
+          api.operations->supports(api.context, ids[request]),
+          expected[state][request]);
+
+      ttx_abstract output{};
+      const auto status =
+          api.operations->bind(api.context, ids[request], &output);
+      EXPECT_EQ(status, expected[state][request]);
+      if (status == TTX_NEGOTIATION_SATISFIED) {
+        EXPECT_EQ(
+            output.operations->get_state(output.context),
+            ttx_abstract_state(state));
+      }
+    }
+  }
 }
 
 // None and Unknown must return themselves for every route. Empty, binary and

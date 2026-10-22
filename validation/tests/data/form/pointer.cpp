@@ -261,10 +261,97 @@ static constexpr auto& narrow_pointer =
 static constexpr auto& wide_pointer =
     Form::Compiled<pointer, 8>::get_representation();
 
-// Neither target identity nor the compiler's native process should affect a
-// pointer free form. It remains the same agreement across both pointer widths.
+// The scalar schema must compile to identical canonical bytes for both
+// supported pointer widths.
 static_assert(Form::Compiled<scalar, 8>::get_representation().compatible(
     Form::Compiled<scalar, 4>::get_representation()));
+
+VALIDATION_TEST(Pointers, pointer_free_width) {
+  const Count widths[] = {4, 8};
+  const auto& expected = Form::Compiled<scalar, 8>::get_representation();
+  for (const auto width : widths) {
+    Form::Representation::compile(scalar, width)
+        .visit(
+            [&](const Form::Representation& representation) {
+              EXPECT(representation.get_bytes() == expected.get_bytes());
+              EXPECT_EQ(representation.get_extent(), Count(4));
+              EXPECT_EQ(representation.get_alignment(), Count(4));
+            },
+
+            [&](Status) { EXPECT(False); });
+  }
+}
+
+// Navigation receives only descriptor bytes. The described pointer target and
+// callable signature contain U16 values, but traversal must return the two
+// pointer positions in the containing record, using its selected pointer width.
+VALIDATION_TEST(Pointers, descriptor_only_navigation) {
+  const auto target = Form::Schema::primitive(Form::Schema::Value::U16);
+  const Count widths[] = {4, 8};
+  for (const auto width : widths) {
+    const auto convention = width == 4
+                                ? Form::Callable::Convention::EmscriptenWasm32
+                                : Form::Callable::Convention::SystemVAMD64;
+    const Form::Schema::Argument argument(target, 1);
+    const auto callable =
+        Form::Schema::callable(convention, {argument, 1}, target, width);
+    const Storage::Vector<Form::Schema::Position, 2> fields = {{
+      Form::Schema::Position(Form::Schema::pointer(&target), 0),
+      {callable, 8},
+    }};
+
+    const auto record = Form::Schema::composite(fields.get_view(), 16, 8);
+
+    Form::Representation::compile(record, width)
+        .visit(
+            [&](const Form::Representation& representation) {
+              const Count offsets[] = {0, 8};
+              for (const auto offset : offsets) {
+                ttx_representation_position position{};
+                ASSERT_EQ(
+                    ttx_representation_next(
+                        &representation.get_abi(), offset, &position),
+                    TTX_DATA_SUCCESS);
+                EXPECT_EQ(position.offset, offset);
+                EXPECT_EQ(position.type, TTX_SCHEMA_POINTER);
+                EXPECT_EQ(position.extent, width);
+              }
+
+              Count count = 0;
+              EXPECT(
+                  representation.visit(
+                      [&](Form::Representation::Position position) {
+                        EXPECT_EQ(position.get_offset(), count * 8);
+                        EXPECT(
+                            position.get_value() ==
+                            Form::Schema::Value::Pointer);
+                        EXPECT_EQ(position.get_extent(), width);
+                        ++count;
+                        return Status::Success;
+                      }) == Status::Success);
+
+              EXPECT_EQ(count, Count(2));
+
+              const Storage::Vector<Count, 1> selected = {{8}};
+              count = 0;
+              EXPECT(
+                  representation.visit(
+                      selected, [&](Form::Representation::Position position) {
+                        EXPECT_EQ(position.get_offset(), Count(8));
+                        EXPECT(
+                            position.get_value() ==
+                            Form::Schema::Value::Pointer);
+                        EXPECT_EQ(position.get_extent(), width);
+                        ++count;
+                        return Status::Success;
+                      }) == Status::Success);
+
+              EXPECT_EQ(count, Count(1));
+            },
+
+            [&](Status) { EXPECT(False); });
+  }
+}
 
 VALIDATION_TEST(Pointers, pointer_width) {
   const Storage::Vector<U8, 16> expected = {

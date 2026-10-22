@@ -24,12 +24,14 @@
 #define TTX_UNKNOWN_ID_HIGH 0ULL
 #define TTX_UNKNOWN_ID_LOW 1ULL
 
-// State classifies one graph result. Present means that traversal reached an
-// ordinary node, even when the consumer recognizes none of its contracts.
-// Graph state describes the traversal result. Negotiation status describes
-// one UUID request: a Present node can leave every requested UUID Unknown.
-// `get_state` classifies the result in one call, while the reserved UUIDs let
-// None and Unknown participate in ordinary contract binding.
+// State classifies a graph result as None, Unknown or Present. Present
+// identifies a graph node even when the consumer recognizes none of its
+// contracts. A Present node must reject both reserved UUIDs, None and Unknown,
+// through `supports` and `bind`. Requests for other contracts can return
+// Satisfied, Unknown or Rejected.
+//
+// `get_state` supplies this classification in one call. The reserved UUIDs
+// let None and Unknown participate in contract binding.
 typedef U8 ttx_abstract_state;
 
 #define TTX_ABSTRACT_NONE ((ttx_abstract_state)0)
@@ -54,9 +56,10 @@ typedef U8 ttx_abstract_state;
 // A successful bind supplies the complete requested contract, including every
 // required operation and policy. The guarantee applies to that returned API.
 // Each further binding is a separate request whose success depends on the
-// provider supplying that API. The returned API can refuse its own UUID,
-// Abstract or any other contract while remaining usable under the contract
-// already supplied.
+// provider supplying that API. For UUIDs other than the reserved None and
+// Unknown, the provider can refuse further requests, including the bound
+// contract's own UUID or Abstract, while its supplied operations remain usable.
+// Requests for the reserved UUIDs must follow `get_state`'s rules.
 //
 // A typed operation can return an Abstract anywhere in the graph. The optional
 // `get_abstract` contract provides a way back: after a successful bind, it
@@ -168,10 +171,11 @@ typedef struct ttx_abstract_ops {
   // The caller uses the context supplied with this table. The provider reports
   // one of these three states through its own interpretation of that context.
   //
-  // For an unchanged result, None satisfies the reserved None UUID and rejects
-  // Unknown. Unknown satisfies its own reserved UUID and rejects None. Present
-  // rejects both. Other contract requests retain their ordinary negotiation
-  // outcomes. Present has no reserved contract UUID.
+  // For an unchanged result, `supports` and `bind` must both agree with its
+  // graph state. A None result must satisfy the None UUID and reject Unknown.
+  // An Unknown result must satisfy the Unknown UUID and reject None. A
+  // Present node must reject both reserved UUIDs. Requests for other UUIDs
+  // remain independent. Present has no reserved contract UUID.
   ttx_abstract_state (*get_state)(void* context);
 } ttx_abstract_ops;
 

@@ -7,6 +7,7 @@
 
 #include "perimortem/core/data.hpp"
 
+#include "ttx/data/transfer.hpp"
 #include "validation/tests/data/form/preparation.hpp"
 
 using namespace Perimortem::Core;
@@ -45,9 +46,54 @@ VALIDATION_TEST(TtxStorage, storage_check) {
           [&](Status status) { EXPECT(status == Status::Bounds); });
 }
 
-// Empty represented values retain their form while observation uses the
+// A copied Storage keeps the original addresses after the source record ends.
+// The Representation and payload stay alive throughout this test. Reading and
+// writing through the copy must reach the same payload rather than a snapshot.
+VALIDATION_TEST(TtxStorage, copied_storage) {
+  Validation::DataTests::Preparation prepare;
+  const auto representation = prepare(u32);
+  U32 value = 7;
+  Storage::Option<Form::Storage> copy;
+  {
+    Form::Storage::create(
+        representation, {*Data::cast<U8>(&value), sizeof(value)})
+        .visit(
+            [&](Form::Storage original) { copy = original; },
+            [&](Status) { EXPECT(False); });
+  }
+
+  ASSERT(copy);
+  copy.visit(
+      [&](Form::Storage storage) {
+        const auto api = storage.get_abi();
+        EXPECT(api.representation == &representation.get_abi());
+        EXPECT(api.data == Data::cast<U8>(&value));
+        EXPECT_EQ(api.size, sizeof(value));
+        EXPECT(
+            storage.get_representation().get_bytes().get_data() ==
+            representation.get_bytes().get_data());
+
+        value = 19;
+
+        U32 read = 0;
+        EXPECT(
+            Transfer::copy(storage, Form::Storage::from(read)) ==
+            Status::Success);
+        EXPECT_EQ(read, U32(19));
+
+        U32 replacement = 31;
+        EXPECT(
+            Transfer::copy(Form::Storage::from(replacement), storage) ==
+            Status::Success);
+        EXPECT_EQ(value, U32(31));
+      },
+
+      [&] { EXPECT(False); });
+}
+
+// Empty represented values retain their form while byte access uses the
 // canonical empty Perimortem View. Writable Access still refers to storage.
-VALIDATION_TEST(TtxStorage, empty_observation) {
+VALIDATION_TEST(TtxStorage, empty_view) {
   static constexpr auto empty =
       Form::Schema::composite(View::Vector<Form::Schema::Position>(), 0);
   const auto& form = Form::Compiled<empty>::get_representation();

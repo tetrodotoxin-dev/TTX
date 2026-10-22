@@ -14,7 +14,7 @@
 // whether it reads or writes the buffer.
 //
 // Copying Storage copies the record, leaving the buffer and description in
-// place. The caller keeps the buffer, Representation and its descriptor bytes
+// place. The caller must keep the buffer, Representation and descriptor bytes
 // accessible for every use. Copying the record does not extend their lifetime.
 typedef struct ttx_storage {
   const ttx_representation* representation;

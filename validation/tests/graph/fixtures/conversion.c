@@ -7,7 +7,8 @@
 
 // This terminal copies a byte to its artifact storage. Reporting uses a
 // second Export provider supplied by the input graph, either on the root or a
-// route. It reads the result while the imported graph is still available.
+// route. The reporting provider reads the imported graph during the import
+// callback.
 ttx_negotiation_status conversion_expose(
     conversion_output* output,
     ttx_abstract subject) {

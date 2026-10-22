@@ -40,7 +40,7 @@ typedef struct ttx_import_ops {
       const void* input,
       const ttx_representation* representation,
       void* callback_context,
-      void (*callback)(void* context, ttx_abstract abstract));
+      void (*callback)(void* callback_context, ttx_abstract abstract));
 } ttx_import_ops;
 
 #endif

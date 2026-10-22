@@ -68,6 +68,11 @@ class Retained {
 
   static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     if (Formats::Uuid(id) == Validation::Value::contract_id) {
       *Data::cast<value_api>(output) = {context, read};
       return TTX_NEGOTIATION_SATISFIED;
@@ -193,6 +198,11 @@ class Discovery {
 
   static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     if (Formats::Uuid(id) == Validation::Value::contract_id) {
       *Data::cast<value_api>(output) = {context, read};
       return TTX_NEGOTIATION_SATISFIED;
@@ -392,4 +402,32 @@ VALIDATION_TEST(Retention, scoped_and_refused) {
       [&]() { EXPECT(False); });
   EXPECT_EQ(counts.acquisitions, Count(0));
   EXPECT_EQ(counts.released, Count(0));
+}
+
+VALIDATION_TEST(Retention, present_bindings) {
+  Observations counts;
+  Discovery discovery{counts};
+  Retained retained{counts, 1, 7};
+  const ttx_abstract graphs[] = {
+    Discovery::get_abstract(&discovery),
+    Retained::get_abstract(&retained),
+  };
+
+  const perimortem_uuid ids[] = {
+    {TTX_NONE_ID_HIGH, TTX_NONE_ID_LOW},
+    {TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW},
+  };
+
+  for (const auto api : graphs) {
+    EXPECT_EQ(api.operations->get_state(api.context), TTX_ABSTRACT_PRESENT);
+    for (const auto id : ids) {
+      EXPECT_EQ(
+          api.operations->supports(api.context, id), TTX_NEGOTIATION_REJECTED);
+
+      ttx_abstract output{};
+      EXPECT_EQ(
+          api.operations->bind(api.context, id, &output),
+          TTX_NEGOTIATION_REJECTED);
+    }
+  }
 }

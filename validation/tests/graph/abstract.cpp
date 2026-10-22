@@ -68,13 +68,15 @@ VALIDATION_TEST(Abstracts, c_observations) {
       Policies::None::get_none().get_abstract());
 }
 
-// Copying a const handle preserves its operations. It imposes no constness on
-// the provider, which makes a fresh typed read on every call.
+// Copying an Abstract must preserve its published context and operations.
+// Provider state may still change through those operations.
 VALIDATION_TEST(Abstracts, copied_view) {
   observation_subject provider{};
   const Abstract subject(observation_abstract(&provider));
   const auto copy = subject;
   EXPECT(copy == subject);
+  EXPECT(copy.get_abi().context == subject.get_abi().context);
+  EXPECT(copy.get_abi().operations == subject.get_abi().operations);
   EXPECT_EQ(
       subject.bind<Validation::Value>().visit(
           [](Validation::Value value) { return value.read(); },
@@ -229,4 +231,33 @@ VALIDATION_TEST(Abstracts, qualified_question) {
           [&](Abstract answer) { EXPECT(answer == Abstract(ttx_none())); },
           [&](Negotiation::Status) { EXPECT(False); });
   EXPECT_EQ(provider.probes, probes);
+}
+
+// Ordinary binding outcomes can change while the provider remains Present.
+// The two reserved UUIDs retain their explicit rejection throughout.
+VALIDATION_TEST(Abstracts, reserved_bindings) {
+  observation_subject provider{};
+  const auto api = observation_abstract(&provider);
+  const ttx_negotiation_status statuses[] = {
+    TTX_NEGOTIATION_SATISFIED, TTX_NEGOTIATION_UNKNOWN,
+    TTX_NEGOTIATION_REJECTED};
+
+  const perimortem_uuid ids[] = {
+    {TTX_NONE_ID_HIGH, TTX_NONE_ID_LOW},
+    {TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW},
+  };
+
+  for (const auto status : statuses) {
+    provider.answer = status;
+    EXPECT_EQ(api.operations->get_state(api.context), TTX_ABSTRACT_PRESENT);
+    for (const auto id : ids) {
+      EXPECT_EQ(
+          api.operations->supports(api.context, id), TTX_NEGOTIATION_REJECTED);
+
+      ttx_abstract output{};
+      EXPECT_EQ(
+          api.operations->bind(api.context, id, &output),
+          TTX_NEGOTIATION_REJECTED);
+    }
+  }
 }

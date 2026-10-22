@@ -12,15 +12,19 @@
 
 namespace Ttx::Data::Form {
 
-// Storage supplies represented memory to Data and negotiation operations.
-// It copies the C record while keeping the representation and data under their
-// existing access contracts. `create` checks declared capacity and alignment.
-// Construction from a C record stores it for an operation to check or use under
-// geometry already established by the caller.
+// Storage describes a buffer for transfer and negotiation through the C ABI.
+// Its Representation supplies the value's layout, while the byte count gives
+// the buffer's available capacity. `create` checks capacity and alignment.
+// Construction from a C record leaves those checks to its caller or the
+// receiving operation.
+//
+// The caller must keep the Representation object, descriptor bytes and buffer
+// accessible throughout every use. Copies preserve their referenced addresses
+// and existing access durations.
 class Storage {
  public:
   // Uses a canonical Representation and the writable range supplied by Access.
-  // Returns the geometry check's status on failure. The caller keeps the
+  // Returns the geometry check's status on failure. The caller must keep the
   // Representation object, its descriptor bytes and the region accessible for
   // every use of the returned Storage.
   static auto create(
@@ -56,7 +60,7 @@ class Storage {
     return *value.representation;
   }
 
-  // Observes the full declared capacity, including any bytes beyond the
+  // Provides a View over the full declared capacity, including bytes beyond the
   // represented value's extent. The caller supplies readable memory for that
   // capacity. Zero capacity produces the canonical empty View.
   constexpr auto get_bytes() const -> Perimortem::Core::View::Bytes {

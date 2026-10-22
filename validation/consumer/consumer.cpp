@@ -10,7 +10,8 @@ using namespace Ttx::Data;
 S32 main() {
   U32 value = 73, output = 0;
   if (Transfer::copy(Form::Storage::from(value), Form::Storage::from(output)) !=
-      Status::Success) {
+          Status::Success ||
+      output != value) {
     return 1;
   }
 
@@ -19,9 +20,11 @@ S32 main() {
     return 2;
   }
 
-  if (none.get_abstract().get_state() != Abstract::State::None) {
-    return 3;
-  }
+  return none.get_abstract().bind<Policies::None>().visit(
+      [](Policies::None bound) -> S32 {
+        const auto next = bound.get_abstract().resolve_route({});
+        return next.get_state() == Abstract::State::None ? 0 : 3;
+      },
 
-  return output == 73 ? 0 : 4;
+      []() -> S32 { return 4; });
 }

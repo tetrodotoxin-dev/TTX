@@ -28,6 +28,8 @@ static Harness Conversion = {.name = "TTX::Conversion"};
 class Report {
  public:
   Count calls = 0;
+  const bool* import_active = nullptr;
+  Count calls_during_import = 0;
   U8 value = 0;
   Negotiation::Status status = Negotiation::Status::Satisfied;
 
@@ -85,6 +87,10 @@ class Report {
       -> ttx_negotiation_status {
     auto& report = *Data::cast<Report>(context);
     ++report.calls;
+    if (report.import_active && *report.import_active) {
+      ++report.calls_during_import;
+    }
+
     return Abstract(subject).bind<Validation::Value>().visit(
         [&](Validation::Value value) -> ttx_negotiation_status {
           report.value = value.read();
@@ -100,10 +106,10 @@ class Report {
   static constexpr ttx_export_ops operations = {get_abstract, expose};
 };
 
-// ImportedByte exposes a byte observation during the import callback. At the
-// root it delegates Report negotiation to the reporting service, whose context
-// differs from the imported value. The resulting API must call the service's
-// functions with that service's context.
+// ImportedByte supplies a typed byte read during the import callback. An
+// Export bound at the root returns to this imported node through get_abstract.
+// Its expose operation interprets the ImportedByte context and delegates to
+// Report::expose using the reporting provider's context.
 class ImportedByte {
  public:
   U8 value;
@@ -141,6 +147,11 @@ class ImportedByte {
 
   static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     if (Formats::Uuid(id) == Validation::Value::contract_id) {
       *Data::cast<value_api>(output) = {context, read};
       return TTX_NEGOTIATION_SATISFIED;
@@ -221,6 +232,11 @@ class ByteImport {
 
   static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     if (Formats::Uuid(id) == Abstract::contract_id) {
       Abstract::Api api = get_abstract(context);
       *Data::cast<Abstract::Api>(output) = api;
@@ -305,6 +321,11 @@ class ByteExport {
 
   static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     if (Formats::Uuid(id) == Abstract::contract_id) {
       Abstract::Api api = get_abstract(context);
       *Data::cast<Abstract::Api>(output) = api;
@@ -392,6 +413,8 @@ VALIDATION_TEST(Conversion, scoped_input) {
 VALIDATION_TEST(Conversion, foreign_pipeline) {
   Report report;
   ByteImport provider;
+  report.import_active = &provider.observing;
+
   ByteExport terminal;
   const auto importer =
       Capabilities::Import({&provider, &ByteImport::operations});
@@ -414,10 +437,14 @@ VALIDATION_TEST(Conversion, foreign_pipeline) {
   provider.at_root = true;
   EXPECT_EQ(run(), TTX_NEGOTIATION_SATISFIED);
   EXPECT_EQ(report.calls, Count(1));
+  EXPECT_EQ(report.calls_during_import, Count(1));
+  EXPECT_NOT(provider.observing);
   provider.at_root = false;
   terminal.output.report_route = 1;
   EXPECT_EQ(run(), TTX_NEGOTIATION_SATISFIED);
   EXPECT_EQ(report.calls, Count(2));
+  EXPECT_EQ(report.calls_during_import, Count(2));
+  EXPECT_NOT(provider.observing);
   EXPECT_EQ(report.value, input);
   EXPECT_EQ(terminal.output.artifacts, Count(3));
 
@@ -447,4 +474,35 @@ VALIDATION_TEST(Conversion, foreign_pipeline) {
 
   EXPECT_EQ(terminal.output.artifacts, Count(7));
   EXPECT_EQ(report.calls, Count(2));
+}
+
+VALIDATION_TEST(Conversion, present_bindings) {
+  Report report;
+  ImportedByte value{17, &report, true};
+  ByteImport importer;
+  ByteExport exporter;
+  const ttx_abstract graphs[] = {
+    Report::get_abstract(&report),
+    ImportedByte::get_abstract(&value),
+    ByteImport::get_abstract(&importer),
+    ByteExport::get_abstract(&exporter),
+  };
+
+  const perimortem_uuid ids[] = {
+    {TTX_NONE_ID_HIGH, TTX_NONE_ID_LOW},
+    {TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW},
+  };
+
+  for (const auto api : graphs) {
+    EXPECT_EQ(api.operations->get_state(api.context), TTX_ABSTRACT_PRESENT);
+    for (const auto id : ids) {
+      EXPECT_EQ(
+          api.operations->supports(api.context, id), TTX_NEGOTIATION_REJECTED);
+
+      ttx_abstract output{};
+      EXPECT_EQ(
+          api.operations->bind(api.context, id, &output),
+          TTX_NEGOTIATION_REJECTED);
+    }
+  }
 }

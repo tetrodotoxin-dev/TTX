@@ -46,6 +46,11 @@ class ScopedCreate {
 
   static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
+    if (id.high == TTX_NONE_ID_HIGH &&
+        (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
     if (Formats::Uuid(id) == Capabilities::Create::contract_id) {
       Capabilities::Create::Api api = {context, &operations};
       *Data::cast<Capabilities::Create::Api>(output) = api;
@@ -102,8 +107,9 @@ class ScopedCreate {
         return TTX_NEGOTIATION_SATISFIED;
       }
 
-      if (supports(context, id) != TTX_NEGOTIATION_SATISFIED) {
-        return TTX_NEGOTIATION_UNKNOWN;
+      const auto status = supports(context, id);
+      if (status != TTX_NEGOTIATION_SATISFIED) {
+        return status;
       }
 
       Abstract::Api api = get_abstract(context);
@@ -198,4 +204,31 @@ VALIDATION_TEST(Creation, scoped_answer) {
           },
 
           [&]() { EXPECT(False); });
+}
+
+VALIDATION_TEST(Creation, present_bindings) {
+  ScopedCreate factory;
+  ScopedCreate::Created value;
+  const ttx_abstract graphs[] = {
+    ScopedCreate::get_abstract(&factory),
+    ScopedCreate::Created::get_abstract(&value),
+  };
+
+  const perimortem_uuid ids[] = {
+    {TTX_NONE_ID_HIGH, TTX_NONE_ID_LOW},
+    {TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW},
+  };
+
+  for (const auto api : graphs) {
+    EXPECT_EQ(api.operations->get_state(api.context), TTX_ABSTRACT_PRESENT);
+    for (const auto id : ids) {
+      EXPECT_EQ(
+          api.operations->supports(api.context, id), TTX_NEGOTIATION_REJECTED);
+
+      ttx_abstract output{};
+      EXPECT_EQ(
+          api.operations->bind(api.context, id, &output),
+          TTX_NEGOTIATION_REJECTED);
+    }
+  }
 }

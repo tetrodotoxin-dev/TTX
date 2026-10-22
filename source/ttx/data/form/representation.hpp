@@ -38,15 +38,14 @@ namespace Ttx::Data::Form {
 // canonical destination before using the source's encoded geometry.
 class Representation {
  public:
-  // Navigation returns a primitive occurrence by value. Its byte coordinates
-  // belong to the containing object, while type and byte order describe the
-  // observation at that coordinate. No pointer to a reconstructed child object
-  // needs to survive the lookup.
-  // Pointer and callable slots both produce a Pointer observation whose extent
-  // comes from the representation's pointer width, including when the reader
-  // runs on another target. Navigation reports the pointer slot's coordinates.
-  // It reads the encoded descriptions rather than dereferencing addresses in
-  // the payload. Target descriptions participate in comparison of the complete
+  // Navigation returns a primitive occurrence by value. Its offset, type and
+  // byte order describe one position within the represented object. Returning
+  // coordinates by value lets lookup finish independently of any reconstructed
+  // child object.
+  // Pointer and callable slots produce Pointer positions whose extents come
+  // from the representation's pointer width, including when the reader runs on
+  // another target. Navigation must derive these coordinates from descriptor
+  // bytes alone. Target descriptions participate in comparison of the complete
   // form.
   class Position {
    public:
@@ -158,7 +157,7 @@ class Representation {
 
   constexpr auto get_alignment() const -> Count;
 
-  // C operations observe this record and its descriptor bytes. The caller
+  // C operations read this record and its descriptor bytes. The caller
   // keeps the Representation at the same address and unchanged while an
   // operation or Storage holds a pointer to the record.
   constexpr auto get_abi() const -> const ttx_representation& { return value; }
@@ -194,13 +193,13 @@ class Representation {
   // it. Padding is skipped, and a coordinate inside a primitive advances to
   // the following primitive rather than returning a partial value. Bounds
   // means there is no such start. Use visit when consuming a whole record so
-  // each successive observation does not repeat this search from the root.
+  // each successive occurrence does not repeat this search from the root.
   EXPORTED(TTX) auto next(Count offset) const
       -> Perimortem::Core::Storage::Result<Position, Ttx::Data::Status>;
 
   // Whole operations consume primitive occurrences in byte order. Repeated
   // composites revisit their shared body for each instance, but successive
-  // observations never restart the search at the root. Returning a failure
+  // occurrences never restart the search at the root. Returning a failure
   // stops the walk immediately. Only the active composite path occupies stack
   // space, even when the descriptor represents a very large repeated object.
   template <typename Consumer>
@@ -208,7 +207,7 @@ class Representation {
 
   // Prepared selections can ask for a sorted set of exact byte coordinates.
   // This walk skips the unrequested instances of a range arithmetically, so
-  // selecting its final element does not observe all preceding elements.
+  // selecting its final element skips the preceding elements.
   // Coordinates must be unique and increasing. A coordinate in padding or
   // inside a primitive returns Bounds rather than rounding to another value.
   template <typename Consumer>

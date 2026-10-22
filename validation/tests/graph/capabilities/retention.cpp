@@ -35,6 +35,66 @@ class ForeignRetention {
           "retention_provider_open"_view))();
 };
 
+// The factory, callback result and retained result all remain Present. Each
+// must reject both reserved terminal UUIDs even though their ordinary
+// capabilities and access durations differ.
+VALIDATION_TEST(Retention, present_bindings) {
+  ForeignRetention foreign;
+  const auto check = [&](Abstract graph) {
+    EXPECT(graph.get_state() == Abstract::State::Present);
+
+    const perimortem_uuid ids[] = {
+      {TTX_NONE_ID_HIGH, TTX_NONE_ID_LOW},
+      {TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW},
+    };
+
+    const auto api = graph.get_abi();
+    for (const auto id : ids) {
+      EXPECT_EQ(
+          api.operations->supports(api.context, id), TTX_NEGOTIATION_REJECTED);
+
+      ttx_abstract output{};
+      EXPECT_EQ(
+          api.operations->bind(api.context, id, &output),
+          TTX_NEGOTIATION_REJECTED);
+    }
+  };
+
+  const Abstract factory(foreign.api.factory);
+  check(factory);
+
+  Storage::Option<Policies::Retained> retained;
+  auto callback = [&](Abstract created) {
+    check(created);
+    created.bind<Capabilities::Retain>().visit(
+        [&](Capabilities::Retain request) {
+          request.retain().visit(
+              [&](Policies::Retained value) { retained = value; },
+              [&](Negotiation::Status) { EXPECT(False); });
+        },
+
+        [&] { EXPECT(False); });
+  };
+
+  factory.bind<Capabilities::Create>().visit(
+      [&](Capabilities::Create create) {
+        EXPECT(
+            create.create(Abstract(ttx_none()), callback) ==
+            Negotiation::Status::Satisfied);
+      },
+
+      [&] { EXPECT(False); });
+  ASSERT(retained);
+  retained.visit(
+      [&](Policies::Retained value) {
+        check(value.get_abstract());
+        value.release();
+      },
+
+      [&] { EXPECT(False); });
+  EXPECT_EQ(foreign.api.statistics().live, Count(0));
+}
+
 // The increment operation is bound and called after the creation callback
 // returns. The retained Abstract must still describe and bind that operation.
 VALIDATION_TEST(Retention, create_retain_invoke_release) {

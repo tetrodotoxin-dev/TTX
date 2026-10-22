@@ -39,7 +39,7 @@ typedef struct ttx_create_ops {
       void* context,
       ttx_abstract arguments,
       void* callback_context,
-      void (*callback)(void* context, ttx_abstract abstract));
+      void (*callback)(void* callback_context, ttx_abstract abstract));
 } ttx_create_ops;
 
 #endif

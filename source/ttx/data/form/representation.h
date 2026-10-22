@@ -6,15 +6,14 @@
 
 #include "ttx/data/form/schema.h"
 
-// Navigation returns a primitive occurrence by value. Its byte coordinates
-// belong to the containing object, while type and byte order describe the
-// observation at that coordinate. No pointer to a reconstructed child object
-// needs to survive the lookup.
-// Pointer and callable slots both produce a Pointer observation whose extent
-// comes from the representation's pointer width, including when the reader
-// runs on another target. Navigation reports the pointer slot's coordinates.
-// It reads the encoded descriptions rather than dereferencing addresses in the
-// payload. Target descriptions participate in comparison of the complete form.
+// Navigation returns a primitive occurrence by value. Its offset, type and
+// byte order describe one position within the represented object. Returning
+// coordinates by value lets lookup finish independently of any reconstructed
+// child object.
+// Pointer and callable slots produce Pointer positions whose extents come from
+// the representation's pointer width, including when the reader runs on another
+// target. Navigation must derive these coordinates from descriptor bytes alone.
+// Target descriptions participate in comparison of the complete form.
 typedef struct ttx_representation_position {
   Count offset;
   ttx_schema_value type;

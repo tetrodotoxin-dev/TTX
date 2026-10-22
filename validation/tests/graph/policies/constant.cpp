@@ -54,8 +54,9 @@ struct Changing {
       return TTX_NEGOTIATION_SATISFIED;
     }
 
-    if (supports(context, id) != TTX_NEGOTIATION_SATISFIED) {
-      return TTX_NEGOTIATION_UNKNOWN;
+    const auto status = supports(context, id);
+    if (status != TTX_NEGOTIATION_SATISFIED) {
+      return status;
     }
 
     Abstract::Api api = get_abstract(context);
@@ -156,12 +157,19 @@ VALIDATION_TEST(Constants, explicit_constant_policy) {
 
   Changing provider{ttx_unknown()};
   Fixed fixed{Changing::get_abstract(&provider)};
+  Fixed equivalent{Changing::get_abstract(&provider)};
   Changing parent{Fixed::get_abstract(&fixed)};
   const Abstract root(Changing::get_abstract(&parent));
   const auto first = root.resolve_route("selected"_view);
   EXPECT(first.get_state() == Abstract::State::Present);
   EXPECT(
       first.supports<Policies::Constant>() == Negotiation::Status::Satisfied);
+  first.bind<Policies::Constant>().visit(
+      [&](Policies::Constant policy) {
+        EXPECT(policy.get_abstract().get_abi().context == &fixed);
+      },
+
+      [&] { EXPECT(False); });
   EXPECT_EQ(
       first.bind<Validation::Value>().visit(
           [](Validation::Value value) { return value.read(); },
@@ -175,9 +183,19 @@ VALIDATION_TEST(Constants, explicit_constant_policy) {
 
   provider.value = 92;
   provider.child = ttx_none();
+  parent.child = Fixed::get_abstract(&equivalent);
 
   const auto second = root.resolve_route("selected"_view);
-  EXPECT(first == second);
+  EXPECT(first.get_abi().context != second.get_abi().context);
+  EXPECT_EQ(
+      first.bind<Validation::Value>().visit(
+          [](Validation::Value value) { return value.read(); },
+          [&] {
+            EXPECT(False);
+            return U8(0);
+          }),
+
+      U8(92));
   EXPECT_EQ(
       second.bind<Validation::Value>().visit(
           [](Validation::Value value) { return value.read(); },
@@ -189,6 +207,7 @@ VALIDATION_TEST(Constants, explicit_constant_policy) {
       U8(92));
 
   const auto child = second.resolve_route("child"_view);
+  EXPECT(first.resolve_route("child"_view) == child);
   EXPECT(child == Abstract(ttx_none()));
   EXPECT(child.supports<Policies::Constant>() == Negotiation::Status::Unknown);
 }
@@ -202,4 +221,31 @@ VALIDATION_TEST(Constants, rejection_can_change) {
 
   provider.child = Changing::get_abstract(&provider);
   EXPECT(subject.resolve_route("child"_view) == subject);
+}
+
+VALIDATION_TEST(Constants, present_bindings) {
+  Changing changing{ttx_none()};
+  Fixed fixed{Changing::get_abstract(&changing)};
+  const ttx_abstract graphs[] = {
+    Changing::get_abstract(&changing),
+    Fixed::get_abstract(&fixed),
+  };
+
+  const perimortem_uuid ids[] = {
+    {TTX_NONE_ID_HIGH, TTX_NONE_ID_LOW},
+    {TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW},
+  };
+
+  for (const auto api : graphs) {
+    EXPECT_EQ(api.operations->get_state(api.context), TTX_ABSTRACT_PRESENT);
+    for (const auto id : ids) {
+      EXPECT_EQ(
+          api.operations->supports(api.context, id), TTX_NEGOTIATION_REJECTED);
+
+      ttx_abstract output{};
+      EXPECT_EQ(
+          api.operations->bind(api.context, id, &output),
+          TTX_NEGOTIATION_REJECTED);
+    }
+  }
 }

@@ -80,6 +80,11 @@ static ttx_negotiation_status temporary_supports(
 
 static ttx_negotiation_status
     temporary_bind(void* context, perimortem_uuid id, void* output) {
+  if (id.high == TTX_NONE_ID_HIGH &&
+      (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+    return TTX_NEGOTIATION_REJECTED;
+  }
+
   if (is(id, TTX_RETAIN_ID_HIGH, TTX_RETAIN_ID_LOW)) {
     ttx_retain api = {context, &temporary_operations};
     ttx_retain* result = output;
@@ -135,6 +140,11 @@ HIDDEN ttx_data_status
 
 static ttx_negotiation_status
     retained_bind(void* context, perimortem_uuid id, void* output) {
+  if (id.high == TTX_NONE_ID_HIGH &&
+      (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+    return TTX_NEGOTIATION_REJECTED;
+  }
+
   if (is(id, TTX_RETAIN_ID_HIGH, TTX_RETAIN_ID_LOW)) {
     ttx_retain api = {context, &retained_retain_operations};
     ttx_retain* result = output;
@@ -244,6 +254,11 @@ static ttx_negotiation_status factory_supports(
 
 static ttx_negotiation_status
     factory_bind(void* context, perimortem_uuid id, void* output) {
+  if (id.high == TTX_NONE_ID_HIGH &&
+      (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+    return TTX_NEGOTIATION_REJECTED;
+  }
+
   if (is(id, TTX_CREATE_ID_HIGH, TTX_CREATE_ID_LOW)) {
     ttx_create api = {context, &factory_operations};
     ttx_create* result = output;

@@ -8,9 +8,10 @@
 
 namespace Ttx::Graph::Policies {
 
-// None carries the governing Abstract for a rejected route. The shared
-// implementation resolves its own routes to itself. The original Abstract's
-// selection can change unless it also supplies Constant for that route.
+// None carries an Abstract marking an explicit graph dead end, including
+// intentionally absent arguments. Every further route returns that None
+// result. The original route's selection can change unless its supplying
+// contract also establishes Constant.
 class None {
  public:
   static constexpr auto contract_id = Perimortem::Serialization::Formats::Uuid(

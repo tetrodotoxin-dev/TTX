@@ -16,6 +16,11 @@ static U8 read(void* context);
 
 static ttx_negotiation_status
     bind(void* context, perimortem_uuid id, void* output) {
+  if (id.high == TTX_NONE_ID_HIGH &&
+      (id.low == TTX_NONE_ID_LOW || id.low == TTX_UNKNOWN_ID_LOW)) {
+    return TTX_NEGOTIATION_REJECTED;
+  }
+
   observation_subject* subject = context;
   ++subject->binds;
   if (subject->answer != TTX_NEGOTIATION_SATISFIED) {
