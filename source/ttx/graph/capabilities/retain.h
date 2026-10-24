@@ -6,8 +6,8 @@
 
 #include "ttx/graph/policies/retained.h"
 
-#define TTX_RETAIN_ID_HIGH 0xe028b547172140acULL
-#define TTX_RETAIN_ID_LOW 0xac4e943287c34557ULL
+#define TTX_RETAIN_ID_HIGH 0x61c32d95c4c24501ULL
+#define TTX_RETAIN_ID_LOW 0x8d7495cbbf143723ULL
 
 // Retain asks the provider to supply an Abstract that remains usable after
 // its current access duration ends. The returned Retained interface carries
@@ -18,6 +18,8 @@
 // returns Satisfied. The consumer calls that record's `release` function once
 // after its last use of the returned Abstract. Each successful call creates a
 // separate release obligation, even when several results use the same context.
+// That release consumes the acquisition and reports its cleanup outcome under
+// the Retained contract.
 //
 // Unknown means the provider leaves its ability to supply that Retained
 // interface undetermined. Rejected means the provider refuses to supply it.

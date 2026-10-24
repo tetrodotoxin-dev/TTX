@@ -163,12 +163,13 @@ HIDDEN U64 composition_evaluate(void* context) {
   return subject->acquired ? subject->state->snapshot : subject->state->value;
 }
 
-static void release(void* context) {
+static ttx_release_status release(void* context) {
   composition_subject* source = context;
   const composition_subject* subject = checked(source);
   assert(subject->acquired);
   --subject->state->references;
   ++subject->state->releases;
+  return TTX_RELEASE_SUCCESS;
 }
 
 static ttx_negotiation_status retain(void* context, ttx_retained* output) {

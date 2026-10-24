@@ -19,6 +19,7 @@ static const perimortem_uuid increment_id = {
 
 static retention_statistics observed;
 static ttx_negotiation_status creation_status, retention_status;
+static ttx_release_status cleanup_status;
 static const ttx_representation* integer_form;
 static const ttx_retain_ops temporary_operations, retained_retain_operations;
 static const ttx_retained_ops retained_operations;
@@ -208,13 +209,18 @@ static ttx_negotiation_status retain_temporary(
   return acquire(value, output);
 }
 
-static void release(void* context) {
+static ttx_release_status release(void* context) {
   retained_value* value = context;
   ++observed.releases;
   if (--value->references == 0) {
+    const ttx_release_status status = cleanup_status;
+    ++observed.cleanups;
     --observed.live;
     free(value);
+    return status;
   }
+
+  return TTX_RELEASE_SUCCESS;
 }
 
 static ttx_negotiation_status describe(
@@ -329,6 +335,15 @@ static void configure(
   observed = (retention_statistics){0};
   creation_status = creation;
   retention_status = retention;
+  cleanup_status = TTX_RELEASE_SUCCESS;
+}
+
+// The simulated external cleanup reports its outcome after the provider's
+// allocation is freed. Statistics stay in the fixture so the consumer can
+// check completion without using any released interface.
+static void configure_cleanup(ttx_release_status status) {
+  assert(observed.live == 0);
+  cleanup_status = status;
 }
 
 retention_fixture retention_provider_open(void) {
@@ -345,5 +360,5 @@ retention_fixture retention_provider_open(void) {
 
   configure(TTX_NEGOTIATION_SATISFIED, TTX_NEGOTIATION_SATISFIED);
   return (retention_fixture){
-    factory_abstract(&observed), statistics, configure};
+    factory_abstract(&observed), statistics, configure, configure_cleanup};
 }

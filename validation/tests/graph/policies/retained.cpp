@@ -140,7 +140,7 @@ class Retained {
     return TTX_NEGOTIATION_SATISFIED;
   }
 
-  static auto release(void* context) -> void {
+  static auto release(void* context) -> ttx_release_status {
     auto& subject = *Data::cast<Retained>(context);
     ++subject.counts.released;
     if (!--subject.references) {
@@ -148,6 +148,8 @@ class Retained {
       subject.~Retained();
       Allocator::Global::release(storage);
     }
+
+    return TTX_RELEASE_SUCCESS;
   }
 
   static constexpr ttx_abstract_ops abstract_operations = {

@@ -88,7 +88,7 @@ VALIDATION_TEST(Retention, present_bindings) {
   retained.visit(
       [&](Policies::Retained value) {
         check(value.get_abstract());
-        value.release();
+        EXPECT(value.release() == Policies::Retained::Status::Success);
       },
 
       [&] { EXPECT(False); });
@@ -228,7 +228,7 @@ VALIDATION_TEST(Retention, create_retain_invoke_release) {
             [&]() { EXPECT(False); });
         EXPECT(second);
         EXPECT_EQ(foreign.api.statistics().acquisitions, Count(2));
-        copied.release();
+        EXPECT(copied.release() == Policies::Retained::Status::Success);
 
         second.visit(
             [&](Policies::Retained acquired) {
@@ -236,7 +236,7 @@ VALIDATION_TEST(Retention, create_retain_invoke_release) {
               EXPECT(
                   acquired.get_abstract().supports<Capabilities::Callable>() ==
                   Negotiation::Status::Satisfied);
-              acquired.release();
+              EXPECT(acquired.release() == Policies::Retained::Status::Success);
             },
 
             [&] { EXPECT(False); });
@@ -247,6 +247,138 @@ VALIDATION_TEST(Retention, create_retain_invoke_release) {
   EXPECT_EQ(foreign.api.statistics().releases, Count(2));
   EXPECT_EQ(foreign.api.statistics().live, Count(0));
   EXPECT_EQ(foreign.api.statistics().calls, Count(2));
+}
+
+// The first release leaves an independent acquisition usable. Final release
+// frees the C provider's allocation before returning either cleanup outcome.
+// The consumer checks the outcome through value data and fixture statistics.
+VALIDATION_TEST(Retention, cleanup_outcome) {
+  ForeignRetention foreign;
+  const ttx_release_status outcomes[] = {
+    TTX_RELEASE_SUCCESS, TTX_RELEASE_CLEANUP_FAILED};
+
+  for (const auto expected : outcomes) {
+    foreign.api.configure(TTX_NEGOTIATION_SATISFIED, TTX_NEGOTIATION_SATISFIED);
+    foreign.api.configure_cleanup(expected);
+
+    Storage::Option<Policies::Retained> first;
+    auto callback = [&](Abstract created) {
+      created.bind<Capabilities::Retain>().visit(
+          [&](Capabilities::Retain request) {
+            request.retain().visit(
+                [&](Policies::Retained acquired) { first = acquired; },
+                [&](Negotiation::Status) { EXPECT(False); });
+          },
+
+          [&] { EXPECT(False); });
+    };
+
+    Abstract(foreign.api.factory)
+        .bind<Capabilities::Create>()
+        .visit(
+            [&](Capabilities::Create create) {
+              EXPECT(
+                  create.create(Abstract(ttx_none()), callback) ==
+                  Negotiation::Status::Satisfied);
+            },
+
+            [&] { EXPECT(False); });
+    ASSERT(first);
+    EXPECT_EQ(foreign.api.statistics().inside_callback, U8(0));
+
+    first.visit(
+        [&](Policies::Retained acquired) {
+          acquired.get_abstract().bind<Capabilities::Retain>().visit(
+              [&](Capabilities::Retain request) {
+                request.retain().visit(
+                    [&](Policies::Retained second) {
+                      const auto api = acquired.get_abi();
+                      EXPECT_EQ(
+                          api.operations->release(api.context),
+                          TTX_RELEASE_SUCCESS);
+                      EXPECT_EQ(foreign.api.statistics().live, Count(1));
+                      EXPECT_EQ(foreign.api.statistics().cleanups, Count(0));
+                      EXPECT(
+                          second.get_abstract()
+                              .supports<Capabilities::Callable>() ==
+                          Negotiation::Status::Satisfied);
+
+                      const auto outcome = second.release();
+                      EXPECT(outcome == Policies::Retained::Status(expected));
+                    },
+
+                    [&](Negotiation::Status) {
+                      EXPECT(False);
+                      acquired.release();
+                    });
+              },
+
+              [&] {
+                EXPECT(False);
+                acquired.release();
+              });
+        },
+
+        [&] { EXPECT(False); });
+
+    EXPECT_EQ(foreign.api.statistics().acquisitions, Count(2));
+    EXPECT_EQ(foreign.api.statistics().releases, Count(2));
+    EXPECT_EQ(foreign.api.statistics().cleanups, Count(1));
+    EXPECT_EQ(foreign.api.statistics().live, Count(0));
+  }
+}
+
+// The earlier UUIDs specify a void release operation. A consumer must obtain
+// the new contracts before interpreting the operation's returned status.
+VALIDATION_TEST(Retention, release_contract_identity) {
+  ForeignRetention foreign;
+  const perimortem_uuid earlier[] = {
+    {0xe028b547172140acULL, 0xac4e943287c34557ULL},
+    {0x36e9d1a476ab4efcULL, 0x950306045c56e03dULL},
+  };
+
+  auto check = [&](Abstract abstract) {
+    const auto api = abstract.get_abi();
+    for (const auto id : earlier) {
+      EXPECT(
+          api.operations->supports(api.context, id) !=
+          TTX_NEGOTIATION_SATISFIED);
+
+      ttx_retained output{};
+      EXPECT(
+          api.operations->bind(api.context, id, &output) !=
+          TTX_NEGOTIATION_SATISFIED);
+    }
+  };
+
+  auto callback = [&](Abstract created) {
+    check(created);
+    created.bind<Capabilities::Retain>().visit(
+        [&](Capabilities::Retain request) {
+          request.retain().visit(
+              [&](Policies::Retained acquired) {
+                check(acquired.get_abstract());
+                EXPECT(
+                    acquired.release() == Policies::Retained::Status::Success);
+              },
+
+              [&](Negotiation::Status) { EXPECT(False); });
+        },
+
+        [&] { EXPECT(False); });
+  };
+
+  Abstract(foreign.api.factory)
+      .bind<Capabilities::Create>()
+      .visit(
+          [&](Capabilities::Create create) {
+            EXPECT(
+                create.create(Abstract(ttx_none()), callback) ==
+                Negotiation::Status::Satisfied);
+          },
+
+          [&] { EXPECT(False); });
+  EXPECT_EQ(foreign.api.statistics().live, Count(0));
 }
 
 VALIDATION_TEST(Retention, refused_creation_and_retention) {

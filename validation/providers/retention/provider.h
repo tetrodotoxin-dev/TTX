@@ -5,6 +5,7 @@
 #define VALIDATION_RETENTION_PROVIDER_H
 
 #include "ttx/graph/capabilities/create.h"
+#include "ttx/graph/policies/retained.h"
 
 typedef struct retention_statistics {
   Count callbacks;
@@ -12,6 +13,7 @@ typedef struct retention_statistics {
   Count releases;
   Count live;
   Count calls;
+  Count cleanups;
   U8 inside_callback;
 } retention_statistics;
 
@@ -23,6 +25,7 @@ typedef struct retention_fixture {
   void (*configure)(
       ttx_negotiation_status creation,
       ttx_negotiation_status retention);
+  void (*configure_cleanup)(ttx_release_status status);
 } retention_fixture;
 
 C_LINKAGE EXPORTED(TTX_TEST)

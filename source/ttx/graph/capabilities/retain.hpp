@@ -18,6 +18,7 @@ namespace Ttx::Graph::Capabilities {
 // undetermined. Rejected means the provider refuses to supply it. Each
 // successful call requires the consumer to call `release` on its Retained
 // result once, even when several results use the same context.
+// Release consumes that acquisition and reports its cleanup outcome.
 //
 // A successful call supplies a complete Retained contract. Its provider
 // keeps the returned Abstract available until the matching release.

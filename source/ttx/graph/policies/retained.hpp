@@ -17,8 +17,17 @@ namespace Ttx::Graph::Policies {
 // finishing all uses of those records and interfaces. Using any of them after
 // that release is undefined behavior. Calling `retain` again creates a separate
 // result with its own release obligation.
+//
+// Release returns Success when cleanup required by that acquisition completes,
+// or CleanupFailed when the provider cannot complete it. Both outcomes consume
+// the acquisition. Other acquisitions remain governed by their own releases.
 class Retained {
  public:
+  enum class Status : U8 {
+    Success = TTX_RELEASE_SUCCESS,
+    CleanupFailed = TTX_RELEASE_CLEANUP_FAILED,
+  };
+
   static constexpr auto contract_id = Perimortem::Core::Identity::Uuid(
       TTX_RETAINED_ID_HIGH,
       TTX_RETAINED_ID_LOW);
@@ -38,9 +47,12 @@ class Retained {
     return Abstract(api.operations->get_abstract(api.context));
   }
 
-  auto release() const -> void {
+  // Consumes this acquisition and reports its cleanup outcome, including
+  // cleanup required by dependent resources. The returned value remains usable
+  // after the released interfaces' access ends.
+  auto release() const -> Status {
     const auto api = get_abi();
-    api.operations->release(api.context);
+    return Status(api.operations->release(api.context));
   }
 
  private:
