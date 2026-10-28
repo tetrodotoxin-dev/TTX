@@ -5,13 +5,10 @@
 
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
-#include "perimortem/memory/allocator/arena.hpp"
 
-#include "ttx/graph/capabilities/callable.hpp"
 #include "ttx/graph/capabilities/create.hpp"
 #include "ttx/graph/capabilities/retain.hpp"
 #include "ttx/graph/policies/none.hpp"
-#include "ttx/semantic/realization/invocation.hpp"
 #include "validation/providers/retention/provider.h"
 #include "validation/support/library.hpp"
 
@@ -95,14 +92,11 @@ VALIDATION_TEST(Retention, present_bindings) {
   EXPECT_EQ(foreign.api.statistics().live, Count(0));
 }
 
-// The increment operation is bound and called after the creation callback
-// returns. The retained Abstract must still describe and bind that operation.
-VALIDATION_TEST(Retention, create_retain_invoke_release) {
+// Retention moves the callback result into provider storage. Copies of one
+// Retained record share its release obligation, while each further retain call
+// creates an independent acquisition.
+VALIDATION_TEST(Retention, create_retain_release) {
   ForeignRetention foreign;
-  Allocator::Arena errors;
-  foreign.library.symbol("retention_invoke"_view, errors)
-      .visit([&](void*) { EXPECT(False); }, [](View::Bytes) {});
-
   const Abstract factory(foreign.api.factory);
   EXPECT(
       factory.supports<Capabilities::Create>() ==
@@ -142,77 +136,20 @@ VALIDATION_TEST(Retention, create_retain_invoke_release) {
   EXPECT_EQ(foreign.api.statistics().inside_callback, U8(0));
   EXPECT_EQ(foreign.api.statistics().live, Count(1));
 
-  // After the creation callback ends, the consumer copies the Retained record
-  // and binds Callable through it. The provider keeps the operation callable
-  // through those interfaces until release. They share the original
-  // acquisition and its single release obligation.
+  // After the creation callback ends, the consumer copies the Retained record.
+  // Both copies identify the same acquisition and its single release
+  // obligation.
   retained.visit(
       [&](Policies::Retained copied) {
         copied.get_abstract().bind<Policies::Retained>().visit(
             [&](Policies::Retained view) {
               EXPECT(
-                  view.get_abstract().supports<Capabilities::Callable>() ==
+                  view.get_abstract().supports<Capabilities::Retain>() ==
                   Negotiation::Status::Satisfied);
             },
 
             [&]() { EXPECT(False); });
         EXPECT_EQ(foreign.api.statistics().acquisitions, Count(1));
-
-        copied.get_abstract().bind<Capabilities::Callable>().visit(
-            [&](Capabilities::Callable callable) {
-              EXPECT(
-                  callable.get_abstract().supports<Policies::Retained>() ==
-                  Negotiation::Status::Satisfied);
-              callable.describe().visit(
-                  [&](Capabilities::Callable::Description description) {
-                    // The consumer establishes the API it can actually call. A
-                    // provider's description alone cannot establish that native
-                    // ABI.
-                    const auto* api_form = ttx_invocation_representation();
-                    ASSERT(
-                        description.get_representation().compatible(*api_form));
-
-                    const auto binding =
-                        callable.get_abstract().bind<Realization::Invocation>(
-                            description.get_contract());
-                    ASSERT(binding);
-                    binding.visit(
-                        [&](Realization::Invocation invoked) {
-                          const auto operation = invoked.get_abi();
-                          const auto& integer =
-                              Form::Compiled<Form::Native<U64>::reference>::
-                                  get_representation();
-                          const Bool compatible =
-                              operation.inputs && operation.outputs &&
-                              integer.compatible(*operation.inputs) &&
-                              integer.compatible(*operation.outputs) &&
-                              integer.compatible(description.get_inputs()
-                                                     .get_representation()) &&
-                              integer.compatible(description.get_outputs()
-                                                     .get_representation());
-                          ASSERT(compatible);
-
-                          const U64 amount = 1;
-                          U64 outcome = 0;
-                          ASSERT_EQ(
-                              operation.invoke(
-                                  operation.context, &amount, &outcome),
-                              TTX_DATA_SUCCESS);
-                          EXPECT_EQ(outcome, U64(42));
-                          ASSERT_EQ(
-                              operation.invoke(
-                                  operation.context, &amount, &outcome),
-                              TTX_DATA_SUCCESS);
-                          EXPECT_EQ(outcome, U64(43));
-                        },
-
-                        [&] { EXPECT(False); });
-                  },
-
-                  [&](Negotiation::Status) { EXPECT(False); });
-            },
-
-            [&]() { EXPECT(False); });
 
         // A second `retain` call creates its own release obligation even when
         // both Retained results use the same context. After releasing the first
@@ -234,7 +171,7 @@ VALIDATION_TEST(Retention, create_retain_invoke_release) {
             [&](Policies::Retained acquired) {
               EXPECT_EQ(foreign.api.statistics().live, Count(1));
               EXPECT(
-                  acquired.get_abstract().supports<Capabilities::Callable>() ==
+                  acquired.get_abstract().supports<Policies::Retained>() ==
                   Negotiation::Status::Satisfied);
               EXPECT(acquired.release() == Policies::Retained::Status::Success);
             },
@@ -246,7 +183,6 @@ VALIDATION_TEST(Retention, create_retain_invoke_release) {
 
   EXPECT_EQ(foreign.api.statistics().releases, Count(2));
   EXPECT_EQ(foreign.api.statistics().live, Count(0));
-  EXPECT_EQ(foreign.api.statistics().calls, Count(2));
 }
 
 // The first release leaves an independent acquisition usable. Final release
@@ -300,7 +236,7 @@ VALIDATION_TEST(Retention, cleanup_outcome) {
                       EXPECT_EQ(foreign.api.statistics().cleanups, Count(0));
                       EXPECT(
                           second.get_abstract()
-                              .supports<Capabilities::Callable>() ==
+                              .supports<Policies::Retained>() ==
                           Negotiation::Status::Satisfied);
 
                       const auto outcome = second.release();

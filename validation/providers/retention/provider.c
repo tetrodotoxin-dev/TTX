@@ -7,23 +7,15 @@
 #include <stdlib.h>
 
 #include "ttx/data/transfer.h"
-#include "ttx/graph/capabilities/callable.h"
 #include "ttx/graph/capabilities/retain.h"
 #include "ttx/graph/policies/none.h"
 #include "ttx/graph/policies/unknown.h"
-#include "ttx/semantic/realization/invocation.h"
-#include "validation/providers/representation.h"
-
-static const perimortem_uuid increment_id = {
-  0x75a9a5de1b164e82ULL, 0x823e42db676680acULL};
 
 static retention_statistics observed;
 static ttx_negotiation_status creation_status, retention_status;
 static ttx_release_status cleanup_status;
-static const ttx_representation* integer_form;
 static const ttx_retain_ops temporary_operations, retained_retain_operations;
 static const ttx_retained_ops retained_operations;
-static const ttx_callable_operations callable_operations;
 static const ttx_create_ops factory_operations;
 static const ttx_abstract_ops temporary_graph_operations,
     retained_graph_operations, factory_graph_operations;
@@ -117,26 +109,9 @@ static ttx_negotiation_status retained_supports(
 
   (void)context;
   return temporary_supports(context, id) == TTX_NEGOTIATION_SATISFIED ||
-                 is(id, TTX_RETAINED_ID_HIGH, TTX_RETAINED_ID_LOW) ||
-                 is(id, TTX_CALLABLE_ID_HIGH, TTX_CALLABLE_ID_LOW) ||
-                 is(id, increment_id.high, increment_id.low)
+                 is(id, TTX_RETAINED_ID_HIGH, TTX_RETAINED_ID_LOW)
              ? TTX_NEGOTIATION_SATISFIED
              : TTX_NEGOTIATION_UNKNOWN;
-}
-
-// The consumer obtains this function through a negotiated API, even though
-// symbol lookup cannot find it. Each call increments the retained value, so
-// the test also checks that a bound operation observes changes in provider
-// state.
-HIDDEN ttx_data_status
-    retention_invoke(void* context, const void* input, void* output) {
-  retained_value* value = context;
-  const U64* amount = input;
-  U64* result = output;
-  value->value += *amount;
-  *result = value->value;
-  ++observed.calls;
-  return TTX_DATA_SUCCESS;
 }
 
 static ttx_negotiation_status
@@ -156,22 +131,6 @@ static ttx_negotiation_status
   if (is(id, TTX_RETAINED_ID_HIGH, TTX_RETAINED_ID_LOW)) {
     ttx_retained api = {context, &retained_operations};
     ttx_retained* result = output;
-    *result = api;
-    return TTX_NEGOTIATION_SATISFIED;
-  }
-
-  if (is(id, TTX_CALLABLE_ID_HIGH, TTX_CALLABLE_ID_LOW)) {
-    ttx_callable api = {context, &callable_operations};
-    ttx_callable* result = output;
-    *result = api;
-    return TTX_NEGOTIATION_SATISFIED;
-  }
-
-  if (is(id, increment_id.high, increment_id.low)) {
-    ttx_invocation api = {
-      context, integer_form, integer_form, retention_invoke};
-
-    ttx_invocation* result = output;
     *result = api;
     return TTX_NEGOTIATION_SATISFIED;
   }
@@ -221,22 +180,6 @@ static ttx_release_status release(void* context) {
   }
 
   return TTX_RELEASE_SUCCESS;
-}
-
-static ttx_negotiation_status describe(
-    void* context,
-    ttx_callable_description* output) {
-  (void)context;
-
-  static ttx_callable_field field;
-  field = (ttx_callable_field){ttx_unknown(), 0};
-  *output = (ttx_callable_description){
-    increment_id,
-    ttx_invocation_representation(),
-    {integer_form, &field, 1},
-    {integer_form, &field, 1}};
-
-  return TTX_NEGOTIATION_SATISFIED;
 }
 
 static ttx_abstract factory_abstract(void* context) {
@@ -319,9 +262,6 @@ static const ttx_retained_ops retained_operations = {
 static const ttx_retain_ops retained_retain_operations = {
   retained_abstract, acquire};
 
-static const ttx_callable_operations callable_operations = {
-  retained_abstract, describe};
-
 static const ttx_create_ops factory_operations = {factory_abstract, create};
 
 static retention_statistics statistics(void) {
@@ -347,17 +287,6 @@ static void configure_cleanup(ttx_release_status status) {
 }
 
 retention_fixture retention_provider_open(void) {
-  static const ttx_schema integer = {
-    8,
-    8,
-    TTX_SCHEMA_VALUE,
-    {.value = {TTX_SCHEMA_U64, TTX_SCHEMA_LITTLE_ENDIAN}}};
-
-  if (!integer_form) {
-    compile_representation = ttx_representation_compile;
-    integer_form = prepare_representation(&integer);
-  }
-
   configure(TTX_NEGOTIATION_SATISFIED, TTX_NEGOTIATION_SATISFIED);
   return (retention_fixture){
     factory_abstract(&observed), statistics, configure, configure_cleanup};

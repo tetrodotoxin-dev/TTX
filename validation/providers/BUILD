@@ -66,7 +66,7 @@ cc_binary(
     ]),
     linkshared = True,
     local_defines = ["TTX_TEST_EXPORT=1"],
-    deps = [":representation"],
+    deps = ["//:ttx"],
 )
 
 cc_binary(

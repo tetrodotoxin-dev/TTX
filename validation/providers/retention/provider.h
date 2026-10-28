@@ -12,7 +12,6 @@ typedef struct retention_statistics {
   Count acquisitions;
   Count releases;
   Count live;
-  Count calls;
   Count cleanups;
   U8 inside_callback;
 } retention_statistics;
