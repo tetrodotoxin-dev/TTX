@@ -5,6 +5,8 @@
 
 #include "toolchain/validation/test.hpp"
 
+#ifndef TOOLCHAIN_WASM
+
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/storage/vector.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
@@ -165,7 +167,7 @@ VALIDATION_TEST(TtxSimulacra, support_outcomes) {
 // The provider compiles its own C Schema at module opening. C++ derives this
 // side's description from counter_api. One checked bind copies the entire API.
 // All later calls use the acquired functions without metadata or allocation.
-VALIDATION_TEST(TtxSimulacra, retained_c_calls) {
+VALIDATION_TEST(TtxSimulacra, bound_c_calls) {
   Foreign foreign;
   ASSERT(foreign.api.query.bind);
   Negotiation::Query(foreign.api.query)
@@ -378,3 +380,5 @@ VALIDATION_TEST(TtxSimulacra, composed_contexts) {
   EXPECT_EQ(first.read(), U64(12));
   EXPECT_EQ(second.read(), U64(112));
 }
+
+#endif

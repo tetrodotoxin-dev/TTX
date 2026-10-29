@@ -43,6 +43,9 @@ implementations. Questions continue through the policies of the interfaces
 encountered along the way, so the graph preserves the conditions under which
 access is provided.
 
+Advanced readers can consult [Simulacra](simulacra.md) for an emergent
+substitution property of this model. It is not required to use TTX.
+
 ## Layers
 
 TTX has three core layers building up from raw data streams to the full TTX

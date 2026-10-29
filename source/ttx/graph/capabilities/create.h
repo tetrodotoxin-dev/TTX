@@ -6,8 +6,8 @@
 
 #include "ttx/graph/abstract.h"
 
-#define TTX_CREATE_ID_HIGH 0x38a9c8cd0a4f41caULL
-#define TTX_CREATE_ID_LOW 0xb8b6e802ba34fd56ULL
+#define TTX_CREATE_ID_HIGH 0x34b34c662f3b492cULL
+#define TTX_CREATE_ID_LOW 0xb30abce0b7a79738ULL
 
 // Exposes the capability to create an Abstract from the supplied argument
 // graph. The provider interprets the arguments through their routes and
@@ -16,10 +16,11 @@
 // returns Satisfied after the callback finishes.
 //
 // The caller can supply callback state through `callback_context`, which is
-// passed unchanged to `callback`. The arguments and callback state remain
-// available until `create` returns. The created Abstract is available during
-// the callback. The consumer can use its capabilities, copy typed results or
-// negotiate retained access, allowing providers to create objects in temporary
+// passed unchanged to `callback`. `create` observes the argument graph and
+// invokes the callback within one synchronous transaction. It transfers no
+// access to either input beyond return. The created Abstract is available
+// during the callback. The consumer can use its capabilities or copy typed
+// results before returning, allowing providers to create objects in temporary
 // storage.
 //
 // A `create` call returning Unknown or Rejected guarantees that `callback` was
@@ -31,10 +32,6 @@ typedef struct ttx_create {
 } ttx_create;
 
 typedef struct ttx_create_ops {
-  // Supplies the graph location from which this contract was bound, with its
-  // own context and operations. Repeated bind/get_abstract round trips preserve
-  // that location even when the provider publishes different API records.
-  ttx_abstract (*get_abstract)(void* context);
   ttx_negotiation_status (*create)(
       void* context,
       ttx_abstract arguments,

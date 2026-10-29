@@ -1,9 +1,9 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "validation/support/library.hpp"
-
 #include "toolchain/validation/test.hpp"
+
+#ifndef TOOLCHAIN_WASM
 
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/diagnostics/log.hpp"
@@ -13,6 +13,7 @@
 #include "ttx/graph/abstract.hpp"
 #include "ttx/semantic/negotiation/library.h"
 #include "validation/providers/abstract/provider.h"
+#include "validation/support/library.hpp"
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Memory;
@@ -235,3 +236,5 @@ VALIDATION_TEST(NativeEntry, nested_table_abi) {
 
       [&](Negotiation::Status) { EXPECT(False); });
 }
+
+#endif

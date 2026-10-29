@@ -30,7 +30,7 @@ static auto allocate_representation(void* context, Count size, Count alignment)
 // bodies. Reversed placement order must produce the same canonical bytes.
 static auto check_pair(const Form::Schema& child, Test::TestResult& result)
     -> void {
-  Validation::DataTests::Preparation prepare;
+  Validation::DataTests::Preparation prepare(8);
   const auto& form = prepare(child);
   const Count width = child.get_extent();
   const Storage::Vector<Form::Schema::Position, 2> positions = {
@@ -147,9 +147,9 @@ VALIDATION_TEST(Composition, records_and_cycles) {
 
   const auto function = Form::Schema::callable(
       Form::Callable::Convention::SystemVAMD64, args.get_view().slice(0, 2),
-      Form::Schema::pointer(&recursive));
-  const auto no_arguments =
-      Form::Schema::callable(Form::Callable::Convention::SystemVAMD64, {});
+      Form::Schema::pointer(&recursive), 8);
+  const auto no_arguments = Form::Schema::callable(
+      Form::Callable::Convention::SystemVAMD64, {}, {}, 8);
   const Storage::Vector<Form::Schema::Position, 2> calls = {
     {
       Form::Schema::Position(function, 0),

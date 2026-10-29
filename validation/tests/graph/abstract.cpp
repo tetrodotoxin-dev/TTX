@@ -24,6 +24,106 @@ static Harness Abstracts = {
   .name = "TTX::Abstract",
 };
 
+struct ReentryApi {
+  void* context;
+  ttx_abstract (*get_abstract)(void* context);
+};
+
+class Reentry {
+ public:
+  using Api = ReentryApi;
+  static constexpr auto contract_id =
+      Identity::Uuid(0x24bf8f024848492dULL, 0xb919d99215b0ff91ULL);
+
+  // Construction accepts only the record supplied under this fixture's UUID.
+  // Explicit construction keeps that interpretation visible at the bind site.
+  explicit Reentry(Api api) : api(api) {}
+
+  auto get_abstract() const -> Abstract {
+    return Abstract(api.get_abstract(api.context));
+  }
+
+ private:
+  Api api;
+};
+
+// EquivalentLocation publishes two API records for one graph location. They
+// share the provider's context while distinct visitation operations make their
+// table addresses deliberately different. Typed reentry and Constant return
+// the alternate record, exercising semantic location without record equality.
+class EquivalentLocation {
+ public:
+  Count first_visits = 0;
+  Count second_visits = 0;
+
+  auto first() -> Abstract { return Abstract(this, first_operations); }
+  auto second() -> Abstract { return Abstract(this, second_operations); }
+
+ private:
+  static auto state(void* context) -> ttx_abstract_state {
+    (void)context;
+    return TTX_ABSTRACT_PRESENT;
+  }
+
+  static auto supports(void* context, perimortem_uuid requested)
+      -> ttx_negotiation_status {
+    (void)context;
+    if (!requested.high && requested.low <= 1) {
+      return TTX_NEGOTIATION_REJECTED;
+    }
+
+    const Identity::Uuid contract(requested);
+    return contract == Reentry::contract_id ||
+                   contract == Abstract::contract_id ||
+                   contract == Policies::Constant::contract_id
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_UNKNOWN;
+  }
+
+  static auto bind(void* context, perimortem_uuid requested, void* output)
+      -> ttx_negotiation_status {
+    const auto status = supports(context, requested);
+    if (status != TTX_NEGOTIATION_SATISFIED) {
+      return status;
+    }
+
+    if (Identity::Uuid(requested) == Reentry::contract_id) {
+      *Data::cast<ReentryApi>(output) = {context, reenter};
+    } else {
+      *Data::cast<ttx_abstract>(output) = reenter(context);
+    }
+
+    return TTX_NEGOTIATION_SATISFIED;
+  }
+
+  static auto reenter(void* context) -> ttx_abstract {
+    return Data::cast<EquivalentLocation>(context)->second().get_abi();
+  }
+
+  static auto route(void* context, perimortem_view_bytes requested)
+      -> ttx_abstract {
+    (void)context;
+    (void)requested;
+    return ttx_none();
+  }
+
+  static auto first_visit(void* context, ttx_graph_visitor visitor) -> void {
+    (void)visitor;
+    ++Data::cast<EquivalentLocation>(context)->first_visits;
+  }
+
+  static auto second_visit(void* context, ttx_graph_visitor visitor) -> void {
+    (void)visitor;
+    ++Data::cast<EquivalentLocation>(context)->second_visits;
+  }
+
+  inline static constexpr ttx_abstract_ops first_operations = {
+    supports, bind, route, first_visit, state};
+
+  inline static constexpr ttx_abstract_ops second_operations = {
+    supports, bind, route, second_visit, state};
+};
+
 VALIDATION_TEST(Abstracts, c_observations) {
   observation_subject provider{};
   const Abstract subject(observation_abstract(&provider));
@@ -52,16 +152,25 @@ VALIDATION_TEST(Abstracts, c_observations) {
   EXPECT_EQ(first, U8(1));
   EXPECT_EQ(second, U8(2));
 
+  const U8 advance_route = 1;
   Count visited = 0;
   auto callback = [&](View::Bytes route, Abstract value) {
-    ++visited;
     EXPECT_EQ(route.get_size(), Count(3));
     EXPECT_EQ(route.get_data()[1], U8(0));
+    EXPECT_EQ(route.get_data()[2], U8(9 + visited));
+    EXPECT_EQ(provider.generation, U8(visited));
     EXPECT(subject.resolve_route(route) == value);
+
+    if (visited == 0) {
+      EXPECT(value.resolve_route(View::Bytes(advance_route, 1)) == value);
+    }
+
+    ++visited;
   };
 
   subject.visit_routes(Abstract::Visitor(callback));
-  EXPECT_EQ(visited, Count(1));
+  EXPECT_EQ(visited, Count(2));
+  EXPECT_EQ(provider.generation, U8(1));
   EXPECT(
       subject.resolve_route("missing"_view) ==
       Policies::None::get_none().get_abstract());
@@ -105,6 +214,37 @@ VALIDATION_TEST(Abstracts, copied_view) {
       U8(3));
 
   static_assert(sizeof(Abstract) == sizeof(ttx_abstract));
+}
+
+VALIDATION_TEST(Abstracts, semantic_reentry_uses_fresh_api_record) {
+  EquivalentLocation provider;
+  const Abstract first = provider.first();
+
+  first.bind<Reentry>().visit(
+      [&](Reentry value) {
+        const Abstract returned = value.get_abstract();
+        EXPECT_EQ(first.get_abi().context, returned.get_abi().context);
+        EXPECT(first.get_abi().operations != returned.get_abi().operations);
+        EXPECT(first != returned);
+
+        first.bind<Policies::Constant>().visit(
+            [&](Policies::Constant constant) {
+              const auto selected = constant.get_abstract();
+              EXPECT_EQ(selected.get_abi().context, first.get_abi().context);
+              EXPECT_EQ(
+                  selected.get_abi().operations, returned.get_abi().operations);
+            },
+
+            [&] { EXPECT(False); });
+
+        auto callback = [&](View::Bytes, Abstract) {};
+        first.visit_routes(Abstract::Visitor(callback));
+        returned.visit_routes(Abstract::Visitor(callback));
+        EXPECT_EQ(provider.first_visits, Count(1));
+        EXPECT_EQ(provider.second_visits, Count(1));
+      },
+
+      [&] { EXPECT(False); });
 }
 
 VALIDATION_TEST(Abstracts, fresh_abstract_binding) {

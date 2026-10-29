@@ -7,7 +7,6 @@
 
 #include "perimortem/core/data.hpp"
 
-#include "ttx/graph/capabilities/retain.hpp"
 #include "ttx/graph/policies/none.hpp"
 #include "ttx/graph/policies/unknown.h"
 #include "validation/tests/graph/fixtures/value.hpp"
@@ -148,7 +147,7 @@ class ScopedCreate {
   static constexpr ttx_abstract_ops graph_operations = {
     supports, bind, lookup, visit, state};
 
-  static constexpr ttx_create_ops operations = {get_abstract, create};
+  static constexpr ttx_create_ops operations = {create};
 };
 
 // The created value lives on the provider's stack. Consuming it during the
@@ -160,17 +159,10 @@ VALIDATION_TEST(Creation, scoped_answer) {
       .bind<Capabilities::Create>()
       .visit(
           [&](Capabilities::Create create) {
-            EXPECT(
-                create.get_abstract().supports<Capabilities::Retain>() ==
-                Negotiation::Status::Unknown);
-
             U8 copied = 0;
             Count visits = 0;
             auto callback = [&](Abstract subject) {
               EXPECT(provider.observing);
-              EXPECT(
-                  subject.supports<Capabilities::Retain>() ==
-                  Negotiation::Status::Unknown);
               copied = subject.bind<Validation::Value>().visit(
                   [](Validation::Value value) { return value.read(); },
                   [&] {

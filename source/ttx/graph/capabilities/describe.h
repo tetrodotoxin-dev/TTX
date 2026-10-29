@@ -6,8 +6,8 @@
 
 #include "ttx/graph/abstract.h"
 
-#define TTX_DESCRIBE_ID_HIGH 0x1214ecbcb2a24558ULL
-#define TTX_DESCRIBE_ID_LOW 0xab4e23d85e9b88d5ULL
+#define TTX_DESCRIBE_ID_HIGH 0x1e5de18376564e69ULL
+#define TTX_DESCRIBE_ID_LOW 0x966d65f910527509ULL
 
 // Describe supplies human readable metadata for a graph location. Name is a
 // label and description is documentation, both encoded as UTF 8 with explicit
@@ -28,9 +28,6 @@ typedef struct ttx_describe {
 } ttx_describe;
 
 typedef struct ttx_describe_ops {
-  // Returns to the graph location that supplied this binding, using the
-  // provider's complete Abstract record and its own context and operations.
-  ttx_abstract (*get_abstract)(void* context);
   U8 (*get_name)(void* context, perimortem_view_bytes* output);
   U8 (*get_description)(void* context, perimortem_view_bytes* output);
 } ttx_describe_ops;

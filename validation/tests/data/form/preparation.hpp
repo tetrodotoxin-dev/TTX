@@ -20,29 +20,39 @@ namespace Validation::DataTests {
 // accidental compilation or allocation during established transfer use.
 class Preparation {
  public:
+  // Pointer width is policy for every later preparation. Explicit construction
+  // prevents an unrelated integer fixture from silently selecting that ABI.
+  explicit Preparation(Count pointer_size = sizeof(void*))
+      : pointer_size(pointer_size) {}
+
   auto operator()(Ttx::Data::Form::Schema::Reference source)
       -> Ttx::Data::Form::Representation {
-    return Ttx::Data::Form::Representation::compile(source).visit(
-        [](Ttx::Data::Form::Representation& representation)
-            -> Ttx::Data::Form::Representation {
-          return Perimortem::Core::Data::take(representation);
-        },
+    return Ttx::Data::Form::Representation::compile(source, pointer_size)
+        .visit(
+            [](Ttx::Data::Form::Representation& representation)
+                -> Ttx::Data::Form::Representation {
+              return Perimortem::Core::Data::take(representation);
+            },
 
-        [](Ttx::Data::Status status) -> Ttx::Data::Form::Representation {
-          fputs("Invalid fixture Representation.", stderr);
-          abort();
-        });
+            [](Ttx::Data::Status status) -> Ttx::Data::Form::Representation {
+              fputs("Invalid fixture Representation.", stderr);
+              abort();
+            });
   }
 
   auto validate(Ttx::Data::Form::Schema::Reference source)
       -> Ttx::Data::Status {
-    return Ttx::Data::Form::Representation::compile(source).visit(
-        [](const Ttx::Data::Form::Representation& representation) {
-          return Ttx::Data::Status::Success;
-        },
+    return Ttx::Data::Form::Representation::compile(source, pointer_size)
+        .visit(
+            [](const Ttx::Data::Form::Representation& representation) {
+              return Ttx::Data::Status::Success;
+            },
 
-        [](Ttx::Data::Status status) { return status; });
+            [](Ttx::Data::Status status) { return status; });
   }
+
+ private:
+  Count pointer_size;
 };
 
 }  // namespace Validation::DataTests

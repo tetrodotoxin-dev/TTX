@@ -28,8 +28,8 @@ namespace Ttx::Graph {
 //
 // The supplying contract defines the context and table access duration.
 // Copies of an Abstract share that duration. A plain Abstract result requires
-// no release. An operation transferring a release obligation returns
-// Retained or a stronger contract that exposes the obligation.
+// no release. Stateful resources use typed contracts that define their own
+// access and release obligations.
 class Abstract {
  public:
   enum class State : U8 {
@@ -122,14 +122,14 @@ class Abstract {
   // and transferring a collection of API records, at the cost of a callback for
   // each advertised route.
   //
-  // Enumeration order has no implied meaning, and each visit is a separate
-  // observation. A consumer needing a particular selection or representation
-  // can negotiate that contract directly instead of walking all routes.
+  // Each callback is an independent observation. It can make further graph
+  // observations through the supplied Abstract, and those operations can
+  // change provider state before the next callback. A consumer requiring one
+  // transaction across several results can bind Selection when the provider
+  // supplies it.
   //
-  // Callbacks finish before visitation returns and must not invalidate the
-  // traversed state. Route bytes survive only their callback and must be copied
-  // if retained. References encoded in those bytes follow the provider's route
-  // contract.
+  // Route bytes survive only their callback and must be copied if kept.
+  // References encoded in those bytes follow the provider's route contract.
   auto visit_routes(Visitor visitor) const -> void {
     const ttx_graph_visitor callback(&visitor, callback_route);
     api.operations->visit_routes(api.context, callback);
@@ -148,8 +148,8 @@ class Abstract {
   }
 
  private:
-  // `visit_routes` supplies its local Visitor as context and keeps it alive
-  // until synchronous enumeration finishes.
+  // `visit_routes` supplies its local Visitor as callback context for the
+  // complete synchronous enumeration.
   static auto callback_route(
       void* context,
       perimortem_view_bytes route,

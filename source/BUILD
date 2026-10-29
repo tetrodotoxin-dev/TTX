@@ -1,5 +1,6 @@
 # Copyright (c) 2023-present Matt Kaes and contributors
 
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@tetro_toolchain//:defs.bzl", "WINDOWS", "library")
 
 package(default_visibility = ["//visibility:public"])
@@ -61,4 +62,14 @@ library(
         "//conditions:default": "libttx.so",
     }),
     deps = _LIBRARY["deps"],
+)
+
+# Consumers that receive TTX's runtime through another SDK still need its
+# public declarations. This target carries headers without introducing TTX or
+# Perimortem as a second shared-library owner in that runtime closure.
+cc_library(
+    name = "ttx_headers",
+    hdrs = _LIBRARY["hdrs"],
+    includes = _LIBRARY["includes"],
+    deps = ["@perimortem//:headers"],
 )

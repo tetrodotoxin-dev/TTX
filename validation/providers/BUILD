@@ -58,18 +58,6 @@ cc_binary(
 )
 
 cc_binary(
-    name = "libretention_provider.so",
-    testonly = True,
-    srcs = glob([
-        "retention/*.c",
-        "retention/*.h",
-    ]),
-    linkshared = True,
-    local_defines = ["TTX_TEST_EXPORT=1"],
-    deps = ["//:ttx"],
-)
-
-cc_binary(
     name = "libinvocation_provider.so",
     testonly = True,
     srcs = glob([
@@ -84,12 +72,14 @@ cc_binary(
 filegroup(
     name = "libraries",
     testonly = True,
-    srcs = [
-        ":libabstract_subject.so",
-        ":libcomposition.so",
-        ":libinterface_provider.so",
-        ":libinvocation_provider.so",
-        ":libretention_provider.so",
-    ],
+    srcs = select({
+        "@tetro_toolchain//:web": [],
+        "//conditions:default": [
+            ":libabstract_subject.so",
+            ":libcomposition.so",
+            ":libinterface_provider.so",
+            ":libinvocation_provider.so",
+        ],
+    }),
     visibility = ["//:__pkg__"],
 )

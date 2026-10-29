@@ -34,6 +34,10 @@ validation(
         "//validation/providers:contracts",
         "//validation/support:library",
     ],
+    # Web runs as one static module. Native provider loading has no equivalent
+    # in that runtime and its guarded tests contribute no Web dependencies.
+    web_test_deps = [],
+    web_threads = False,
 )
 
 vscode()

@@ -21,9 +21,6 @@ class Describe {
 
   explicit constexpr Describe(Api api) : api(api) {}
   constexpr auto get_abi() const -> Api { return api; }
-  auto get_abstract() const -> Abstract {
-    return Abstract(api.operations->get_abstract(api.context));
-  }
 
   auto get_name() const
       -> Perimortem::Core::Storage::Option<Perimortem::Core::View::Bytes> {

@@ -17,13 +17,13 @@ namespace Ttx::Graph::Capabilities {
 //
 // The callback is a callable passed by reference and invoked with an Abstract.
 // Its captured state belongs to the consumer. The call returns the
-// provider's status and discards any value returned by the callback. The
-// input, Representation and callback remain available until the call returns.
-// The caller supplies a readable region with the represented extent and
-// alignment. The wrapper forwards these arguments to the provider directly.
-// The imported graph is available during the callback, where the consumer can
-// inspect it, copy data or negotiate retained access through the graph's
-// capabilities.
+// provider's status and discards any value returned by the callback. The input,
+// Representation and callback participate in one synchronous transaction,
+// with no access transferred beyond return. The caller supplies a readable
+// region with the represented extent and alignment. The wrapper forwards these
+// arguments to the provider directly. The imported graph is available during
+// the callback, where the consumer can inspect it or copy the typed data it
+// needs after the observation.
 //
 // A `visit` returning Unknown or Rejected guarantees that the callback was
 // never invoked. Unknown leaves the import request undetermined. Rejected
@@ -41,12 +41,6 @@ class Import {
   explicit constexpr Import(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }
-
-  // Returns to the graph location that supplied this binding. The provider
-  // supplies the complete Abstract and may use a different context and table.
-  auto get_abstract() const -> Abstract {
-    return Abstract(api.operations->get_abstract(api.context));
-  }
 
   template <typename Function>
   auto visit(

@@ -131,8 +131,8 @@ const ttx_schema* ttx_test_callable_schema(void) {
 
   static const ttx_schema functions[] = {
     {
-      8,
-      8,
+      sizeof(void*),
+      sizeof(void*),
       TTX_SCHEMA_CALLABLE,
       {
         .callable =
@@ -144,14 +144,14 @@ const ttx_schema* ttx_test_callable_schema(void) {
                 0,
               },
 
-              TTX_SCHEMA_SYSTEM_V_AMD64,
+              TTX_SCHEMA_NATIVE_CONVENTION,
             },
       },
     },
 
     {
-      8,
-      8,
+      sizeof(void*),
+      sizeof(void*),
       TTX_SCHEMA_CALLABLE,
       {
         .callable =
@@ -163,14 +163,14 @@ const ttx_schema* ttx_test_callable_schema(void) {
                 0,
               },
 
-              TTX_SCHEMA_SYSTEM_V_AMD64_VARIADIC,
+              TTX_SCHEMA_NATIVE_VARIADIC,
             },
       },
     },
 
     {
-      8,
-      8,
+      sizeof(void*),
+      sizeof(void*),
       TTX_SCHEMA_CALLABLE,
       {
         .callable =
@@ -182,7 +182,7 @@ const ttx_schema* ttx_test_callable_schema(void) {
                 0,
               },
 
-              TTX_SCHEMA_SYSTEM_V_AMD64,
+              TTX_SCHEMA_NATIVE_CONVENTION,
             },
       },
     },

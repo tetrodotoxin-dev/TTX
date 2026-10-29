@@ -15,10 +15,12 @@ namespace Ttx::Graph::Capabilities {
 // root or one of its routes. Each participating contract defines the
 // required services, their arguments and their effect on the exported result.
 //
-// The graph is available through `expose`. Satisfied reports that the provider
-// fulfilled its request, Unknown leaves the outcome undetermined, and Rejected
-// refuses it. The provider defines its artifacts and effects, including any
-// observations it reports through the supplied graph.
+// `expose` performs its graph observations and effects within one synchronous
+// transaction and transfers no access to the supplied Abstract beyond return.
+// Satisfied reports that the provider fulfilled its request, Unknown leaves
+// the outcome undetermined, and Rejected refuses it. The provider defines its
+// artifacts and effects, including any observations it reports through the
+// supplied graph.
 class Export {
  public:
   static constexpr auto contract_id =
@@ -32,12 +34,6 @@ class Export {
   explicit constexpr Export(Api api) : api(api) {}
 
   constexpr auto get_abi() const -> Api { return api; }
-
-  // Returns to the graph location that supplied this binding. The provider
-  // supplies the complete Abstract and may use a different context and table.
-  auto get_abstract() const -> Abstract {
-    return Abstract(api.operations->get_abstract(api.context));
-  }
 
   auto expose(Abstract abstract) const -> Semantic::Negotiation::Status {
     const auto api = get_abi();

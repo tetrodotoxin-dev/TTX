@@ -10,7 +10,6 @@
 
 #include "ttx/graph/capabilities/export.hpp"
 #include "ttx/graph/capabilities/import.hpp"
-#include "ttx/graph/capabilities/retain.hpp"
 #include "ttx/graph/policies/constant.hpp"
 #include "ttx/graph/policies/none.hpp"
 #include "ttx/graph/policies/unknown.h"
@@ -102,13 +101,12 @@ class Report {
   static constexpr ttx_abstract_ops graph_operations = {
     supports, bind, lookup, visit, state};
 
-  static constexpr ttx_export_ops operations = {get_abstract, expose};
+  static constexpr ttx_export_ops operations = {expose};
 };
 
-// ImportedByte supplies a typed byte read during the import callback. An
-// Export bound at the root returns to this imported node through get_abstract.
-// Its expose operation interprets the ImportedByte context and delegates to
-// Report::expose using the reporting provider's context.
+// ImportedByte supplies a typed byte read during the import callback. Export
+// interprets the ImportedByte context and delegates to Report::expose using the
+// reporting provider's context.
 class ImportedByte {
  public:
   U8 value;
@@ -200,7 +198,7 @@ class ImportedByte {
     return Report::expose(provider.report, abstract);
   }
 
-  static constexpr ttx_export_ops export_operations = {get_abstract, expose};
+  static constexpr ttx_export_ops export_operations = {expose};
 };
 
 class ByteImport {
@@ -293,7 +291,7 @@ class ByteImport {
   static constexpr ttx_abstract_ops graph_operations = {
     supports, bind, lookup, visit_routes, state};
 
-  static constexpr ttx_import_ops operations = {get_abstract, visit};
+  static constexpr ttx_import_ops operations = {visit};
 };
 
 class ByteExport {
@@ -352,7 +350,7 @@ class ByteExport {
   static constexpr ttx_abstract_ops graph_operations = {
     supports, bind, ByteImport::lookup, ByteImport::visit_routes, state};
 
-  static constexpr ttx_export_ops operations = {get_abstract, expose};
+  static constexpr ttx_export_ops operations = {expose};
 };
 
 VALIDATION_TEST(Conversion, scoped_input) {
@@ -365,8 +363,6 @@ VALIDATION_TEST(Conversion, scoped_input) {
   U8 copied = 0;
   auto callback = [&](Abstract graph) {
     EXPECT(provider.observing);
-    EXPECT(
-        graph.supports<Capabilities::Retain>() == Negotiation::Status::Unknown);
     copied = graph.bind<Validation::Value>().visit(
         [](Validation::Value value) { return value.read(); },
         [&] {

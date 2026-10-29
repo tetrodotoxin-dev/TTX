@@ -12,9 +12,10 @@ namespace Ttx::Graph {
 // chooses which values to visit and can read them directly from its own data.
 // Value can be a native reference or a negotiated API record.
 //
-// Enumeration is synchronous. The caller keeps the callback alive until
-// enumeration returns, and the provider completes every callback in that time.
-// The enumeration contract specifies how long each route and value can be used.
+// Every callback is one synchronous graph observation. The callback can make
+// further observations before returning to the provider, and provider state can
+// change before the next callback. The enumeration contract specifies how long
+// each route and value can be used.
 template <typename Value>
 class Visitor {
  public:
@@ -25,8 +26,8 @@ class Visitor {
 
   template <typename Function>
     requires(!__is_same(__remove_cvref(Function), Visitor))
-  // Stores a reference to callback, which the caller keeps alive until
-  // visitation returns. Explicit construction makes that callback reference
+  // Uses callback directly for every invocation made by the enclosing
+  // visitation. Explicit construction makes the borrowed callback reference
   // visible at the call site.
   constexpr explicit Visitor(Function& callback)
       : Visitor(&callback, invoke<Function>) {}
@@ -37,8 +38,8 @@ class Visitor {
   }
 
  private:
-  // The constructor stores &callback as context. The caller keeps that
-  // Function alive until all calls through this Visitor have finished.
+  // The constructor publishes &callback as context. `invoke` is called only by
+  // the enclosing synchronous visitation.
   template <typename Function>
   static auto
       invoke(void* context, Perimortem::Core::View::Bytes route, Value value)

@@ -29,7 +29,8 @@ static consteval auto recursive_bytes() -> Storage::Bytes<8> {
   node = Form::Schema::composite({field, 1}, 8, 8);
 
   Form::Compiler<Compile::Vector> compiler;
-  if (compiler.compile(node) != Status::Success || compiler.get_size() != 8) {
+  if (compiler.compile(node, 8) != Status::Success ||
+      compiler.get_size() != 8) {
     return Storage::Bytes<8>();
   }
 
@@ -44,7 +45,7 @@ static_assert(recursive[4] == 0x80 && recursive[5] == 0x22);
 // One target is used both inline and indirectly. The pointer modifier belongs
 // to the reference, so neither use changes or copies that target definition.
 VALIDATION_TEST(Pointers, reference_modifier) {
-  Validation::DataTests::Preparation prepare;
+  Validation::DataTests::Preparation prepare(8);
   const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
   const Form::Schema::Position member(integer, 0);
   const auto target = Form::Schema::composite({member, 1}, 4, 4);
@@ -76,12 +77,12 @@ VALIDATION_TEST(Pointers, reference_modifier) {
 
   Form::Compiler compiler;
   EXPECT(
-      compiler.compile(Form::Schema::Reference(&target.get_abi(), 2)) ==
+      compiler.compile(Form::Schema::Reference(&target.get_abi(), 2), 8) ==
       Status::Invalid);
 }
 
 VALIDATION_TEST(Pointers, opaque_spelling) {
-  Validation::DataTests::Preparation prepare;
+  Validation::DataTests::Preparation prepare(8);
   const Storage::Vector<U8, 8> expected = {
     {
       0x11,
@@ -99,8 +100,9 @@ VALIDATION_TEST(Pointers, opaque_spelling) {
   EXPECT(pointer.compatible(
       Form::Representation(expected.get_data(), sizeof(expected))));
   // Both ways of describing an opaque pointer compile to the same bytes.
-  EXPECT(pointer.compatible(
-      prepare(Form::Schema::primitive(Form::Schema::Value::Pointer))));
+  EXPECT(pointer.compatible(prepare(
+      Form::Schema::primitive(
+          Form::Schema::Value::Pointer, Form::Schema::ByteOrder::Little, 8))));
 
   const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
   const auto& typed = prepare(Form::Schema::pointer(&integer));
@@ -117,7 +119,7 @@ VALIDATION_TEST(Pointers, opaque_spelling) {
 // Both allocations describe one recursive shape. Doubling the source graph
 // must not double the emitted bodies or change their reference numbering.
 VALIDATION_TEST(Pointers, recursive_sharing) {
-  Validation::DataTests::Preparation prepare;
+  Validation::DataTests::Preparation prepare(8);
   auto a =
       Form::Schema::composite(View::Vector<Form::Schema::Position>(), 8, 8);
   auto b =
@@ -163,19 +165,19 @@ VALIDATION_TEST(Pointers, inline_cycle_rejected) {
   node = Form::Schema::composite({self, 1}, 8, 8);
 
   Form::Compiler compiler;
-  EXPECT(compiler.compile(node) == Status::Invalid);
+  EXPECT(compiler.compile(node, 8) == Status::Invalid);
 }
 
 // The callable is a pointer edge even when its argument is its containing
 // struct by value. Preparation must not mistake that signature for inline
 // containment and must not omit a function with no payload arguments.
 VALIDATION_TEST(Pointers, recursive_callable) {
-  Validation::DataTests::Preparation prepare;
+  Validation::DataTests::Preparation prepare(8);
   auto node =
       Form::Schema::composite(View::Vector<Form::Schema::Position>(), 8, 8);
   const Form::Schema::Argument self(node, 1);
   const auto callback = Form::Schema::callable(
-      Form::Callable::Convention::SystemVAMD64, {self, 1});
+      Form::Callable::Convention::SystemVAMD64, {self, 1}, {}, 8);
   const Form::Schema::Position field(callback, 0);
   node = Form::Schema::composite({field, 1}, 8, 8);
 
@@ -192,7 +194,7 @@ VALIDATION_TEST(Pointers, recursive_callable) {
 // the compiler recognizes that shared layout, it can describe both pointers
 // as one run while preserving their sixteen byte spacing.
 VALIDATION_TEST(Pointers, pointer_run) {
-  Validation::DataTests::Preparation prepare;
+  Validation::DataTests::Preparation prepare(8);
   const auto integer = Form::Schema::primitive(Form::Schema::Value::U32);
   const Form::Schema::Position value(integer, 0);
   const auto a = Form::Schema::composite({value, 1}, 4, 4);
@@ -228,7 +230,7 @@ VALIDATION_TEST(Pointers, pointer_run) {
 // entire cycle before equality settles. Independent allocation and reversed
 // source member enumeration still have to produce exactly the same stream.
 VALIDATION_TEST(Pointers, distinct_ring) {
-  Validation::DataTests::Preparation prepare;
+  Validation::DataTests::Preparation prepare(8);
   constexpr Count size = 32;
   Storage::Vector<Storage::Vector<Form::Schema, size>, 2> nodes;
   Storage::Vector<Storage::Vector<Form::Schema::Reference, size>, 2> pointers;

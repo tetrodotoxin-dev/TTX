@@ -8,6 +8,7 @@
 
 typedef struct observation_subject {
   U8 value;
+  U8 generation;
   ttx_abstract selected;
   ttx_negotiation_status answer;
   Count binds;

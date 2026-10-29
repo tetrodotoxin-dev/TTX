@@ -66,8 +66,13 @@ static ttx_abstract get_abstract(void* context) {
 
 static ttx_abstract lookup(void* context, perimortem_view_bytes route) {
   observation_subject* source = context;
+  if (route.size == 1 && route.data[0] == 1) {
+    ++source->generation;
+    return get_abstract(source);
+  }
+
   if (route.size == 3 && route.data[0] == 7 && route.data[1] == 0 &&
-      route.data[2] == 9) {
+      (route.data[2] == 9 || route.data[2] == 10)) {
     return get_abstract(source);
   }
 
@@ -76,18 +81,19 @@ static ttx_abstract lookup(void* context, perimortem_view_bytes route) {
 
 static void visit(void* context, ttx_graph_visitor visitor) {
   observation_subject* source = context;
-  const U8 route[] = {
-    7,
-    0,
-    9,
+  const U8 routes[][3] = {
+    {7, 0, 9},
+    {7, 0, 10},
   };
 
-  const perimortem_view_bytes bytes = {
-    route,
-    sizeof(route),
-  };
+  for (Count index = 0; index < 2; ++index) {
+    const perimortem_view_bytes bytes = {
+      routes[index],
+      sizeof(routes[index]),
+    };
 
-  visitor.callback(visitor.callback_context, bytes, get_abstract(source));
+    visitor.callback(visitor.callback_context, bytes, get_abstract(source));
+  }
 }
 
 static ttx_negotiation_status supports(void* context, perimortem_uuid id) {

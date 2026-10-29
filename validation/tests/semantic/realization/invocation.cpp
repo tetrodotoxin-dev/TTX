@@ -5,6 +5,8 @@
 
 #include "toolchain/validation/test.hpp"
 
+#ifndef TOOLCHAIN_WASM
+
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/storage/vector.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
@@ -144,3 +146,5 @@ VALIDATION_TEST(InvocationTests, refused_and_malformed_records) {
   EXPECT_EQ(foreign.api.statistics().transfers, U64(1));
   EXPECT_EQ(foreign.api.statistics().calls, U64(0));
 }
+
+#endif

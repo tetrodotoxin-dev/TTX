@@ -10,8 +10,9 @@ namespace Ttx::Graph::Policies {
 
 // None carries an Abstract marking an explicit graph dead end, including
 // intentionally absent arguments. Every further route returns that None
-// result. The original route's selection can change unless its supplying
-// contract also establishes Constant.
+// result. None itself supplies Constant and rejects unrelated contracts. That
+// policy does not prevent the original route from selecting another location
+// on a later observation.
 class None {
  public:
   static constexpr auto contract_id =

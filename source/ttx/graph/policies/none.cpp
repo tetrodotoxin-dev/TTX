@@ -3,12 +3,14 @@
 
 #include "ttx/graph/policies/none.hpp"
 
+#include "ttx/graph/policies/constant.hpp"
+
 using namespace Perimortem::Core;
 using namespace Ttx::Graph;
 
-// NoneProvider supplies the shared None result. Its own routes stay on
+// NoneProvider supplies the shared Constant dead end. Its own routes stay on
 // this result, while the original Abstract and route make a new selection on
-// each observation unless they also supply Constant.
+// each observation unless that selection establishes its own stability.
 class NoneProvider {
  public:
   static auto supports(void* context, perimortem_uuid id)
@@ -19,9 +21,10 @@ class NoneProvider {
     }
 
     return contract == Abstract::contract_id ||
-                   contract == Policies::None::contract_id
+                   contract == Policies::None::contract_id ||
+                   contract == Policies::Constant::contract_id
                ? TTX_NEGOTIATION_SATISFIED
-               : TTX_NEGOTIATION_UNKNOWN;
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   static auto bind(void* context, perimortem_uuid id, void* output)

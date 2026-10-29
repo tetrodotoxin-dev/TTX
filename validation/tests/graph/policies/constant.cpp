@@ -208,7 +208,8 @@ VALIDATION_TEST(Constants, explicit_constant_policy) {
   const auto child = second.resolve_route("child"_view);
   EXPECT(first.resolve_route("child"_view) == child);
   EXPECT(child == Abstract(ttx_none()));
-  EXPECT(child.supports<Policies::Constant>() == Negotiation::Status::Unknown);
+  EXPECT(
+      child.supports<Policies::Constant>() == Negotiation::Status::Satisfied);
 }
 
 // The shared None result leaves the original provider free to select a

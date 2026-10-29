@@ -236,14 +236,18 @@ VALIDATION_TEST(Sentinels, retry_original_route) {
 VALIDATION_TEST(Sentinels, support_properties) {
   const auto unknown = Policies::Unknown::get_unknown().get_abstract();
   const auto none = Policies::None::get_none().get_abstract();
+  constexpr auto unrelated =
+      Identity::Uuid(0x44f044cf9d8e4b8fULL, 0x81b4ce5aa42be54eULL);
 
   EXPECT(unknown.supports<Abstract>() == Negotiation::Status::Satisfied);
   EXPECT(
       unknown.supports<Policies::Unknown>() == Negotiation::Status::Satisfied);
   EXPECT(
       unknown.supports<Policies::Constant>() == Negotiation::Status::Unknown);
-  EXPECT(none.supports<Policies::Constant>() == Negotiation::Status::Unknown);
+  EXPECT(none.supports<Policies::Constant>() == Negotiation::Status::Satisfied);
   EXPECT(none.supports<Policies::Unknown>() == Negotiation::Status::Rejected);
+  EXPECT(unknown.supports(unrelated) == Negotiation::Status::Unknown);
+  EXPECT(none.supports(unrelated) == Negotiation::Status::Rejected);
 }
 
 // Sentinel UUIDs return complete Abstract records through the established
@@ -263,8 +267,17 @@ VALIDATION_TEST(Sentinels, policy_binding) {
       TTX_NEGOTIATION_SATISFIED);
   EXPECT(Abstract(output).get_state() == Abstract::State::Unknown);
   EXPECT(Abstract(none).bind<Policies::None>());
-  EXPECT_NOT(Abstract(none).bind<Policies::Constant>());
+  EXPECT(Abstract(none).bind<Policies::Constant>());
   EXPECT_NOT(Abstract(none).bind<Policies::Unknown>());
+
+  constexpr auto unrelated =
+      Identity::Uuid(0x44f044cf9d8e4b8fULL, 0x81b4ce5aa42be54eULL);
+  EXPECT_EQ(
+      none.operations->bind(none.context, unrelated, &output),
+      TTX_NEGOTIATION_REJECTED);
+  EXPECT_EQ(
+      unknown.operations->bind(unknown.context, unrelated, &output),
+      TTX_NEGOTIATION_UNKNOWN);
 }
 
 VALIDATION_TEST(Sentinels, navigation_and_unknown) {

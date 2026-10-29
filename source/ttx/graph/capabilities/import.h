@@ -6,8 +6,8 @@
 
 #include "ttx/graph/abstract.h"
 
-#define TTX_IMPORT_ID_HIGH 0x9ba836087deb4829ULL
-#define TTX_IMPORT_ID_LOW 0x9ed9407f66ea20deULL
+#define TTX_IMPORT_ID_HIGH 0x2793e7c714e64355ULL
+#define TTX_IMPORT_ID_LOW 0xb6104e50092bf2e2ULL
 
 // Exposes the capability to interpret data described by the supplied
 // Representation and supply an Abstract for the imported graph. The provider
@@ -16,11 +16,12 @@
 // callback finishes.
 //
 // The caller can supply callback state through `callback_context`, which is
-// passed unchanged to `callback`. The input, Representation and callback state
-// remain available until `visit` returns. Input storage satisfies the extent
-// and alignment of its canonical Representation. The imported graph is
-// available during the callback, where the consumer can inspect it, copy data
-// or negotiate retained access through the graph's capabilities.
+// passed unchanged to `callback`. `visit` observes the input, Representation
+// and callback state within one synchronous transaction and transfers no
+// access to them beyond return. Input storage satisfies the extent and
+// alignment of its canonical Representation. The imported graph is available
+// during the callback, where the consumer can inspect it or copy the typed data
+// it needs after the observation.
 //
 // A `visit` returning Unknown or Rejected guarantees that `callback` was never
 // called. Unknown leaves the import request undetermined. Rejected explicitly
@@ -31,10 +32,6 @@ typedef struct ttx_import {
 } ttx_import;
 
 typedef struct ttx_import_ops {
-  // Supplies the graph location from which this contract was bound, with its
-  // own context and operations. Repeated bind/get_abstract round trips preserve
-  // that location even when the provider publishes different API records.
-  ttx_abstract (*get_abstract)(void* context);
   ttx_negotiation_status (*visit)(
       void* context,
       const void* input,
