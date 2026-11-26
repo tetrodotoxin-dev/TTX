@@ -248,6 +248,38 @@ VALIDATION_TEST(Callables, invalid_signatures) {
           8) == Status::Success);
 }
 
+// An invalid target reached through a pointer is inspected after the callable's
+// immediate arguments. A count overflow in that list is observable first.
+VALIDATION_TEST(Callables, admission_failure_order) {
+  const Form::Schema unknown(ttx_schema{8, 8, 17, {}});
+  const Form::Schema::Argument arguments[] = {
+    {Form::Schema::pointer(&unknown), 1},
+    {integer, Count(-1)},
+  };
+  const auto schema = Form::Schema::callable(
+      Form::Callable::Convention::SystemVAMD64, {arguments[0], 2}, {}, 8);
+  Validation::DataTests::Preparation prepare(8);
+  EXPECT(prepare.validate(schema) == Status::Overflow);
+
+  const auto inline_range =
+      Form::Schema::range(integer, 3, Count(1) << 63, Count(-1), 4);
+  const Form::Schema::Position fields[] = {{inline_range, 0}, {{}, 0}};
+  EXPECT(
+      prepare.validate(Form::Schema::composite({fields[0], 2}, Count(-1), 8)) ==
+      Status::Overflow);
+
+  // With a usable allocator and output slot, the C entry checks the root
+  // before delegating pointer-width selection to the compiler.
+  const ttx_representation sentinel{};
+  const ttx_representation* published = &sentinel;
+  const ttx_representation_allocator allocator{
+    nullptr, [](void*, Count, Count) -> void* { return nullptr; }};
+  EXPECT_EQ(
+      ttx_representation_compile({}, 16, allocator, &published),
+      TTX_DATA_INVALID);
+  EXPECT(published == &sentinel);
+}
+
 // C authors its descriptions and executable table independently. Agreement
 // permits one ordinary copy into the C++ table, followed by actual fixed,
 // variadic and SIMD calls. No Semantic negotiation or invocation wrapper is

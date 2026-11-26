@@ -72,6 +72,11 @@ class Native<Type[size]> {
 template <typename Type>
 class Native<const Type> : public Native<Type> {};
 
+// A pointer to a const array retains the array bound in its target type.
+// Both specializations above match that target. Reuse the same bounded Range.
+template <typename Type, Count size>
+class Native<const Type[size]> : public Native<Type[size]> {};
+
 // A typed pointer describes one address and the layout reachable through it.
 // Pointer targets participate in canonical comparison without contributing
 // their extent to the pointer slot or requiring access to a pointed value.
@@ -125,6 +130,8 @@ class Native<const void*> : public Native<void*> {};
 // A function pointer describes the host's fixed C calling convention, ordered
 // arguments and return value. The resulting form compares the whole signature
 // while the pointer occupies one address in the containing record.
+// C++ adjusts a parameter declared T a[N] to T* before Native sees it.
+// A parameter declared T (*a)[N] retains the bound in its pointee schema.
 template <typename Result, typename... Arguments>
 class Native<Result (*)(Arguments...)> {
 
