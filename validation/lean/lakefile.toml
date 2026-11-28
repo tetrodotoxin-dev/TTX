@@ -1,7 +1,0 @@
-name = "ttx-research"
-defaultTargets = ["ttx"]
-
-[[lean_lib]]
-name = "ttx"
-roots = ["ttx"]
-globs = ["ttx.+", "ttx"]

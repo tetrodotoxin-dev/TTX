@@ -43,7 +43,7 @@ implementations. Questions continue through the policies of the interfaces
 encountered along the way, so the graph preserves the conditions under which
 access is provided.
 
-Advanced readers can consult [Simulacra](simulacra.md) for an emergent
+Advanced readers can consult [Simulacra](https://github.com/tetrodotoxin-dev/Proofs/blob/main/simulacra.md) in the private Proofs repository for an emergent
 substitution property of this model. It is not required to use TTX.
 
 ## Layers
