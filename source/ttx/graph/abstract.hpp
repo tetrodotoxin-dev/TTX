@@ -101,12 +101,11 @@ class Abstract {
   //
   // Each lookup observes the provider again. If the result supplies Constant,
   // the caller can reuse the selection for this Abstract and route during
-  // the supplying access. None also commits this edge to permanent absence.
+  // the supplying access. None reports absence for this lookup.
   // A fresh lookup requires valid access to the same semantic origin.
   auto resolve_route(Perimortem::Core::View::Bytes route) const -> Abstract {
-    return Abstract(api.operations->resolve_route(
-        api.context,
-        perimortem_view_bytes(route.get_data(), route.get_size())));
+    return api.operations->resolve_route(
+        api.context, perimortem_view_bytes(route.get_data(), route.get_size()));
   }
 
   // The provider advertises the routes visible through this Abstract's policy.

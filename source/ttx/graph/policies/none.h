@@ -6,28 +6,19 @@
 
 #include "ttx/graph/abstract.h"
 
-// None represents a known durable dead end in the Abstract graph. It does not
-// mark that an observation is empty, but instead signals that there is not and
-// NEVER will be a location at the observed location in the graph: the requested
-// location is permanently unreachable.
+// None reports that a selection has no target in this observation. A later
+// lookup at the original location may return a different result. A caller
+// can reuse a route selection when its provider independently grants Constant.
 //
-// The None contract represents one of the two axiomatic Abstracts and can only
-// be reported as supported if the Abstract meets these exact policies:
+// An Abstract supplying None supports None and Abstract and reports
+// Unreachable. Binding Abstract returns its own location. Binding None
+// returns Rejected. Resolution and every route lead back to this location,
+// visitation invokes zero callbacks, and these observations have no visible
+// side effects. Additional policies carry their own obligations.
 //
-// * It must also support both Constant and Abstract contracts.
-// * It must explicitly reject all other contracts.
-// * It must only satisfy bind for Abstract.
-// * It must explicitly reject all other binds.
-// * It must return Unreachable for it's reachability.
-// * Every route from it must return itself.
-// * Any observations on the Abstract produces no observable side effects.
-//
-// None's contract is the formal TTX domain identifier that provides a fast path
-// for identification without needing to observe all behaviors. Any Abstract can
-// emit support for the None contract must collapse to a perfect simulacra so
-// TTX supports a built in Abstract that can be used to statically emit for ture
-// unreachable paths. Consumers however should not assume that the static TTX
-// address represents the one and only `None` representation.
+// Check support for None to recognize the policy on independently supplied
+// records. The function `ttx_none()` returns the library's shared
+// implementation, which declines Constant.
 C_LINKAGE EXPORTED(TTX)
 ttx_abstract ttx_none(void);
 

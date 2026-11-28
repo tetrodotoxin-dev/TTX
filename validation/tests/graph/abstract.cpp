@@ -68,7 +68,7 @@ class EquivalentLocation {
   static auto supports(void* context, perimortem_uuid requested)
       -> ttx_negotiation_status {
     (void)context;
-    if (!requested.high && requested.low <= 1) {
+    if (!requested.high && requested.low <= TTX_NONE_ID_LOW) {
       return TTX_NEGOTIATION_REJECTED;
     }
 

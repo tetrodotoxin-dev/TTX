@@ -118,11 +118,6 @@ struct Fixed {
     }
 
     const auto target = Data::cast<Fixed>(context)->target;
-    if (Abstract(target).supports<Policies::None>() ==
-        Negotiation::Status::Satisfied) {
-      return target.operations->bind(target.context, id, output);
-    }
-
     if (contract == Abstract::contract_id ||
         contract == Policies::Constant::contract_id) {
       Abstract::Api api = get_abstract(context);
@@ -140,6 +135,11 @@ struct Fixed {
   static auto lookup(void* context, perimortem_view_bytes route)
       -> ttx_abstract {
     const auto target = Data::cast<Fixed>(context)->target;
+    if (Abstract(target).supports<Policies::None>() ==
+        Negotiation::Status::Satisfied) {
+      return get_abstract(context);
+    }
+
     return target.operations->resolve_route(target.context, route);
   }
 
@@ -179,20 +179,18 @@ VALIDATION_TEST(Constants, constant_indeterminate_target) {
 }
 
 VALIDATION_TEST(Constants, explicit_constant_policy) {
-  Fixed rejected{ttx_none()};
-  const Abstract permanent(Fixed::get_abstract(&rejected));
-  EXPECT(permanent.get_reachability() == Abstract::Reachability::Unreachable);
-  EXPECT(permanent != Abstract(ttx_none()));
+  Fixed stable_absence{ttx_none()};
+  const Abstract absent(Fixed::get_abstract(&stable_absence));
+  EXPECT(absent.get_reachability() == Abstract::Reachability::Unreachable);
+  EXPECT(absent != Abstract(ttx_none()));
+  EXPECT(absent.supports<Policies::None>() == Negotiation::Status::Satisfied);
   EXPECT(
-      permanent.supports<Policies::None>() == Negotiation::Status::Satisfied);
-  EXPECT(
-      permanent.supports<Policies::Constant>() ==
-      Negotiation::Status::Satisfied);
-  EXPECT_NOT(permanent.bind<Policies::None>());
-  EXPECT_NOT(permanent.bind<Policies::Constant>());
-  permanent.bind<Abstract>().visit(
+      absent.supports<Policies::Constant>() == Negotiation::Status::Satisfied);
+  EXPECT_NOT(absent.bind<Policies::None>());
+  EXPECT(absent.bind<Policies::Constant>());
+  absent.bind<Abstract>().visit(
       [&](Abstract answer) {
-        EXPECT(answer != permanent);
+        EXPECT(answer == absent);
         EXPECT(
             answer.get_reachability() == Abstract::Reachability::Unreachable);
         EXPECT(
@@ -256,36 +254,21 @@ VALIDATION_TEST(Constants, explicit_constant_policy) {
   const auto child = second.resolve_route("child"_view);
   EXPECT(first.resolve_route("child"_view) == child);
   EXPECT(child.get_reachability() == Abstract::Reachability::Unreachable);
-  EXPECT(
-      child.supports<Policies::Constant>() == Negotiation::Status::Satisfied);
+  EXPECT(child.supports<Policies::Constant>() == Negotiation::Status::Rejected);
 }
 
-// A later access to the same origin must still see "missing" as absent.
-// A new access must identify None by its policy even after "child" becomes
-// available on the same origin.
-VALIDATION_TEST(Constants, none_selection_remains_absent) {
-  Changing provider{ttx_unknown()};
-  {
-    const Abstract subject(Changing::get_abstract(&provider));
-    const auto missing = subject.resolve_route("missing"_view);
-    ASSERT(
-        missing.supports<Policies::None>() == Negotiation::Status::Satisfied);
-    EXPECT(missing.get_reachability() == Abstract::Reachability::Unreachable);
-    EXPECT(
-        missing.supports<Policies::Constant>() ==
-        Negotiation::Status::Satisfied);
-    EXPECT(
-        subject.resolve_route("child"_view).get_reachability() ==
-        Abstract::Reachability::Indeterminate);
-  }
+// A caller holding the result of a missing lookup can still inspect it after
+// the same route begins selecting a child.
+VALIDATION_TEST(Constants, absence_is_one_observation) {
+  Changing provider{ttx_none()};
+  const Abstract origin(Changing::get_abstract(&provider));
+  const auto missing = origin.resolve_route("child"_view);
+  ASSERT(missing.supports<Policies::None>() == Negotiation::Status::Satisfied);
+  EXPECT(
+      missing.supports<Policies::Constant>() == Negotiation::Status::Rejected);
 
-  provider.child = Changing::get_abstract(&provider);
-
-  const Abstract subject(Changing::get_abstract(&provider));
-  EXPECT(subject.resolve_route("child"_view) == subject);
-
-  const auto missing = subject.resolve_route("missing"_view);
-  EXPECT(missing.supports<Policies::None>() == Negotiation::Status::Satisfied);
+  provider.child = origin;
+  EXPECT(origin.resolve_route("child"_view) == origin);
   EXPECT(missing.get_reachability() == Abstract::Reachability::Unreachable);
 }
 

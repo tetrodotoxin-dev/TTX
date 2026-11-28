@@ -34,11 +34,11 @@ struct RouteProvider {
   Count negotiations = 0;
   Count reachability_queries = 0;
 
-  auto get_abi() -> ttx_abstract {
+  auto get_abstract() -> Abstract {
     static const ttx_abstract_ops operations = {
       supports, bind, lookup, visit, get_reachability};
 
-    return ttx_abstract(this, &operations);
+    return Abstract(this, operations);
   }
 
   static auto get_reachability(void* context) -> ttx_abstract_reachability {
@@ -84,7 +84,7 @@ struct RouteProvider {
 // context and table, with zero support or bind probes.
 VALIDATION_TEST(Sentinels, reachable_without_known_contracts) {
   RouteProvider provider{"next"_view, ttx_unknown()};
-  const Abstract abstract(provider.get_abi());
+  const Abstract abstract = provider.get_abstract();
   EXPECT(abstract.get_reachability() == Abstract::Reachability::Reachable);
   EXPECT_EQ(provider.reachability_queries, Count(1));
   EXPECT_EQ(provider.negotiations, Count(0));
@@ -95,7 +95,7 @@ VALIDATION_TEST(Sentinels, reachable_without_known_contracts) {
   EXPECT(
       abstract.supports<Policies::Unknown>() == Negotiation::Status::Rejected);
   EXPECT(
-      abstract.supports(Identity::Uuid(0, 2)) == Negotiation::Status::Unknown);
+      abstract.supports(Identity::Uuid(0, 3)) == Negotiation::Status::Unknown);
   EXPECT_EQ(provider.reachability_queries, Count(1));
 
   EXPECT(
@@ -106,10 +106,12 @@ VALIDATION_TEST(Sentinels, reachable_without_known_contracts) {
 // Support identifies each sentinel. A caller obtains its graph location by
 // binding Abstract, so neither reserved policy request supplies a record.
 VALIDATION_TEST(Sentinels, reserved_policies) {
-  static_assert(TTX_NONE_ID_HIGH == 0 && TTX_NONE_ID_LOW == 0);
+  static_assert(TTX_NONE_ID_HIGH == 0 && TTX_NONE_ID_LOW == 2);
   static_assert(TTX_UNKNOWN_ID_HIGH == 0 && TTX_UNKNOWN_ID_LOW == 1);
   RouteProvider present{"next"_view, ttx_none()};
-  const ttx_abstract values[] = {ttx_none(), ttx_unknown(), present.get_abi()};
+  const ttx_abstract values[] = {
+    ttx_none(), ttx_unknown(), present.get_abstract()};
+
   const perimortem_uuid ids[] = {
     Policies::None::contract_id, Policies::Unknown::contract_id};
 
@@ -178,9 +180,9 @@ struct Search
 VALIDATION_TEST(Sentinels, reachability_does_not_identify_policy) {
   Search search;
   RouteProvider origin{"product"_view, ttx_unknown()};
-  const Abstract root(origin.get_abi());
+  const Abstract root = origin.get_abstract();
   const auto unknown = root.resolve_route("product"_view);
-  origin.selected = search.get_abstract().get_abi();
+  origin.selected = search.get_abstract();
 
   const auto pending = root.resolve_route("product"_view);
   EXPECT(unknown.get_reachability() == Abstract::Reachability::Indeterminate);
@@ -203,12 +205,12 @@ VALIDATION_TEST(Sentinels, reachability_does_not_identify_policy) {
       [&](Validation::Value value) { EXPECT_EQ(value.read(), U8(1)); },
       [&] { EXPECT(False); });
 
-  RouteProvider installed{"self"_view, origin.get_abi()};
-  origin.selected = installed.get_abi();
+  RouteProvider installed{"self"_view, origin.get_abstract()};
+  origin.selected = installed.get_abstract();
 
   const auto product = root.resolve_route("product"_view);
   EXPECT(product.get_reachability() == Abstract::Reachability::Reachable);
-  EXPECT(product == Abstract(installed.get_abi()));
+  EXPECT(product == installed.get_abstract());
 }
 
 // None and Unknown must return themselves for every route. Empty, binary and
@@ -239,17 +241,17 @@ VALIDATION_TEST(Sentinels, terminal_entry_position) {
 
   for (const auto terminal : terminals) {
     for (Count position = 0; position < 3; ++position) {
-      RouteProvider third{"c"_view, terminal.get_abi()};
-      RouteProvider second{"b"_view, third.get_abi()};
-      RouteProvider first{"a"_view, second.get_abi()};
+      RouteProvider third{"c"_view, terminal};
+      RouteProvider second{"b"_view, third.get_abstract()};
+      RouteProvider first{"a"_view, second.get_abstract()};
 
       if (position == 0) {
-        first.selected = terminal.get_abi();
+        first.selected = terminal;
       } else if (position == 1) {
-        second.selected = terminal.get_abi();
+        second.selected = terminal;
       }
 
-      const Abstract root(first.get_abi());
+      const Abstract root = first.get_abstract();
       const auto abstract =
           root.resolve_route("a"_view).resolve_route("b"_view).resolve_route(
               "c"_view);
@@ -276,14 +278,14 @@ VALIDATION_TEST(Sentinels, terminal_entry_position) {
 VALIDATION_TEST(Sentinels, retry_original_route) {
   RouteProvider available{"child"_view, ttx_none()};
   RouteProvider provider{"selected"_view, ttx_unknown()};
-  const Abstract root(provider.get_abi());
+  const Abstract root = provider.get_abstract();
   const auto first = root.resolve_route("selected"_view);
   EXPECT(first == Abstract(ttx_unknown()));
 
-  provider.selected = available.get_abi();
+  provider.selected = available.get_abstract();
 
   const auto second = root.resolve_route("selected"_view);
-  EXPECT(second == Abstract(available.get_abi()));
+  EXPECT(second == available.get_abstract());
   EXPECT(second.resolve_route("child"_view) == Abstract(ttx_none()));
   EXPECT(first.resolve_route("child"_view) == first);
   EXPECT_EQ(provider.resolutions, Count(2));
@@ -309,7 +311,7 @@ VALIDATION_TEST(Sentinels, support_properties) {
   EXPECT(
       unknown.supports<Policies::Constant>() == Negotiation::Status::Unknown);
   EXPECT(none.supports<Abstract>() == Negotiation::Status::Satisfied);
-  EXPECT(none.supports<Policies::Constant>() == Negotiation::Status::Satisfied);
+  EXPECT(none.supports<Policies::Constant>() == Negotiation::Status::Rejected);
   EXPECT(none.supports<Policies::Unknown>() == Negotiation::Status::Rejected);
   EXPECT(unknown.supports(unrelated) == Negotiation::Status::Unknown);
   EXPECT(none.supports(unrelated) == Negotiation::Status::Rejected);

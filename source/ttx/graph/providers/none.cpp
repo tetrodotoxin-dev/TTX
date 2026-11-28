@@ -4,7 +4,6 @@
 #include "ttx/graph/providers/none.hpp"
 
 #include "ttx/graph/policies/none.hpp"
-#include "ttx/graph/policies/constant.hpp"
 
 using namespace Perimortem::Core;
 using namespace Ttx::Graph;
@@ -13,7 +12,6 @@ using namespace Ttx::Semantic;
 static auto supports(void*, perimortem_uuid id) -> Negotiation::Status {
   const Identity::Uuid contract(id);
   return contract == Abstract::contract_id ||
-                 contract == Policies::Constant::contract_id ||
                  contract == Policies::None::contract_id
              ? Negotiation::Status::Satisfied
              : Negotiation::Status::Rejected;

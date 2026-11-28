@@ -147,7 +147,7 @@ class Projection {
 
   static constexpr auto reserved(Uuid contract) -> Bool {
     const perimortem_uuid value = contract;
-    return value.high == 0 && value.low <= 1;
+    return value.high == 0 && value.low <= TTX_NONE_ID_LOW;
   }
 
   static constexpr auto advertised(Uuid contract) -> Bool {

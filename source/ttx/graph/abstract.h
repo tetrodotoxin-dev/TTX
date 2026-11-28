@@ -18,9 +18,11 @@
 #define TTX_ABSTRACT_ID_LOW 0xa89c2453ec3f8636ULL
 
 // None and Unknown use reserved UUIDs in Graph. These identifiers describe the
-// axiomatic graph results. Other UUIDs identify independently chosen contracts.
+// axiomatic graph results. The identifier for the former permanent absence
+// policy (0, 0) is reserved. Other UUIDs identify independently chosen
+// contracts.
 #define TTX_NONE_ID_HIGH 0ULL
-#define TTX_NONE_ID_LOW 0ULL
+#define TTX_NONE_ID_LOW 2ULL
 #define TTX_UNKNOWN_ID_HIGH 0ULL
 #define TTX_UNKNOWN_ID_LOW 1ULL
 
@@ -30,7 +32,7 @@
 // existence unsettled. The supplying contract determines how long the caller
 // may rely on the observation.
 //
-// None implies Unreachable and promises permanent absence for its edge.
+// None establishes Unreachable for this selection.
 // Unknown implies Indeterminate. A search provider can also report
 // Indeterminate while exposing progress. A consumer must check support for
 // the reserved policy before relying on its traversal or binding guarantees.
@@ -48,12 +50,13 @@ typedef U8 ttx_abstract_reachability;
 // leave graph navigation and follow the bound contract.
 //
 // The Semantic Graph has two axiomatic results: None and Unknown. When a route
-// resolves to None, that route is permanently absent on the original semantic
-// location, including on a later access to that location. Unknown
+// resolves to None, the provider establishes absence for this lookup. A later
+// lookup at the same origin may select an available target. Unknown
 // leaves the route unsettled. The caller can try the original lookup again,
 // but the provider makes no promise to schedule work or produce a target later.
 //
-// None and Unknown return themselves for every further route and produce no
+// None and Unknown resolve to themselves, return themselves for every further
+// route, and produce no
 // ordinary visitation callbacks. This preserves the result without exposing
 // where it entered a route chain. A reachable target can supply a location
 // even when the consumer recognizes none of its application contracts.
@@ -63,11 +66,10 @@ typedef U8 ttx_abstract_reachability;
 // Capability can be bound to obtain an extensible API surface. These categories
 // organize contracts rather than restricting their design.
 //
-// None supports exactly None, Constant and Abstract. Binding Abstract
-// supplies an Abstract at the same semantic location. None rejects every
-// other bind request. Unknown supports Unknown and Abstract. Only binding
-// Abstract supplies its graph location. Every other support or bind request
-// on Unknown returns the Unknown negotiation status.
+// None supports None and Abstract. A provider can independently promise
+// Constant for the supplying edge. Unknown supports Unknown and Abstract. Only
+// binding Abstract supplies its graph location. Every other support or bind
+// request on Unknown returns the Unknown negotiation status.
 //
 // `supports` observes whether the provider establishes a contract's semantic
 // promise. `bind` independently observes whether the provider can materialize
@@ -91,11 +93,9 @@ typedef U8 ttx_abstract_reachability;
 // callbacks, but the provider can still change graph state while attempting it.
 // Retrying therefore _always_ begins a new transaction.
 //
-// Idempotence applies only to the selected graph location and only when the
-// observation's Abstract result satisfies policy support for
-// `Graph::Policies::Constant`. None always supports Constant while Unknown
-// intentionally leaves it unsettled. Typed data and outgoing observations
-// remain governed by their own contracts.
+// When a route selects an Abstract supporting Constant, the caller can reuse
+// that selection throughout the supplying access. Typed data and outgoing
+// observations remain governed by their own contracts.
 //
 // `resolve_route` returns one observation directly. Ordinary visitation
 // performs one observation for each visible route, so every callback can

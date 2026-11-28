@@ -44,7 +44,7 @@ class Request {
       return TTX_NEGOTIATION_SATISFIED;
     }
 
-    if (!requested.high && requested.low <= 1) {
+    if (!requested.high && requested.low <= TTX_NONE_ID_LOW) {
       return TTX_NEGOTIATION_REJECTED;
     }
 
