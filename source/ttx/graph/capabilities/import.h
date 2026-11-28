@@ -6,8 +6,8 @@
 
 #include "ttx/graph/abstract.h"
 
-#define TTX_IMPORT_ID_HIGH 0x9acbad530f3447aeULL
-#define TTX_IMPORT_ID_LOW 0x958bf21908b71050ULL
+#define TTX_IMPORT_ID_HIGH 0xfc74733d6cbf4e0bULL
+#define TTX_IMPORT_ID_LOW 0x8353746754d8da75ULL
 
 // Exposes the capability to interpret data described by the supplied
 // Representation and supply an Abstract for the imported graph. The provider

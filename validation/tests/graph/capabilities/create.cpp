@@ -124,7 +124,7 @@ class ScopedCreate {
     }
 
     static constexpr ttx_abstract_ops operations = {
-      supports, bind, lookup, visit, get_reachability};
+      supports, bind, lookup, visit, get_reachability, ttx_resolve_self};
   };
 
   static auto create(
@@ -145,7 +145,7 @@ class ScopedCreate {
   }
 
   static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, lookup, visit, get_reachability};
+    supports, bind, lookup, visit, get_reachability, ttx_resolve_self};
 
   static constexpr ttx_create_ops operations = {create};
 };

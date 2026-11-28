@@ -13,7 +13,7 @@
 // preserve that position even when a binding produces a different API record.
 // The selected node's data and outgoing observations can still change under
 // their own contracts.
-#define TTX_CONSTANT_ID_HIGH 0x2159150dbac94faaULL
-#define TTX_CONSTANT_ID_LOW 0xac5543fb2a1ec317ULL
+#define TTX_CONSTANT_ID_HIGH 0xa9f347a1f048455bULL
+#define TTX_CONSTANT_ID_LOW 0xa5d873dbc5e5761fULL
 
 #endif

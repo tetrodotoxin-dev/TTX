@@ -87,8 +87,7 @@ static void visit(void* context, ttx_graph_visitor visitor) {
 }
 
 static const ttx_abstract_ops abstract_operations = {
-  supports, composition_bind, route, visit, get_reachability,
-};
+  supports, composition_bind, route, visit, get_reachability, ttx_resolve_self};
 
 static composition_subject* expression_graph(void* context) {
   composition_expression* value = context;

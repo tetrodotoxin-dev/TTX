@@ -252,6 +252,7 @@ struct WrongAbstractOperations {
   decltype(ttx_abstract_ops::resolve_route) resolve_route;
   decltype(ttx_abstract_ops::visit_routes) visit_routes;
   U64 (*get_reachability)(void*);
+  decltype(ttx_abstract_ops::resolve) resolve;
 };
 
 struct WrongAbstract {
@@ -265,7 +266,8 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(WrongAbstractOperations, bind),
     TTX_DATA_MEMBER(WrongAbstractOperations, resolve_route),
     TTX_DATA_MEMBER(WrongAbstractOperations, visit_routes),
-    TTX_DATA_MEMBER(WrongAbstractOperations, get_reachability));
+    TTX_DATA_MEMBER(WrongAbstractOperations, get_reachability),
+    TTX_DATA_MEMBER(WrongAbstractOperations, resolve));
 TTX_DATA_RECORD(
     WrongAbstract,
     TTX_DATA_MEMBER(WrongAbstract, context),

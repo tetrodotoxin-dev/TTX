@@ -41,7 +41,7 @@ static auto reachability(void*) -> ttx_abstract_reachability {
 auto Providers::Unknown::get_abstract() -> Abstract {
   static Unknown provider;
   static constexpr ttx_abstract_ops operations = {
-    supports, bind, route, visit, reachability};
+    supports, bind, route, visit, reachability, ttx_resolve_self};
 
   return Abstract(&provider, operations);
 }

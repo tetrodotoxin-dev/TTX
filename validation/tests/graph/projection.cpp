@@ -160,8 +160,8 @@ class Simulacrum {
       Value::Abstract::Operations(get_typed, reenter);
 
   inline static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, resolve_route, visit_routes, get_reachability,
-  };
+    supports,        bind, resolve_route, visit_routes, get_reachability,
+    ttx_resolve_self};
 
   GraphContext graph;
   TypedContext typed;

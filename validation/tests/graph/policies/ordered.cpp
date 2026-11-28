@@ -82,7 +82,7 @@ struct Sequence {
   }
 
   static constexpr ttx_abstract_ops operations = {
-    supports, bind, route, visit, get_reachability};
+    supports, bind, route, visit, get_reachability, ttx_resolve_self};
 };
 
 VALIDATION_TEST(Ordering, repeated_occurrences) {

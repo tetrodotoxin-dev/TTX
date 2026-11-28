@@ -58,7 +58,7 @@ static ttx_abstract_reachability reachable(void* context) {
 
 S32 main(void) {
   static const ttx_abstract_ops operations = {
-    supports, bind, child, visit, reachable};
+    supports, bind, child, visit, reachable, ttx_resolve_self};
 
   ttx_abstract child_a = ttx_unknown();
   ttx_abstract child_b = ttx_none();

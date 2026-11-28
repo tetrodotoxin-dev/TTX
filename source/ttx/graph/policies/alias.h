@@ -6,8 +6,8 @@
 
 #include "ttx/graph/abstract.h"
 
-#define TTX_ALIAS_ID_HIGH 0xf40f9afeff4b4d64ULL
-#define TTX_ALIAS_ID_LOW 0x923720295c38b2f0ULL
+#define TTX_ALIAS_ID_HIGH 0x3049a145302d432fULL
+#define TTX_ALIAS_ID_LOW 0xa4bf1f457f1000efULL
 
 // Alias lets consumers share a graph reference whose target can change.
 // The Abstract returned by a read is called the referent. A parser can

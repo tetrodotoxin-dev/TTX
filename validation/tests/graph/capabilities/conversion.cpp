@@ -99,7 +99,7 @@ class Report {
   }
 
   static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, lookup, visit, get_reachability};
+    supports, bind, lookup, visit, get_reachability, ttx_resolve_self};
 
   static constexpr ttx_export_ops operations = {expose};
 };
@@ -190,7 +190,7 @@ class ImportedByte {
   static auto visit(void* context, ttx_graph_visitor callback) -> void {}
 
   static constexpr ttx_abstract_ops operations = {
-    supports, bind, lookup, visit, get_reachability};
+    supports, bind, lookup, visit, get_reachability, ttx_resolve_self};
 
   static auto expose(void* context, ttx_abstract abstract)
       -> ttx_negotiation_status {
@@ -289,7 +289,7 @@ class ByteImport {
   }
 
   static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, lookup, visit_routes, get_reachability};
+    supports, bind, lookup, visit_routes, get_reachability, ttx_resolve_self};
 
   static constexpr ttx_import_ops operations = {visit};
 };
@@ -348,8 +348,9 @@ class ByteExport {
   }
 
   static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, ByteImport::lookup, ByteImport::visit_routes,
-    get_reachability};
+    supports,           bind,
+    ByteImport::lookup, ByteImport::visit_routes,
+    get_reachability,   ttx_resolve_self};
 
   static constexpr ttx_export_ops operations = {expose};
 };

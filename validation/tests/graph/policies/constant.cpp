@@ -83,7 +83,7 @@ struct Changing {
   static auto visit(void* context, ttx_graph_visitor callback) -> void {}
 
   static constexpr ttx_abstract_ops operations = {
-    supports, bind, lookup, visit, get_reachability};
+    supports, bind, lookup, visit, get_reachability, ttx_resolve_self};
 };
 
 // Fixed preserves the selected Abstract. Outgoing routes still use the
@@ -149,7 +149,7 @@ struct Fixed {
   }
 
   static constexpr ttx_abstract_ops operations = {
-    supports, bind, lookup, visit, get_reachability};
+    supports, bind, lookup, visit, get_reachability, ttx_resolve_self};
 };
 
 // Adding Constant gives the caller a guarantee the Unknown policy leaves

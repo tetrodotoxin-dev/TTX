@@ -256,11 +256,20 @@ class Projection {
     return TTX_ABSTRACT_REACHABLE;
   }
 
+  static auto resolve_subject(ttx_abstract self) -> ttx_abstract {
+    if constexpr (requires(Concrete& value) { value.resolve(); }) {
+      return concrete(self.context).resolve();
+    }
+
+    return self;
+  }
+
   inline static constexpr typename Abstract::Operations typed_operations =
       typename Abstract::Operations(typed, reenter);
 
   inline static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, resolve_route, visit_routes, get_reachability,
+    supports,        bind, resolve_route, visit_routes, get_reachability,
+    resolve_subject,
   };
 };
 

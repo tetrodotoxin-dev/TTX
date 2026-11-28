@@ -36,7 +36,7 @@ struct RouteProvider {
 
   auto get_abstract() -> Abstract {
     static const ttx_abstract_ops operations = {
-      supports, bind, lookup, visit, get_reachability};
+      supports, bind, lookup, visit, get_reachability, ttx_resolve_self};
 
     return Abstract(this, operations);
   }

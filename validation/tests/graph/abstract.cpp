@@ -118,10 +118,10 @@ class EquivalentLocation {
   }
 
   inline static constexpr ttx_abstract_ops first_operations = {
-    supports, bind, route, first_visit, get_reachability};
+    supports, bind, route, first_visit, get_reachability, ttx_resolve_self};
 
   inline static constexpr ttx_abstract_ops second_operations = {
-    supports, bind, route, second_visit, get_reachability};
+    supports, bind, route, second_visit, get_reachability, ttx_resolve_self};
 };
 
 VALIDATION_TEST(Abstracts, c_observations) {
@@ -340,8 +340,8 @@ VALIDATION_TEST(Abstracts, encountered_policy) {
   } policy{ttx_none(), TTX_NEGOTIATION_REJECTED};
 
   const ttx_abstract_ops operations = {
-    Policy::supports, Policy::bind, Policy::lookup, Policy::visit,
-    Policy::get_reachability};
+    Policy::supports,         Policy::bind,    Policy::lookup, Policy::visit,
+    Policy::get_reachability, ttx_resolve_self};
 
   const Abstract subject(&policy, operations);
   EXPECT(subject.resolve_route("selected"_view) == Abstract(ttx_none()));

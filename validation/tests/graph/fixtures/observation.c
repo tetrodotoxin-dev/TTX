@@ -114,8 +114,8 @@ static ttx_negotiation_status supports(void* context, perimortem_uuid id) {
 // makes a fresh grant distinguishable from a copy of the caller's record.
 static ttx_abstract view(observation_subject* subject, U8 index) {
   static const ttx_abstract_ops operations[] = {
-    {supports, bind, lookup, visit, get_reachability},
-    {supports, bind, lookup, visit, get_reachability},
+    {supports, bind, lookup, visit, get_reachability, ttx_resolve_self},
+    {supports, bind, lookup, visit, get_reachability, ttx_resolve_self},
   };
 
   const ttx_abstract result = {

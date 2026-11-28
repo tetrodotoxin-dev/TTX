@@ -114,8 +114,7 @@ static ttx_abstract_reachability get_reachability(void* context) {
 }
 
 static const ttx_abstract_ops graph_operations = {
-  supports, bind, route, visit, get_reachability,
-};
+  supports, bind, route, visit, get_reachability, ttx_resolve_self};
 
 static ttx_abstract graph(void* context) {
   return (ttx_abstract){context, &graph_operations};

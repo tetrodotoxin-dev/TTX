@@ -14,8 +14,8 @@
 
 // The Abstract UUID identifies its complete callable ABI. Changing the
 // published operations requires a new UUID for bootstrap negotiation.
-#define TTX_ABSTRACT_ID_HIGH 0x914c3769ef564732ULL
-#define TTX_ABSTRACT_ID_LOW 0xa89c2453ec3f8636ULL
+#define TTX_ABSTRACT_ID_HIGH 0x0035c4e4db514293ULL
+#define TTX_ABSTRACT_ID_LOW 0xa5d8d6be7b7bbd8cULL
 
 // None and Unknown use reserved UUIDs in Graph. These identifiers describe the
 // axiomatic graph results. The identifier for the former permanent absence
@@ -202,7 +202,24 @@ typedef struct ttx_abstract_ops {
   // progress interface on this Abstract. The caller uses the supplied context
   // and can observe the result without requesting either reserved policy.
   ttx_abstract_reachability (*get_reachability)(void* context);
+
+  // Returns the subject this position denotes in one observation. An ordinary
+  // position resolves to itself. An indirection can return a different subject
+  // or Unknown when unresolved. A provider keeps its policy in force when
+  // selecting the subject. With the same state, resolving a subject again
+  // denotes the same semantic position. Each call receives the complete handle.
+  // The caller can retain that subject through its grant. A subsequent named
+  // route and any Constant promise on its result belong to that subject.
+  // Another resolve at the original location is a fresh observation.
+  ttx_abstract (*resolve)(ttx_abstract self);
 } ttx_abstract_ops;
+
+// An ordinary node can install `ttx_resolve_self` in its operation table.
+// Returning the supplied record preserves its context and operations for the
+// caller even when another provider shares the same callback.
+static inline ttx_abstract ttx_resolve_self(ttx_abstract self) {
+  return self;
+}
 
 C_LINKAGE
 EXPORTED(TTX) const ttx_representation* ttx_abstract_representation(void);

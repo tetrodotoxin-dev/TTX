@@ -204,7 +204,7 @@ class AliasProvider {
   static constexpr ttx_normalize_ops normalize_operations = {resolve};
 
   static constexpr ttx_abstract_ops operations = {
-    supports, bind, route, visit, get_reachability};
+    supports, bind, route, visit, get_reachability, ttx_resolve_self};
 };
 
 thread_local AliasProvider::Delegation* AliasProvider::Delegation::active =

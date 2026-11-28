@@ -58,6 +58,10 @@ class Abstract {
 
   constexpr auto get_abi() const -> Api { return api; }
 
+  // Resolves this position without selecting a named route. The consumer may
+  // retain the subject under its grant and make route observations there.
+  auto resolve() const -> Abstract { return api.operations->resolve(api); }
+
   // Observes whether the selected target can be reached. The consumer can
   // ask before it knows any application contracts. A provider reporting
   // Indeterminate can still offer contracts explaining the pending result.
@@ -192,7 +196,8 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(ttx_abstract_ops, bind),
     TTX_DATA_MEMBER(ttx_abstract_ops, resolve_route),
     TTX_DATA_MEMBER(ttx_abstract_ops, visit_routes),
-    TTX_DATA_MEMBER(ttx_abstract_ops, get_reachability));
+    TTX_DATA_MEMBER(ttx_abstract_ops, get_reachability),
+    TTX_DATA_MEMBER(ttx_abstract_ops, resolve));
 
 inline constexpr Ttx::Data::Form::Schema
     Ttx::Data::Form::Native<ttx_abstract>::schema = [] {

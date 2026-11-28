@@ -87,7 +87,7 @@ class Request {
 
   U8 value;
   inline static constexpr ttx_abstract_ops operations = {
-    supports, bind, route, visit, get_reachability};
+    supports, bind, route, visit, get_reachability, ttx_resolve_self};
 };
 
 // The C provider evaluates each request before invoking the visitor. A private

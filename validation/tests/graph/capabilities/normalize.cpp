@@ -369,7 +369,7 @@ VALIDATION_TEST(Normalization, foreign_closed_policies) {
     [](void* context) {
       const auto& source = *Data::cast<ttx_abstract>(context);
       return source.operations->get_reachability(source.context);
-    }};
+    }, ttx_resolve_self};
 
   Slot slot;
   ttx_normalize normalizer{};

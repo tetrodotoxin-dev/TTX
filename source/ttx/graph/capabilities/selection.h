@@ -6,8 +6,8 @@
 
 #include "ttx/graph/abstract.h"
 
-#define TTX_SELECTION_ID_HIGH 0xd09d764acf6542deULL
-#define TTX_SELECTION_ID_LOW 0x92abe31b1ca5ec0aULL
+#define TTX_SELECTION_ID_HIGH 0x84e9cf0b6c6f44c6ULL
+#define TTX_SELECTION_ID_LOW 0xb06ad2db4fd6476fULL
 
 // Selection provides domain-specific visitation by allowing the consumer to
 // supply additional context through a semantic graph. Regular visitation is
