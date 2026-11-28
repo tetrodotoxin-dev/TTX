@@ -77,12 +77,12 @@ struct Sequence {
     }
   }
 
-  static auto state(void* context) -> ttx_abstract_state {
-    return TTX_ABSTRACT_PRESENT;
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   static constexpr ttx_abstract_ops operations = {
-    supports, bind, route, visit, state};
+    supports, bind, route, visit, get_reachability};
 };
 
 VALIDATION_TEST(Ordering, repeated_occurrences) {
@@ -97,9 +97,10 @@ VALIDATION_TEST(Ordering, repeated_occurrences) {
         const View::Bytes routes[] = {
           "repeat"_view, "middle"_view, "repeat"_view};
 
-        const Abstract::State states[] = {
-          Abstract::State::None, Abstract::State::Unknown,
-          Abstract::State::None};
+        const Abstract::Reachability states[] = {
+          Abstract::Reachability::Unreachable,
+          Abstract::Reachability::Indeterminate,
+          Abstract::Reachability::Unreachable};
 
         auto check = [&](const Count(&positions)[3]) {
           Count count = 0;
@@ -108,7 +109,7 @@ VALIDATION_TEST(Ordering, repeated_occurrences) {
 
             const auto position = positions[count];
             EXPECT(route == routes[position]);
-            EXPECT(value.get_state() == states[position]);
+            EXPECT(value.get_reachability() == states[position]);
             EXPECT(graph.resolve_route(route) == value);
             ++count;
           };

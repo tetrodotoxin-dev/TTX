@@ -10,6 +10,7 @@
 
 #include "ttx/data/transfer.hpp"
 #include "ttx/graph/abstract.hpp"
+#include "ttx/graph/capabilities/import.hpp"
 #include "ttx/graph/policies/unknown.h"
 #include "ttx/semantic/negotiation/library.h"
 
@@ -28,8 +29,8 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(bootstrap_indexed, get));
 
 struct Root {
-  static auto state(void* context) -> ttx_abstract_state {
-    return TTX_ABSTRACT_PRESENT;
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   static auto supports(void* context, perimortem_uuid id)
@@ -81,7 +82,7 @@ struct Root {
   static auto visit(void* context, ttx_graph_visitor callback) -> void {}
 
   static constexpr ttx_abstract_ops operations = {
-    supports, bind, lookup, visit, state};
+    supports, bind, lookup, visit, get_reachability};
 };
 
 struct Module {
@@ -109,6 +110,7 @@ auto get(void* context, U64 index) -> ttx_abstract {
 auto supports(void* context, perimortem_uuid id) -> ttx_negotiation_status {
   const Identity::Uuid contract(id);
   return contract == Abstract::contract_id ||
+                 contract == Capabilities::Import::contract_id ||
                  contract ==
                      Identity::Uuid(
                          BOOTSTRAP_EXPORTS_HIGH, BOOTSTRAP_EXPORTS_LOW) ||
@@ -130,6 +132,28 @@ auto bind(void* context, perimortem_uuid id, ttx_storage target)
   const Identity::Uuid contract(id);
   if (contract == Abstract::contract_id) {
     return Root::query_bind(&state.root, id, target);
+  }
+
+  if (contract == Capabilities::Import::contract_id) {
+    static const ttx_import_ops operations{
+      [](void* root, const void* input,
+         const ttx_representation* representation, void* caller,
+         void (*receive)(void*, ttx_abstract)) -> ttx_negotiation_status {
+        if (!input || !representation || !receive ||
+            !Form::Compiled<Form::Native<U8>::reference>::get_representation()
+                 .compatible(*representation)) {
+          return TTX_NEGOTIATION_REJECTED;
+        }
+
+        receive(caller, Root::get_abstract(root));
+        return TTX_NEGOTIATION_SATISFIED;
+      }};
+
+    ttx_import api{&state.root, &operations};
+    return Transfer::copy(Form::Storage::from(api), Form::Storage(target)) ==
+                   Status::Success
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
   }
 
   if (contract == Identity::Uuid(BOOTSTRAP_QUERY_HIGH, BOOTSTRAP_QUERY_LOW)) {

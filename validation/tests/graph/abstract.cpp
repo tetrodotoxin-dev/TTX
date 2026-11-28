@@ -60,9 +60,9 @@ class EquivalentLocation {
   auto second() -> Abstract { return Abstract(this, second_operations); }
 
  private:
-  static auto state(void* context) -> ttx_abstract_state {
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
     (void)context;
-    return TTX_ABSTRACT_PRESENT;
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   static auto supports(void* context, perimortem_uuid requested)
@@ -118,17 +118,21 @@ class EquivalentLocation {
   }
 
   inline static constexpr ttx_abstract_ops first_operations = {
-    supports, bind, route, first_visit, state};
+    supports, bind, route, first_visit, get_reachability};
 
   inline static constexpr ttx_abstract_ops second_operations = {
-    supports, bind, route, second_visit, state};
+    supports, bind, route, second_visit, get_reachability};
 };
 
 VALIDATION_TEST(Abstracts, c_observations) {
   observation_subject provider{};
   const Abstract subject(observation_abstract(&provider));
   subject.bind<Abstract>().visit(
-      [&](Abstract acquired) { EXPECT(acquired == subject); },
+      [&](Abstract acquired) {
+        EXPECT(
+            acquired.get_reachability() == Abstract::Reachability::Reachable);
+      },
+
       [&]() { EXPECT(False); });
   subject.bind<Policies::Constant>().visit(
       [](Policies::Constant) {}, [&]() { EXPECT(False); });
@@ -250,27 +254,45 @@ VALIDATION_TEST(Abstracts, semantic_reentry_uses_fresh_api_record) {
 VALIDATION_TEST(Abstracts, fresh_abstract_binding) {
   observation_subject provider{};
   const Abstract subject(observation_abstract(&provider));
-  const auto check = [&](Abstract expected) {
-    subject.bind<Abstract>().visit(
-        [&](Abstract answer) { EXPECT(answer == expected); },
-        [&]() { EXPECT(False); });
+  const auto acquire = [&] {
+    return subject.bind<Abstract>().visit(
+        [](Abstract answer) { return answer; },
+        [&] {
+          EXPECT(False);
+          return subject;
+        });
   };
 
-  provider.selected = ttx_none();
-  check(Abstract(ttx_none()));
+  const auto first = acquire();
+  const auto second = acquire();
+  EXPECT(first != second);
 
-  provider.selected = ttx_unknown();
-  check(Abstract(ttx_unknown()));
+  const U8 advance = 1;
+  const View::Bytes route(advance, 1);
+  EXPECT(
+      first.resolve_route(route).get_reachability() ==
+      Abstract::Reachability::Reachable);
+  EXPECT_EQ(provider.generation, U8(1));
+  EXPECT(
+      second.resolve_route(route).get_reachability() ==
+      Abstract::Reachability::Reachable);
+  EXPECT_EQ(provider.generation, U8(2));
 
+  const auto api = subject.get_abi();
   const ttx_negotiation_status failures[] = {
     TTX_NEGOTIATION_UNKNOWN, TTX_NEGOTIATION_REJECTED};
 
   for (auto status : failures) {
     provider.answer = status;
-    subject.bind<Abstract>().visit([&](Abstract) { EXPECT(False); }, [&] {});
+
+    ttx_abstract output{};
+    EXPECT_EQ(
+        api.operations->bind(api.context, Abstract::contract_id, &output),
+        status);
+    EXPECT_NOT(subject.bind<Abstract>());
   }
 
-  EXPECT_EQ(provider.binds, Count(4));
+  EXPECT_EQ(provider.binds, Count(6));
 }
 
 // A route returns None, while support on the original Abstract can report
@@ -282,8 +304,8 @@ VALIDATION_TEST(Abstracts, encountered_policy) {
     ttx_negotiation_status answer;
     Count binds = 0;
 
-    static auto state(void* context) -> ttx_abstract_state {
-      return TTX_ABSTRACT_PRESENT;
+    static auto get_reachability(void* context) -> ttx_abstract_reachability {
+      return TTX_ABSTRACT_REACHABLE;
     }
 
     static auto supports(void* context, perimortem_uuid id)
@@ -312,7 +334,7 @@ VALIDATION_TEST(Abstracts, encountered_policy) {
 
   const ttx_abstract_ops operations = {
     Policy::supports, Policy::bind, Policy::lookup, Policy::visit,
-    Policy::state};
+    Policy::get_reachability};
 
   const Abstract subject(&policy, operations);
   EXPECT(subject.resolve_route("selected"_view) == Abstract(ttx_none()));
@@ -372,8 +394,8 @@ VALIDATION_TEST(Abstracts, qualified_question) {
   EXPECT_EQ(provider.probes, probes);
 }
 
-// Ordinary binding outcomes can change while the provider remains Present.
-// The two reserved UUIDs retain their explicit rejection throughout.
+// Ordinary binding outcomes can change while the selected target remains
+// reachable. The two reserved UUIDs retain their explicit rejection throughout.
 VALIDATION_TEST(Abstracts, reserved_bindings) {
   observation_subject provider{};
   const auto api = observation_abstract(&provider);
@@ -388,7 +410,8 @@ VALIDATION_TEST(Abstracts, reserved_bindings) {
 
   for (const auto status : statuses) {
     provider.answer = status;
-    EXPECT_EQ(api.operations->get_state(api.context), TTX_ABSTRACT_PRESENT);
+    EXPECT_EQ(
+        api.operations->get_reachability(api.context), TTX_ABSTRACT_REACHABLE);
     for (const auto id : ids) {
       EXPECT_EQ(
           api.operations->supports(api.context, id), TTX_NEGOTIATION_REJECTED);

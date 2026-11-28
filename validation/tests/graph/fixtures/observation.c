@@ -7,12 +7,13 @@
 #include "ttx/graph/policies/none.h"
 #include "validation/tests/graph/fixtures/value.h"
 
-static ttx_abstract_state graph_state(void* context) {
+static ttx_abstract_reachability get_reachability(void* context) {
   (void)context;
-  return TTX_ABSTRACT_PRESENT;
+  return TTX_ABSTRACT_REACHABLE;
 }
 
 static U8 read(void* context);
+static ttx_abstract view(observation_subject* subject, U8 index);
 
 static ttx_negotiation_status
     bind(void* context, perimortem_uuid id, void* output) {
@@ -34,11 +35,8 @@ static ttx_negotiation_status
   }
 
   if (id.high == TTX_ABSTRACT_ID_HIGH && id.low == TTX_ABSTRACT_ID_LOW) {
-    ttx_abstract api = subject->selected.operations
-                           ? subject->selected
-                           : observation_abstract(subject);
-    ttx_abstract* result = output;
-    *result = api;
+    subject->view_index = 1 - subject->view_index;
+    *(ttx_abstract*)output = view(subject, subject->view_index);
     return TTX_NEGOTIATION_SATISFIED;
   }
 
@@ -112,15 +110,22 @@ static ttx_negotiation_status supports(void* context, perimortem_uuid id) {
              : TTX_NEGOTIATION_UNKNOWN;
 }
 
-ttx_abstract observation_abstract(observation_subject* subject) {
-  static const ttx_abstract_ops operations = {
-    supports, bind, lookup, visit, graph_state,
+// Both tables operate on the same subject. Alternating their addresses
+// makes a fresh grant distinguishable from a copy of the caller's record.
+static ttx_abstract view(observation_subject* subject, U8 index) {
+  static const ttx_abstract_ops operations[] = {
+    {supports, bind, lookup, visit, get_reachability},
+    {supports, bind, lookup, visit, get_reachability},
   };
 
   const ttx_abstract result = {
     subject,
-    &operations,
+    &operations[index],
   };
 
   return result;
+}
+
+ttx_abstract observation_abstract(observation_subject* subject) {
+  return view(subject, 0);
 }

@@ -22,9 +22,9 @@ static ttx_abstract graph(composition_subject* subject) {
   return (ttx_abstract){subject, &abstract_operations};
 }
 
-static ttx_abstract_state state(void* context) {
+static ttx_abstract_reachability get_reachability(void* context) {
   (void)context;
-  return TTX_ABSTRACT_PRESENT;
+  return TTX_ABSTRACT_REACHABLE;
 }
 
 static ttx_negotiation_status supports(void* context, perimortem_uuid id) {
@@ -87,7 +87,7 @@ static void visit(void* context, ttx_graph_visitor visitor) {
 }
 
 static const ttx_abstract_ops abstract_operations = {
-  supports, composition_bind, route, visit, state,
+  supports, composition_bind, route, visit, get_reachability,
 };
 
 static composition_subject* expression_graph(void* context) {

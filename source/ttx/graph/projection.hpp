@@ -38,7 +38,9 @@ namespace Ttx::Graph {
 // mechanism requires the provider to supply an API record. Projection always
 // binds its native Abstract and Graph::Abstract. `bind_contract` handles every
 // remaining bind request when Concrete provides it. Route resolution and
-// visitation follow the same extension pattern.
+// visitation follow the same extension pattern. A projection normally exposes
+// its concrete value as a reachable target. When the target is selected by
+// the provider, its `get_reachability` member reports the current observation.
 template <typename Concrete, U64 ProjectionHigh, U64 ProjectionLow>
 class Projection {
  public:
@@ -114,7 +116,7 @@ class Projection {
     Api api;
   };
 
-  // Publishes this complete Concrete value as one Present graph location. The
+  // Publishes this complete Concrete value through its graph location. The
   // returned record keeps no ownership. Concrete's provider establishes the
   // access duration for the value and generated operation tables.
   auto get_abstract() -> Graph::Abstract {
@@ -242,16 +244,19 @@ class Projection {
     visit(concrete(context), Graph::Abstract::Visitor(callback));
   }
 
-  static auto get_state(void* context) -> ttx_abstract_state {
-    (void)context;
-    return TTX_ABSTRACT_PRESENT;
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
+    if constexpr (requires(Concrete& value) { value.get_reachability(); }) {
+      return ttx_abstract_reachability(concrete(context).get_reachability());
+    }
+
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   inline static constexpr typename Abstract::Operations typed_operations =
       typename Abstract::Operations(typed, reenter);
 
   inline static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, resolve_route, visit_routes, get_state,
+    supports, bind, resolve_route, visit_routes, get_reachability,
   };
 };
 

@@ -80,14 +80,14 @@ class Request {
     (void)visitor;
   }
 
-  static auto state(void* context) -> ttx_abstract_state {
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
     (void)context;
-    return TTX_ABSTRACT_PRESENT;
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   U8 value;
   inline static constexpr ttx_abstract_ops operations = {
-    supports, bind, route, visit, state};
+    supports, bind, route, visit, get_reachability};
 };
 
 // The C provider evaluates each request before invoking the visitor. A private
@@ -107,24 +107,31 @@ VALIDATION_TEST(SelectionTests, provider_interprets_request) {
   EXPECT_EQ(ordinary, Count(0));
 
   EXPECT(
-      graph.resolve_route("first"_view).get_state() == Abstract::State::None);
+      graph.resolve_route("first"_view).get_reachability() ==
+      Abstract::Reachability::Unreachable);
   EXPECT(
-      graph.resolve_route("second"_view).get_state() == Abstract::State::None);
+      graph.resolve_route("second"_view).get_reachability() ==
+      Abstract::Reachability::Unreachable);
 
   Request public_request(1);
   Request private_request(2);
   Request unsupported_request(3);
-  Count callbacks = 0;
-  Bool mutate_selection = True;
+  Count first = 0;
+  Count second = 0;
   auto observe = [&](View::Bytes route, Abstract value) {
-    EXPECT(value.get_state() == Abstract::State::None);
-    EXPECT(route == "first"_view || route == "second"_view);
-    if (mutate_selection && callbacks == 0) {
+    EXPECT(value.get_reachability() == Abstract::Reachability::Unreachable);
+    if (first == 0 && second == 0) {
       public_request.set(2);
       provider.status = TTX_NEGOTIATION_REJECTED;
     }
 
-    ++callbacks;
+    if (route == "first"_view) {
+      ++first;
+    } else if (route == "second"_view) {
+      ++second;
+    } else {
+      EXPECT(False);
+    }
   };
 
   selection.visit(
@@ -147,37 +154,41 @@ VALIDATION_TEST(SelectionTests, provider_interprets_request) {
             selected.select(
                 public_request.get_abstract(), Abstract::Visitor(observe)) ==
             Negotiation::Status::Satisfied);
-        EXPECT_EQ(callbacks, Count(2));
+        EXPECT_EQ(first, Count(1));
+        EXPECT_EQ(second, Count(1));
         EXPECT_EQ(provider.status, TTX_NEGOTIATION_REJECTED);
         public_request.set(1);
         provider.status = TTX_NEGOTIATION_SATISFIED;
-        mutate_selection = False;
 
         EXPECT(
             selected.select(
                 private_request.get_abstract(), Abstract::Visitor(observe)) ==
             Negotiation::Status::Satisfied);
-        EXPECT_EQ(callbacks, Count(2));
+        EXPECT_EQ(first, Count(1));
+        EXPECT_EQ(second, Count(1));
 
         provider.private_access = 1;
         EXPECT(
             selected.select(
                 private_request.get_abstract(), Abstract::Visitor(observe)) ==
             Negotiation::Status::Satisfied);
-        EXPECT_EQ(callbacks, Count(3));
+        EXPECT_EQ(first, Count(2));
+        EXPECT_EQ(second, Count(1));
 
         EXPECT(
             selected.select(
                 unsupported_request.get_abstract(),
                 Abstract::Visitor(observe)) == Negotiation::Status::Unknown);
-        EXPECT_EQ(callbacks, Count(3));
+        EXPECT_EQ(first, Count(2));
+        EXPECT_EQ(second, Count(1));
 
         provider.status = TTX_NEGOTIATION_REJECTED;
         EXPECT(
             selected.select(
                 public_request.get_abstract(), Abstract::Visitor(observe)) ==
             Negotiation::Status::Rejected);
-        EXPECT_EQ(callbacks, Count(3));
+        EXPECT_EQ(first, Count(2));
+        EXPECT_EQ(second, Count(1));
       },
 
       [&] { EXPECT(False); });

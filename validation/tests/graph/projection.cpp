@@ -141,9 +141,9 @@ class Simulacrum {
     (void)visitor;
   }
 
-  static auto get_state(void* context) -> ttx_abstract_state {
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
     (void)context;
-    return TTX_ABSTRACT_PRESENT;
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   static auto get_typed(void* context) -> const void* {
@@ -158,7 +158,7 @@ class Simulacrum {
       Value::Abstract::Operations(get_typed, reenter);
 
   inline static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, resolve_route, visit_routes, get_state,
+    supports, bind, resolve_route, visit_routes, get_reachability,
   };
 
   GraphContext graph;
@@ -171,7 +171,7 @@ VALIDATION_TEST(ProjectionTests, generated_contracts) {
   auto value = Value::create(42);
   const auto abstract = value.get_abstract();
 
-  EXPECT(abstract.get_state() == Abstract::State::Present);
+  EXPECT(abstract.get_reachability() == Abstract::Reachability::Reachable);
   EXPECT(
       abstract.supports(Value::Abstract::contract_id) ==
       Negotiation::Status::Satisfied);
@@ -197,7 +197,9 @@ VALIDATION_TEST(ProjectionTests, generated_contracts) {
       [&](BoundValue bound) { EXPECT_EQ(bound.get_value(), U64(42)); },
       [&] { EXPECT(False); });
 
-  EXPECT(abstract.resolve_route({}).get_state() == Abstract::State::None);
+  EXPECT(
+      abstract.resolve_route({}).get_reachability() ==
+      Abstract::Reachability::Unreachable);
 
   Count visited = 0;
   auto visitor = [&](View::Bytes, Abstract) { ++visited; };

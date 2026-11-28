@@ -32,10 +32,10 @@ namespace Ttx::Graph {
 // access and release obligations.
 class Abstract {
  public:
-  enum class State : U8 {
-    None = TTX_ABSTRACT_NONE,
-    Unknown = TTX_ABSTRACT_UNKNOWN,
-    Present = TTX_ABSTRACT_PRESENT,
+  enum class Reachability : U8 {
+    Unreachable = TTX_ABSTRACT_UNREACHABLE,
+    Indeterminate = TTX_ABSTRACT_INDETERMINATE,
+    Reachable = TTX_ABSTRACT_REACHABLE,
   };
 
   static constexpr auto contract_id = Perimortem::Core::Identity::Uuid(
@@ -58,11 +58,11 @@ class Abstract {
 
   constexpr auto get_abi() const -> Api { return api; }
 
-  // Reports the graph result independently of any application UUID. Present
-  // permits further navigation under this Abstract's policy, even when every
-  // application contract requested so far was refused or undetermined.
-  auto get_state() const -> State {
-    return State(api.operations->get_state(api.context));
+  // Observes whether the selected target can be reached. The consumer can
+  // ask before it knows any application contracts. A provider reporting
+  // Indeterminate can still offer contracts explaining the pending result.
+  auto get_reachability() const -> Reachability {
+    return Reachability(api.operations->get_reachability(api.context));
   }
 
   auto supports(Perimortem::Core::Identity::Uuid contract) const
@@ -77,7 +77,8 @@ class Abstract {
   }
 
   // A successful UUID request supplies the complete Contract::Api record.
-  // The provider establishes its operations and policies. The empty Option
+  // Binding Abstract, or using a bound contract's `get_abstract` member,
+  // preserves the semantic location of this Abstract. The empty Option
   // represents either an undetermined or refused request.
   template <typename Contract>
   auto bind() const -> Perimortem::Core::Storage::Option<Contract> {
@@ -106,11 +107,10 @@ class Abstract {
   // None and Unknown return themselves for further routes. Chaining resolution
   // preserves either terminal result regardless of which step reached it.
   //
-  // Each call is a separate observation and may return a different result.
-  // A value that provides `Constant` promises it only for the particular edge
-  // established by the Abstract and route pair. The consumer can reuse that
-  // selection while its supplying access remains valid. Constant preserves
-  // the selection independently of the contract that determines its lifetime.
+  // Each lookup observes the provider again. If the result supplies Constant,
+  // the caller can reuse the selection for this Abstract and route during
+  // the supplying access. None also commits this edge to permanent absence.
+  // A fresh lookup requires valid access to the same semantic origin.
   auto resolve_route(Perimortem::Core::View::Bytes route) const -> Abstract {
     return Abstract(api.operations->resolve_route(
         api.context,
@@ -201,7 +201,7 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(ttx_abstract_ops, bind),
     TTX_DATA_MEMBER(ttx_abstract_ops, resolve_route),
     TTX_DATA_MEMBER(ttx_abstract_ops, visit_routes),
-    TTX_DATA_MEMBER(ttx_abstract_ops, get_state));
+    TTX_DATA_MEMBER(ttx_abstract_ops, get_reachability));
 
 inline constexpr Ttx::Data::Form::Schema
     Ttx::Data::Form::Native<ttx_abstract>::schema = [] {

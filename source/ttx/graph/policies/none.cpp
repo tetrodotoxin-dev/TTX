@@ -8,9 +8,16 @@
 using namespace Perimortem::Core;
 using namespace Ttx::Graph;
 
-// NoneProvider supplies the shared Constant dead end. Its own routes stay on
-// this result, while the original Abstract and route make a new selection on
-// each observation unless that selection establishes its own stability.
+// A built in provider that satisfies the None contract in C++.
+//
+// Since this is an axiomatic perfect simulacra we can provide a single static
+// instance to serve as a reference that any C++ or C implementation can return
+// without being required to allocate a new instance. This also makes recursive
+// navigation memory safe since all routes point to itself.
+//
+// Consumers should not assume this provider is the only provider of the None
+// contract. Using the memory address of the provider is not a stand in for
+// checking if an Abstract supports None.
 class NoneProvider {
  public:
   static auto supports(void* context, perimortem_uuid id)
@@ -29,9 +36,8 @@ class NoneProvider {
 
   static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
-    const auto status = supports(context, id);
-    if (status != TTX_NEGOTIATION_SATISFIED) {
-      return status;
+    if (Identity::Uuid(id) != Abstract::contract_id) {
+      return TTX_NEGOTIATION_REJECTED;
     }
 
     *Data::cast<ttx_abstract>(output) = get_abstract(context);
@@ -49,12 +55,12 @@ class NoneProvider {
 
   static auto visit(void* context, ttx_graph_visitor callback) -> void {}
 
-  static auto state(void* context) -> ttx_abstract_state {
-    return TTX_ABSTRACT_NONE;
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
+    return TTX_ABSTRACT_UNREACHABLE;
   }
 
   static constexpr ttx_abstract_ops operations = {
-    supports, bind, route, visit, state};
+    supports, bind, route, visit, get_reachability};
 };
 
 auto Policies::None::get_none() -> None {

@@ -108,13 +108,13 @@ static void visit(void* context, ttx_graph_visitor visitor) {
   (void)visitor;
 }
 
-static ttx_abstract_state state(void* context) {
+static ttx_abstract_reachability get_reachability(void* context) {
   (void)context;
-  return TTX_ABSTRACT_PRESENT;
+  return TTX_ABSTRACT_REACHABLE;
 }
 
 static const ttx_abstract_ops graph_operations = {
-  supports, bind, route, visit, state,
+  supports, bind, route, visit, get_reachability,
 };
 
 static ttx_abstract graph(void* context) {

@@ -8,10 +8,27 @@
 
 namespace Ttx::Graph::Policies {
 
-// Unknown exposes the Abstract returned when the provider leaves a route's
-// result undetermined. The shared sentinel from `get_unknown` returns itself
-// for further lookups. To observe the provider again, the consumer resolves
-// the same route on the original Abstract.
+// Unknown represents an unresolved selection in the Abstract graph. It leaves
+// open whether the target route can be reached on during future observations.
+// The provider makes no promise to eventually produce a target.
+//
+// Unknown is one of the two axiomatic Abstracts. An Abstract may report
+// support for the Unknown contract only if it meets these exact rules:
+//
+// * It must also support the Abstract contract.
+// * It must report unknown for all other contracts.
+// * It must only satisfy bind for Abstract.
+// * It must report unknown for all other support and binds.
+// * It must return indeterminate for it's reachability.
+// * Every route from it must return itself.
+// * Any observations on the Abstract produces no observable side effects.
+//
+// Unknown's contract is the formal TTX domain identifier that provides a fast
+// path for identification without needing to observe all behaviors. Any
+// Abstract can emit support for the Unknown contract must collapse to a perfect
+// simulacra so TTX supports a built in Abstract that can be used to statically
+// emit for indeterminate paths. Consumers however should not assume that the
+// static TTX address represents the one and only `Unknown` representation.
 class Unknown {
  public:
   static constexpr auto contract_id =

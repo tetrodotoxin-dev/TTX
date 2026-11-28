@@ -6,18 +6,21 @@
 using namespace Perimortem::Core;
 using namespace Ttx::Graph;
 
-// UnknownProvider supplies the shared Unknown result. Its own routes stay on
-// this result, while the original Abstract and route make a new selection on
-// each observation unless they also supply Constant.
+// A built in provider that satisfies the Unknown contract in C++.
+//
+// Since this is an axiomatic perfect simulacra we can provide a single static
+// instance to serve as a reference that any C++ or C implementation can return
+// without being required to allocate a new instance. This also makes recursive
+// navigation memory safe since all routes point to itself.
+//
+// Consumers should not assume this provider is the only provider of the Unknown
+// contract. Using the memory address of the provider is not a stand in for
+// checking if an Abstract supports Unknown.
 class UnknownProvider {
  public:
   static auto supports(void* context, perimortem_uuid id)
       -> ttx_negotiation_status {
     const Identity::Uuid contract(id);
-    if (contract == Identity::Uuid(TTX_NONE_ID_HIGH, TTX_NONE_ID_LOW)) {
-      return TTX_NEGOTIATION_REJECTED;
-    }
-
     return contract == Abstract::contract_id ||
                    contract == Policies::Unknown::contract_id
                ? TTX_NEGOTIATION_SATISFIED
@@ -26,9 +29,8 @@ class UnknownProvider {
 
   static auto bind(void* context, perimortem_uuid id, void* output)
       -> ttx_negotiation_status {
-    const auto status = supports(context, id);
-    if (status != TTX_NEGOTIATION_SATISFIED) {
-      return status;
+    if (Identity::Uuid(id) != Abstract::contract_id) {
+      return TTX_NEGOTIATION_UNKNOWN;
     }
 
     *Data::cast<ttx_abstract>(output) = get_abstract(context);
@@ -46,12 +48,12 @@ class UnknownProvider {
 
   static auto visit(void* context, ttx_graph_visitor callback) -> void {}
 
-  static auto state(void* context) -> ttx_abstract_state {
-    return TTX_ABSTRACT_UNKNOWN;
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
+    return TTX_ABSTRACT_INDETERMINATE;
   }
 
   static constexpr ttx_abstract_ops operations = {
-    supports, bind, route, visit, state};
+    supports, bind, route, visit, get_reachability};
 };
 
 auto Policies::Unknown::get_unknown() -> Unknown {

@@ -14,8 +14,8 @@
 
 // The Abstract UUID identifies its complete callable ABI. Changing the
 // published operations requires a new UUID for bootstrap negotiation.
-#define TTX_ABSTRACT_ID_HIGH 0xb427e8d104cf46b1ULL
-#define TTX_ABSTRACT_ID_LOW 0x83a7da1ee62a518bULL
+#define TTX_ABSTRACT_ID_HIGH 0x914c3769ef564732ULL
+#define TTX_ABSTRACT_ID_LOW 0xa89c2453ec3f8636ULL
 
 // None and Unknown use reserved UUIDs in Graph. These identifiers describe the
 // axiomatic graph results. Other UUIDs identify independently chosen contracts.
@@ -24,19 +24,21 @@
 #define TTX_UNKNOWN_ID_HIGH 0ULL
 #define TTX_UNKNOWN_ID_LOW 1ULL
 
-// State classifies a graph result as None, Unknown or Present. Present
-// identifies a graph node even when the consumer recognizes none of its
-// contracts. A Present node must reject both reserved UUIDs, None and Unknown,
-// through `supports` and `bind`. Requests for other contracts can return
-// Satisfied, Unknown or Rejected.
+// Reachability reports what this observation establishes about the selected
+// target. Reachable supplies a graph location for the target. Unreachable
+// establishes its absence for this selection. Indeterminate leaves its
+// existence unsettled. The supplying contract determines how long the caller
+// may rely on the observation.
 //
-// `get_state` supplies this classification in one call. The reserved UUIDs
-// let None and Unknown participate in contract binding.
-typedef U8 ttx_abstract_state;
+// None implies Unreachable and promises permanent absence for its edge.
+// Unknown implies Indeterminate. A search provider can also report
+// Indeterminate while exposing progress. A consumer must check support for
+// the reserved policy before relying on its traversal or binding guarantees.
+typedef U8 ttx_abstract_reachability;
 
-#define TTX_ABSTRACT_NONE ((ttx_abstract_state)0)
-#define TTX_ABSTRACT_UNKNOWN ((ttx_abstract_state)1)
-#define TTX_ABSTRACT_PRESENT ((ttx_abstract_state)2)
+#define TTX_ABSTRACT_UNREACHABLE ((ttx_abstract_reachability)0)
+#define TTX_ABSTRACT_INDETERMINATE ((ttx_abstract_reachability)1)
+#define TTX_ABSTRACT_REACHABLE ((ttx_abstract_reachability)2)
 
 // Abstracts connect through route operations to form a graph independent of
 // any host language's native type system. This lets providers and consumers
@@ -45,28 +47,27 @@ typedef U8 ttx_abstract_state;
 // systems. TTX treats operations on those typed values as terminals that
 // leave graph navigation and follow the bound contract.
 //
-// The Semantic Graph has two axiomatic results: None and Unknown. None marks an
-// explicit dead end. Its provider commits that the selected path remains
-// blocked for the supplying access duration. Unknown leaves the result
-// unsettled. Retrying the original Abstract may produce another result, though
-// Unknown promises neither scheduling nor eventual resolution.
+// The Semantic Graph has two axiomatic results: None and Unknown. When a route
+// resolves to None, that route is permanently absent on the original semantic
+// location, including on a later access to that location. Unknown
+// leaves the route unsettled. The caller can try the original lookup again,
+// but the provider makes no promise to schedule work or produce a target later.
 //
 // None and Unknown return themselves for every further route and produce no
 // ordinary visitation callbacks. This preserves the result without exposing
-// where it entered a route chain. Present identifies an ordinary graph location
-// even when the consumer recognizes none of its contracts.
+// where it entered a route chain. A reachable target can supply a location
+// even when the consumer recognizes none of its application contracts.
 //
 // Policies and Capabilities provide two useful logical categories for Abstract
 // contracts. Policy support establishes a property of the Abstract, while a
 // Capability can be bound to obtain an extensible API surface. These categories
 // organize contracts rather than restricting their design.
 //
-// None and Unknown expose the axiomatic results as reserved Policies. Binding
-// either Policy supplies its Abstract API. None satisfies Constant and rejects
-// unrelated contract UUIDs. Unknown leaves Constant and unrelated contract
-// UUIDs Unknown. Each rejects the other axiomatic Policy. `get_state` provides
-// their direct classification and must agree with support and binding for the
-// reserved UUIDs.
+// None supports exactly None, Constant and Abstract. Binding Abstract
+// supplies an Abstract at the same semantic location. None rejects every
+// other bind request. Unknown supports Unknown and Abstract. Only binding
+// Abstract supplies its graph location. Every other support or bind request
+// on Unknown returns the Unknown negotiation status.
 //
 // `supports` observes whether the provider establishes a contract's semantic
 // promise. `bind` independently observes whether the provider can materialize
@@ -104,10 +105,11 @@ typedef U8 ttx_abstract_state;
 //
 // A successful bind supplies the complete requested contract, including every
 // required operation and policy. The guarantee applies to that returned API.
-// Each further binding is a separate request whose success depends on the
-// provider supplying that API. The provider can refuse later requests,
-// including the bound contract's own UUID or Abstract, while the operations
-// already supplied remain usable.
+// Each further binding is a separate observation whose success depends on the
+// provider supplying that API. Some contracts require a particular binding,
+// as None requires binding Abstract. Otherwise a provider can refuse later
+// requests, including the bound contract's own UUID or Abstract, while the
+// operations already supplied remain usable.
 //
 // A typed operation can return an Abstract anywhere in the graph. The optional
 // `get_abstract` contract provides a way back after a successful bind. It
@@ -179,8 +181,13 @@ typedef struct ttx_abstract_ops {
   // the output record, while each referenced context, description and
   // function follows its supplying access contract. Copying the record
   // preserves those access durations.
-  // On a successful bind, the returned API satisfies the requested contract.
-  // Any further binding is a separate request to that API's provider.
+  //
+  // A successful bind supplies an interpretation of the location on which
+  // the caller made the request. Binding Abstract returns that location
+  // directly. If a typed contract supplies `get_abstract`, that operation
+  // returns the binding's origin throughout the granted access. Repeating
+  // these conversions preserves the semantic location even when a provider
+  // supplies different native records. Each subsequent bind is a new request.
   //
   // The caller uses the context supplied with this operation. Substituting
   // another context through this interface is undefined behavior.
@@ -200,16 +207,11 @@ typedef struct ttx_abstract_ops {
   // negotiated policy.
   void (*visit_routes)(void* context, ttx_graph_visitor visitor);
 
-  // Classifies this Abstract as None, Unknown or Present in one provider call.
-  // The caller uses the context supplied with this table. The provider reports
-  // one of these three states through its own interpretation of that context.
-  //
-  // For an unchanged result, `supports` and `bind` must both agree with its
-  // graph state. A None result must satisfy the None UUID and reject Unknown.
-  // An Unknown result must satisfy the Unknown UUID and reject None. A
-  // Present node must reject both reserved UUIDs. Requests for other UUIDs
-  // remain independent. Present has no reserved contract UUID.
-  ttx_abstract_state (*get_state)(void* context);
+  // Reports reachability of the selected target in one observation. A provider
+  // waiting for a target may report Indeterminate and let the caller bind a
+  // progress interface on this Abstract. The caller uses the supplied context
+  // and can observe the result without requesting either reserved policy.
+  ttx_abstract_reachability (*get_reachability)(void* context);
 } ttx_abstract_ops;
 
 C_LINKAGE

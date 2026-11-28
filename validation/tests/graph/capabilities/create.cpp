@@ -24,8 +24,8 @@ class ScopedCreate {
   Negotiation::Status status = Negotiation::Status::Satisfied;
   bool observing = false;
 
-  static auto state(void* context) -> ttx_abstract_state {
-    return TTX_ABSTRACT_PRESENT;
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   static auto supports(void* context, perimortem_uuid id)
@@ -78,8 +78,8 @@ class ScopedCreate {
   struct Created {
     U8 value = 42;
 
-    static auto state(void* context) -> ttx_abstract_state {
-      return TTX_ABSTRACT_PRESENT;
+    static auto get_reachability(void* context) -> ttx_abstract_reachability {
+      return TTX_ABSTRACT_REACHABLE;
     }
 
     static auto supports(void* context, perimortem_uuid id)
@@ -124,7 +124,7 @@ class ScopedCreate {
     }
 
     static constexpr ttx_abstract_ops operations = {
-      supports, bind, lookup, visit, state};
+      supports, bind, lookup, visit, get_reachability};
   };
 
   static auto create(
@@ -145,7 +145,7 @@ class ScopedCreate {
   }
 
   static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, lookup, visit, state};
+    supports, bind, lookup, visit, get_reachability};
 
   static constexpr ttx_create_ops operations = {create};
 };
@@ -211,7 +211,8 @@ VALIDATION_TEST(Creation, present_bindings) {
   };
 
   for (const auto api : graphs) {
-    EXPECT_EQ(api.operations->get_state(api.context), TTX_ABSTRACT_PRESENT);
+    EXPECT_EQ(
+        api.operations->get_reachability(api.context), TTX_ABSTRACT_REACHABLE);
     for (const auto id : ids) {
       EXPECT_EQ(
           api.operations->supports(api.context, id), TTX_NEGOTIATION_REJECTED);

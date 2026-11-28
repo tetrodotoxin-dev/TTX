@@ -9,6 +9,8 @@
 #include "ttx/graph/policies/constant.hpp"
 #include "ttx/graph/policies/none.hpp"
 #include "ttx/graph/policies/unknown.hpp"
+#include "ttx/graph/projection.hpp"
+#include "validation/tests/graph/fixtures/value.hpp"
 
 using namespace Perimortem::Core;
 using namespace Toolchain::Validation;
@@ -28,18 +30,18 @@ struct RouteProvider {
   ttx_abstract selected;
   Count resolutions = 0;
   Count negotiations = 0;
-  Count classifications = 0;
+  Count reachability_queries = 0;
 
   auto get_abi() -> ttx_abstract {
     static const ttx_abstract_ops operations = {
-      supports, bind, lookup, visit, state};
+      supports, bind, lookup, visit, get_reachability};
 
     return ttx_abstract(this, &operations);
   }
 
-  static auto state(void* context) -> ttx_abstract_state {
-    ++Data::cast<RouteProvider>(context)->classifications;
-    return TTX_ABSTRACT_PRESENT;
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
+    ++Data::cast<RouteProvider>(context)->reachability_queries;
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   static auto supports(void* context, perimortem_uuid contract)
@@ -75,14 +77,14 @@ struct RouteProvider {
   }
 };
 
-// Classification identifies an ordinary node even when it supplies none of
+// Reachability establishes a target even when its provider supplies none of
 // the consumer's UUIDs. The operation makes one call through the published
 // context and table, with zero support or bind probes.
-VALIDATION_TEST(Sentinels, present_without_known_contracts) {
+VALIDATION_TEST(Sentinels, reachable_without_known_contracts) {
   RouteProvider provider{"next"_view, ttx_unknown()};
   const Abstract abstract(provider.get_abi());
-  EXPECT(abstract.get_state() == Abstract::State::Present);
-  EXPECT_EQ(provider.classifications, Count(1));
+  EXPECT(abstract.get_reachability() == Abstract::Reachability::Reachable);
+  EXPECT_EQ(provider.reachability_queries, Count(1));
   EXPECT_EQ(provider.negotiations, Count(0));
   EXPECT_EQ(provider.resolutions, Count(0));
 
@@ -92,16 +94,16 @@ VALIDATION_TEST(Sentinels, present_without_known_contracts) {
       abstract.supports<Policies::Unknown>() == Negotiation::Status::Rejected);
   EXPECT(
       abstract.supports(Identity::Uuid(0, 2)) == Negotiation::Status::Unknown);
-  EXPECT_EQ(provider.classifications, Count(1));
+  EXPECT_EQ(provider.reachability_queries, Count(1));
 
   EXPECT(
-      abstract.resolve_route("next"_view).get_state() ==
-      Abstract::State::Unknown);
+      abstract.resolve_route("next"_view).get_reachability() ==
+      Abstract::Reachability::Indeterminate);
 }
 
-// Reserved UUID requests follow the classified graph state through both
-// support queries and bindings. Ordinary contract requests remain independent.
-VALIDATION_TEST(Sentinels, reserved_states) {
+// Support identifies each sentinel. A caller obtains its graph location by
+// binding Abstract, so neither reserved policy request supplies a record.
+VALIDATION_TEST(Sentinels, reserved_policies) {
   static_assert(TTX_NONE_ID_HIGH == 0 && TTX_NONE_ID_LOW == 0);
   static_assert(TTX_UNKNOWN_ID_HIGH == 0 && TTX_UNKNOWN_ID_LOW == 1);
   RouteProvider present{"next"_view, ttx_none()};
@@ -109,32 +111,102 @@ VALIDATION_TEST(Sentinels, reserved_states) {
   const perimortem_uuid ids[] = {
     Policies::None::contract_id, Policies::Unknown::contract_id};
 
-  const ttx_negotiation_status expected[][2] = {
+  const ttx_negotiation_status support[][2] = {
     {TTX_NEGOTIATION_SATISFIED, TTX_NEGOTIATION_REJECTED},
-    {TTX_NEGOTIATION_REJECTED, TTX_NEGOTIATION_SATISFIED},
+    {TTX_NEGOTIATION_UNKNOWN, TTX_NEGOTIATION_SATISFIED},
     {TTX_NEGOTIATION_REJECTED, TTX_NEGOTIATION_REJECTED},
   };
 
-  for (Count state = 0; state < 3; ++state) {
-    const auto api = values[state];
-    EXPECT_EQ(
-        api.operations->get_state(api.context), ttx_abstract_state(state));
+  const ttx_negotiation_status binding[][2] = {
+    {TTX_NEGOTIATION_REJECTED, TTX_NEGOTIATION_REJECTED},
+    {TTX_NEGOTIATION_UNKNOWN, TTX_NEGOTIATION_UNKNOWN},
+    {TTX_NEGOTIATION_REJECTED, TTX_NEGOTIATION_REJECTED},
+  };
+
+  const ttx_abstract_reachability reachability[] = {
+    TTX_ABSTRACT_UNREACHABLE, TTX_ABSTRACT_INDETERMINATE,
+    TTX_ABSTRACT_REACHABLE};
+
+  for (Count row = 0; row < 3; ++row) {
+    const auto api = values[row];
+    EXPECT_EQ(api.operations->get_reachability(api.context), reachability[row]);
     for (Count request = 0; request < 2; ++request) {
       EXPECT_EQ(
           api.operations->supports(api.context, ids[request]),
-          expected[state][request]);
+          support[row][request]);
 
       ttx_abstract output{};
       const auto status =
           api.operations->bind(api.context, ids[request], &output);
-      EXPECT_EQ(status, expected[state][request]);
-      if (status == TTX_NEGOTIATION_SATISFIED) {
-        EXPECT_EQ(
-            output.operations->get_state(output.context),
-            ttx_abstract_state(state));
-      }
+      EXPECT_EQ(status, binding[row][request]);
     }
   }
+}
+
+// A search exposes the number of completed checks while its target is
+// unsettled. An unsuccessful search establishes absence at this observation.
+// A later installation can still make the original route select a target.
+struct Search
+    : Projection<Search, 0x2ca9c41248f74ee4ULL, 0x9e7112fc472593f1ULL> {
+  U8 completed = 0;
+  auto get_reachability() const -> ttx_abstract_reachability {
+    return completed ? TTX_ABSTRACT_UNREACHABLE : TTX_ABSTRACT_INDETERMINATE;
+  }
+
+  auto supports_contract(Identity::Uuid contract) const
+      -> ttx_negotiation_status {
+    return contract == Validation::Value::contract_id
+               ? TTX_NEGOTIATION_SATISFIED
+               : TTX_NEGOTIATION_REJECTED;
+  }
+
+  auto bind_contract(Identity::Uuid contract, void* output)
+      -> ttx_negotiation_status {
+    const auto status = supports_contract(contract);
+    if (status == TTX_NEGOTIATION_SATISFIED) {
+      *Data::cast<value_api>(output) = {
+        this,
+        [](void* context) { return Data::cast<Search>(context)->completed; }};
+    }
+
+    return status;
+  }
+};
+
+VALIDATION_TEST(Sentinels, reachability_does_not_identify_policy) {
+  Search search;
+  RouteProvider origin{"product"_view, ttx_unknown()};
+  const Abstract root(origin.get_abi());
+  const auto unknown = root.resolve_route("product"_view);
+  origin.selected = search.get_abstract().get_abi();
+
+  const auto pending = root.resolve_route("product"_view);
+  EXPECT(unknown.get_reachability() == Abstract::Reachability::Indeterminate);
+  EXPECT(pending.get_reachability() == unknown.get_reachability());
+  EXPECT(
+      pending.supports<Policies::Unknown>() == Negotiation::Status::Rejected);
+  EXPECT_NOT(unknown.bind<Validation::Value>());
+
+  const auto progress = pending.bind<Validation::Value>();
+  ASSERT(progress);
+
+  search.completed = 1;
+
+  const auto missing = root.resolve_route("product"_view);
+  EXPECT(missing.get_reachability() == Abstract::Reachability::Unreachable);
+  EXPECT(missing.supports<Policies::None>() == Negotiation::Status::Rejected);
+  EXPECT(
+      missing.supports<Policies::Constant>() == Negotiation::Status::Rejected);
+  progress.visit(
+      [&](Validation::Value value) { EXPECT_EQ(value.read(), U8(1)); },
+      [&] { EXPECT(False); });
+
+  RouteProvider installed{"self"_view, origin.get_abi()};
+  origin.selected = installed.get_abi();
+
+  const auto product = root.resolve_route("product"_view);
+  EXPECT(product.get_reachability() == Abstract::Reachability::Reachable);
+  EXPECT(product == Abstract(installed.get_abi()));
 }
 
 // None and Unknown must return themselves for every route. Empty, binary and
@@ -187,26 +259,12 @@ VALIDATION_TEST(Sentinels, terminal_entry_position) {
           first.negotiations + second.negotiations + third.negotiations,
           Count(0));
 
-      Bool bound = False;
-      if (terminal == Abstract(ttx_none())) {
-        abstract.bind<Policies::None>().visit(
-            [&](Policies::None policy) {
-              bound = True;
-              EXPECT(Abstract(policy.get_abi()) == terminal);
-            },
+      abstract.bind<Abstract>().visit(
+          [&](Abstract bound) {
+            EXPECT(bound.get_reachability() == terminal.get_reachability());
+          },
 
-            [&]() { EXPECT(False); });
-      } else {
-        abstract.bind<Policies::Unknown>().visit(
-            [&](Policies::Unknown policy) {
-              bound = True;
-              EXPECT(Abstract(policy.get_abi()) == terminal);
-            },
-
-            [&]() { EXPECT(False); });
-      }
-
-      EXPECT(bound);
+          [&]() { EXPECT(False); });
     }
   }
 }
@@ -244,31 +302,48 @@ VALIDATION_TEST(Sentinels, support_properties) {
       unknown.supports<Policies::Unknown>() == Negotiation::Status::Satisfied);
   EXPECT(
       unknown.supports<Policies::Constant>() == Negotiation::Status::Unknown);
+  EXPECT(none.supports<Abstract>() == Negotiation::Status::Satisfied);
   EXPECT(none.supports<Policies::Constant>() == Negotiation::Status::Satisfied);
   EXPECT(none.supports<Policies::Unknown>() == Negotiation::Status::Rejected);
   EXPECT(unknown.supports(unrelated) == Negotiation::Status::Unknown);
   EXPECT(none.supports(unrelated) == Negotiation::Status::Rejected);
 }
 
-// Sentinel UUIDs return complete Abstract records through the established
-// Graph ABI. Refused and undetermined bindings produce an empty Option.
+// Binding Abstract preserves the sentinel's meaning at the returned location.
+// Other binds convey permanent refusal on None and uncertainty on Unknown.
 VALIDATION_TEST(Sentinels, policy_binding) {
   const auto none = ttx_none();
   ttx_abstract output{};
-  EXPECT_EQ(
-      none.operations->bind(none.context, Policies::None::contract_id, &output),
+  ASSERT_EQ(
+      none.operations->bind(none.context, Abstract::contract_id, &output),
       TTX_NEGOTIATION_SATISFIED);
-  EXPECT(Abstract(output).get_state() == Abstract::State::None);
+  EXPECT(
+      Abstract(output).get_reachability() ==
+      Abstract::Reachability::Unreachable);
 
   const auto unknown = ttx_unknown();
-  EXPECT_EQ(
-      unknown.operations->bind(
-          unknown.context, Policies::Unknown::contract_id, &output),
+  ASSERT_EQ(
+      unknown.operations->bind(unknown.context, Abstract::contract_id, &output),
       TTX_NEGOTIATION_SATISFIED);
-  EXPECT(Abstract(output).get_state() == Abstract::State::Unknown);
-  EXPECT(Abstract(none).bind<Policies::None>());
-  EXPECT(Abstract(none).bind<Policies::Constant>());
-  EXPECT_NOT(Abstract(none).bind<Policies::Unknown>());
+  EXPECT(
+      Abstract(output).get_reachability() ==
+      Abstract::Reachability::Indeterminate);
+  EXPECT(
+      Abstract(output).supports<Policies::Unknown>() ==
+      Negotiation::Status::Satisfied);
+
+  const perimortem_uuid policies[] = {
+    Policies::None::contract_id, Policies::Constant::contract_id,
+    Policies::Unknown::contract_id};
+
+  for (const auto id : policies) {
+    EXPECT_EQ(
+        none.operations->bind(none.context, id, &output),
+        TTX_NEGOTIATION_REJECTED);
+    EXPECT_EQ(
+        unknown.operations->bind(unknown.context, id, &output),
+        TTX_NEGOTIATION_UNKNOWN);
+  }
 
   constexpr auto unrelated =
       Identity::Uuid(0x44f044cf9d8e4b8fULL, 0x81b4ce5aa42be54eULL);
@@ -284,10 +359,11 @@ VALIDATION_TEST(Sentinels, navigation_and_unknown) {
   const auto unknown = Abstract(ttx_unknown());
   unknown.bind<Abstract>().visit(
       [&](Abstract root) {
-        EXPECT(root.get_state() == Abstract::State::Unknown);
         EXPECT(
-            root.resolve_route("remaining"_view).get_state() ==
-            Abstract::State::Unknown);
+            root.get_reachability() == Abstract::Reachability::Indeterminate);
+        EXPECT(
+            root.resolve_route("remaining"_view).get_reachability() ==
+            Abstract::Reachability::Indeterminate);
       },
 
       [&] { EXPECT(False); });

@@ -31,8 +31,8 @@ class Report {
   U8 value = 0;
   Negotiation::Status status = Negotiation::Status::Satisfied;
 
-  static auto state(void* context) -> ttx_abstract_state {
-    return TTX_ABSTRACT_PRESENT;
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   static auto supports(void* context, perimortem_uuid id)
@@ -99,7 +99,7 @@ class Report {
   }
 
   static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, lookup, visit, state};
+    supports, bind, lookup, visit, get_reachability};
 
   static constexpr ttx_export_ops operations = {expose};
 };
@@ -117,8 +117,8 @@ class ImportedByte {
     return Data::cast<ImportedByte>(context)->value;
   }
 
-  static auto state(void* context) -> ttx_abstract_state {
-    return TTX_ABSTRACT_PRESENT;
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   static auto supports(void* context, perimortem_uuid id)
@@ -190,7 +190,7 @@ class ImportedByte {
   static auto visit(void* context, ttx_graph_visitor callback) -> void {}
 
   static constexpr ttx_abstract_ops operations = {
-    supports, bind, lookup, visit, state};
+    supports, bind, lookup, visit, get_reachability};
 
   static auto expose(void* context, ttx_abstract abstract)
       -> ttx_negotiation_status {
@@ -209,8 +209,8 @@ class ByteImport {
   Count reads = 0;
   bool observing = false;
 
-  static auto state(void* context) -> ttx_abstract_state {
-    return TTX_ABSTRACT_PRESENT;
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   static auto supports(void* context, perimortem_uuid id)
@@ -289,7 +289,7 @@ class ByteImport {
   }
 
   static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, lookup, visit_routes, state};
+    supports, bind, lookup, visit_routes, get_reachability};
 
   static constexpr ttx_import_ops operations = {visit};
 };
@@ -298,8 +298,8 @@ class ByteExport {
  public:
   conversion_output output = {0, 0, 0, TTX_NEGOTIATION_SATISFIED};
 
-  static auto state(void* context) -> ttx_abstract_state {
-    return TTX_ABSTRACT_PRESENT;
+  static auto get_reachability(void* context) -> ttx_abstract_reachability {
+    return TTX_ABSTRACT_REACHABLE;
   }
 
   static auto supports(void* context, perimortem_uuid id)
@@ -348,7 +348,8 @@ class ByteExport {
   }
 
   static constexpr ttx_abstract_ops graph_operations = {
-    supports, bind, ByteImport::lookup, ByteImport::visit_routes, state};
+    supports, bind, ByteImport::lookup, ByteImport::visit_routes,
+    get_reachability};
 
   static constexpr ttx_export_ops operations = {expose};
 };
@@ -489,7 +490,8 @@ VALIDATION_TEST(Conversion, present_bindings) {
   };
 
   for (const auto api : graphs) {
-    EXPECT_EQ(api.operations->get_state(api.context), TTX_ABSTRACT_PRESENT);
+    EXPECT_EQ(
+        api.operations->get_reachability(api.context), TTX_ABSTRACT_REACHABLE);
     for (const auto id : ids) {
       EXPECT_EQ(
           api.operations->supports(api.context, id), TTX_NEGOTIATION_REJECTED);

@@ -6,13 +6,27 @@
 
 #include "ttx/graph/abstract.h"
 
-// Unknown marks an undetermined result in graph traversal. Every further route
-// returns the same Unknown result. A chain preserves the outcome independently
-// of which step reached it. Binding this policy supplies its Abstract.
-// `ttx_unknown` provides a shared implementation.
+// Unknown represents an unresolved selection in the Abstract graph. It leaves
+// open whether the target route can be reached on during future observations.
+// The provider makes no promise to eventually produce a target.
 //
-// To try again, the consumer resolves the same route on the original Abstract.
-// The provider evaluates that new request under its current policy.
+// Unknown is one of the two axiomatic Abstracts. An Abstract may report
+// support for the Unknown contract only if it meets these exact rules:
+//
+// * It must also support the Abstract contract.
+// * It must report unknown for all other contracts.
+// * It must only satisfy bind for Abstract.
+// * It must report unknown for all other support and binds.
+// * It must return indeterminate for it's reachability.
+// * Every route from it must return itself.
+// * Any observations on the Abstract produces no observable side effects.
+//
+// Unknown's contract is the formal TTX domain identifier that provides a fast
+// path for identification without needing to observe all behaviors. Any
+// Abstract can emit support for the Unknown contract must collapse to a perfect
+// simulacra so TTX supports a built in Abstract that can be used to statically
+// emit for ture indeterminate paths. Consumers however should not assume that the
+// static TTX address represents the one and only `Unknown` representation.
 C_LINKAGE EXPORTED(TTX)
 ttx_abstract ttx_unknown(void);
 

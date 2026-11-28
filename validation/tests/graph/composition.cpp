@@ -70,7 +70,12 @@ VALIDATION_TEST(Composition, substituted_round_trip) {
           returned = value.get_abstract();
           EXPECT(returned.get_abi().context != value.get_abi().context);
           EXPECT(returned.get_abi().context != origin.get_abi().context);
-          EXPECT(returned.get_state() == Abstract::State::Present);
+          EXPECT(
+              returned.get_reachability() == Abstract::Reachability::Reachable);
+
+          returned.bind<Abstract>().visit(
+              [&](Abstract rebound) { returned = rebound; },
+              [&] { EXPECT(False); });
 
           returned.bind<Policies::Constant>().visit(
               [&](Policies::Constant policy) {
@@ -79,7 +84,9 @@ VALIDATION_TEST(Composition, substituted_round_trip) {
 
               [&] { EXPECT(False); });
 
-          EXPECT(value.other().get_state() == Abstract::State::None);
+          EXPECT(
+              value.other().get_reachability() ==
+              Abstract::Reachability::Unreachable);
         },
 
         [&] { EXPECT(False); });
@@ -103,7 +110,9 @@ VALIDATION_TEST(Composition, substituted_round_trip) {
         state.refuse_bindings = 1;
         EXPECT_NOT(value.get_abstract().bind<Expression>());
         EXPECT_NOT(value.get_abstract().bind<Abstract>());
-        EXPECT(value.get_abstract().get_state() == Abstract::State::Present);
+        EXPECT(
+            value.get_abstract().get_reachability() ==
+            Abstract::Reachability::Reachable);
         EXPECT_EQ(value.evaluate(), U64(46));
       },
 

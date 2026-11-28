@@ -16,14 +16,17 @@ S32 main() {
   }
 
   const auto none = Policies::None::get_none();
-  if (none.get_abstract().get_state() != Abstract::State::None) {
+  if (none.get_abstract().get_reachability() !=
+      Abstract::Reachability::Unreachable) {
     return 2;
   }
 
-  return none.get_abstract().bind<Policies::None>().visit(
-      [](Policies::None bound) -> S32 {
-        const auto next = bound.get_abstract().resolve_route({});
-        return next.get_state() == Abstract::State::None ? 0 : 3;
+  return none.get_abstract().bind<Abstract>().visit(
+      [](Abstract bound) -> S32 {
+        const auto next = bound.resolve_route({});
+        return next.get_reachability() == Abstract::Reachability::Unreachable
+                   ? 0
+                   : 3;
       },
 
       []() -> S32 { return 4; });
