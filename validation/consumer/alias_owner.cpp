@@ -4,6 +4,7 @@
 #include "ttx/graph/policies/alias.hpp"
 #include "ttx/graph/policies/none.h"
 #include "ttx/graph/providers/alias.hpp"
+#include "ttx/graph/providers/promise.hpp"
 #include "validation/consumer/alias.h"
 
 using namespace Ttx::Graph;
@@ -50,6 +51,14 @@ auto consume_c_provider(
 }
 
 S32 main() {
+  Providers::Promise promise;
+  const auto captured = promise.get_abstract();
+  if (validate_promise(captured, 1) ||
+      promise.fulfill(ttx_none()) != Negotiation::Status::Satisfied ||
+      validate_promise(captured, 0)) {
+    return 15;
+  }
+
   Providers::Alias owner;
   return validate_alias(owner.get_abstract());
 }

@@ -5,6 +5,7 @@
 
 #include "ttx/graph/policies/alias.h"
 #include "ttx/graph/policies/none.h"
+#include "ttx/graph/policies/promise.h"
 #include "ttx/graph/policies/unknown.h"
 
 // Both nodes publish the same single route. Each context supplies its own
@@ -42,6 +43,36 @@ static ttx_negotiation_status
 static ttx_abstract_reachability reachable(void* context) {
   (void)context;
   return TTX_ABSTRACT_REACHABLE;
+}
+
+S32 validate_promise(ttx_abstract location, U8 pending) {
+  const perimortem_uuid policy = {TTX_PROMISE_ID_HIGH, TTX_PROMISE_ID_LOW};
+  const perimortem_uuid abstract = {TTX_ABSTRACT_ID_HIGH, TTX_ABSTRACT_ID_LOW};
+  const ttx_abstract selected = location.operations->resolve(location);
+  ttx_abstract output = {0};
+  if (pending) {
+    return location.operations->supports(location.context, policy) ==
+                       TTX_NEGOTIATION_SATISFIED &&
+                   location.operations->bind(
+                       location.context, policy, &output) ==
+                       TTX_NEGOTIATION_UNKNOWN &&
+                   selected.operations->get_reachability(selected.context) ==
+                       TTX_ABSTRACT_INDETERMINATE
+               ? 0
+               : 15;
+  }
+
+  return location.operations->supports(location.context, policy) ==
+                     TTX_NEGOTIATION_REJECTED &&
+                 location.operations->bind(
+                     location.context, abstract, &output) ==
+                     TTX_NEGOTIATION_SATISFIED &&
+                 output.operations->get_reachability(output.context) ==
+                     TTX_ABSTRACT_UNREACHABLE &&
+                 selected.operations->get_reachability(selected.context) ==
+                     TTX_ABSTRACT_UNREACHABLE
+             ? 0
+             : 16;
 }
 
 S32 validate_alias(ttx_abstract location) {
