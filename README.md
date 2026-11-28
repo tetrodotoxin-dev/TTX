@@ -61,23 +61,28 @@ semantic graph:
 
 ## Building and testing
 
-Python 3 and Bazel are required. The Bazel version is specified in
-[.bazelversion](.bazelversion), and [MODULE.bazel](MODULE.bazel) declares the
-Toolchain dependency that supplies the compilers and shared build rules.
+Install Python 3 and `bazel` and make both available via your PATH.
+[MODULE.bazel](MODULE.bazel) declares the Toolchain dependency that supplies
+the compilers and shared build rules.
 
 Run these commands from the repository root:
 
 ```sh
-bazel run :format -- --check
+bazel run :format
 bazel build //source/...
 bazel run :tests
 bazel run :benchmarks --config=release
-bazel build :sdk --config=release
+bazel build :_sdk_archives --config=release
 bazel run :snapshot
 ```
 
-Tests and benchmarks are standalone executables. The SDK packages headers and
-static and shared libraries for independently built consumers. A snapshot
+The formatter edits files in place. To limit it to selected files, pass their
+paths after `bazel run :format --`. Tests and benchmarks are standalone
+executables. The SDK archive target writes the headers, platform libraries
+and checksum manifest in the directory printed by
+`bazel info bazel-bin --config=release`. Run
+`python3 validation/consumer/check.py` to build and exercise independent
+consumers of the static and shared Linux archives. A snapshot
 archives the clean Git commit that reproduces the source and validation state.
 
 For VS Code tasks, debugging and header navigation, run `bazel run :vscode`.

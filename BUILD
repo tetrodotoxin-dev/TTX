@@ -4,7 +4,7 @@ load(
     "@tetro_toolchain//:defs.bzl",
     "format",
     "package",
-    "snapshot",
+    "sdk",
     "validation",
     "vscode",
 )
@@ -26,7 +26,7 @@ package(
 
 format()
 
-snapshot()
+sdk(name = "snapshot")
 
 validation(
     test_data = ["//validation/providers:libraries"],
