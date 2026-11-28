@@ -64,12 +64,13 @@ VALIDATION_TEST(Composition, substituted_round_trip) {
   for (Count index = 0; index < 4; ++index) {
     returned.bind<Expression>().visit(
         [&](Expression value) {
-          EXPECT(value.get_abi().context != returned.get_abi().context);
+          EXPECT(value.get_abi().context != ttx_abstract(returned).context);
           EXPECT_EQ(value.evaluate(), state.value);
 
           returned = value.get_abstract();
-          EXPECT(returned.get_abi().context != value.get_abi().context);
-          EXPECT(returned.get_abi().context != origin.get_abi().context);
+          EXPECT(ttx_abstract(returned).context != value.get_abi().context);
+          EXPECT(
+              ttx_abstract(returned).context != ttx_abstract(origin).context);
           EXPECT(
               returned.get_reachability() == Abstract::Reachability::Reachable);
 

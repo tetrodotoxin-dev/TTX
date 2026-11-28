@@ -46,8 +46,7 @@ class Create {
       -> Semantic::Negotiation::Status {
     const auto api = get_abi();
     return Semantic::Negotiation::Status(api.operations->create(
-        api.context, arguments.get_abi(), &callback,
-        Create::callback<Function>));
+        api.context, arguments, &callback, Create::callback<Function>));
   }
 
  private:

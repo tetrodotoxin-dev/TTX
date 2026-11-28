@@ -50,10 +50,11 @@ class Abstract {
   constexpr Abstract(void* context, const Operations& operations)
       : api(context, &operations) {}
 
-  // Copies a record already supplied under the Abstract contract. The caller
-  // establishes its representation and required pointers. Explicit construction
-  // marks this unchecked conversion from the C record.
-  explicit constexpr Abstract(Api api) : api(api) {}
+  // The C and C++ handles copy the same context and operation table in either
+  // direction. The caller supplies a complete record under the Abstract
+  // contract. Both copies share the original access duration.
+  constexpr Abstract(Api api) : api(api) {}
+  constexpr operator Api() const { return api; }
 
   constexpr auto get_abi() const -> Api { return api; }
 

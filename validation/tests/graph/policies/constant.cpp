@@ -163,7 +163,7 @@ VALIDATION_TEST(Constants, constant_indeterminate_target) {
   EXPECT(
       subject.supports<Policies::Unknown>() == Negotiation::Status::Rejected);
 
-  const auto api = subject.get_abi();
+  const ttx_abstract api = subject;
   ttx_abstract output{};
   EXPECT_EQ(
       api.operations->bind(
@@ -213,7 +213,7 @@ VALIDATION_TEST(Constants, explicit_constant_policy) {
       first.supports<Policies::Constant>() == Negotiation::Status::Satisfied);
   first.bind<Policies::Constant>().visit(
       [&](Policies::Constant policy) {
-        EXPECT(policy.get_abstract().get_abi().context == &fixed);
+        EXPECT(ttx_abstract(policy.get_abstract()).context == &fixed);
       },
 
       [&] { EXPECT(False); });
@@ -233,7 +233,7 @@ VALIDATION_TEST(Constants, explicit_constant_policy) {
   parent.child = Fixed::get_abstract(&equivalent);
 
   const auto second = root.resolve_route("selected"_view);
-  EXPECT(first.get_abi().context != second.get_abi().context);
+  EXPECT(ttx_abstract(first).context != ttx_abstract(second).context);
   EXPECT_EQ(
       first.bind<Validation::Value>().visit(
           [](Validation::Value value) { return value.read(); },

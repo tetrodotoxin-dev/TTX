@@ -93,7 +93,7 @@ class Projection {
     }
 
     auto get_abstract() const -> Graph::Abstract {
-      return Graph::Abstract(api.operations->get_abstract(api.context));
+      return api.operations->get_abstract(api.context);
     }
 
     // Conversion requests Concrete's complete typed record from the supplied
@@ -102,7 +102,7 @@ class Projection {
     static auto convert(Graph::Abstract abstract)
         -> Perimortem::Core::Storage::Option<Abstract> {
       Api output;
-      const ttx_abstract graph = abstract.get_abi();
+      const ttx_abstract graph = abstract;
       const auto status =
           graph.operations->bind(graph.context, contract_id, &output);
       if (status == TTX_NEGOTIATION_SATISFIED) {
@@ -140,7 +140,7 @@ class Projection {
   }
 
   static auto reenter(void* context) -> ttx_abstract {
-    return project(concrete(context)).get_abi();
+    return project(concrete(context));
   }
 
   static constexpr auto reserved(Uuid contract) -> Bool {
@@ -238,7 +238,7 @@ class Projection {
   static auto visit_routes(void* context, ttx_graph_visitor visitor) -> void {
     auto callback = [&](Perimortem::Core::View::Bytes route,
                         Graph::Abstract abstract) {
-      visitor.callback(visitor.callback_context, route, abstract.get_abi());
+      visitor.callback(visitor.callback_context, route, abstract);
     };
 
     visit(concrete(context), Graph::Abstract::Visitor(callback));

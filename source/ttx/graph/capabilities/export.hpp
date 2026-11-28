@@ -38,7 +38,7 @@ class Export {
   auto expose(Abstract abstract) const -> Semantic::Negotiation::Status {
     const auto api = get_abi();
     return Semantic::Negotiation::Status(
-        api.operations->expose(api.context, abstract.get_abi()));
+        api.operations->expose(api.context, abstract));
   }
 
  private:

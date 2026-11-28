@@ -97,7 +97,7 @@ class EquivalentLocation {
   }
 
   static auto reenter(void* context) -> ttx_abstract {
-    return Data::cast<EquivalentLocation>(context)->second().get_abi();
+    return Data::cast<EquivalentLocation>(context)->second();
   }
 
   static auto route(void* context, perimortem_view_bytes requested)
@@ -183,12 +183,18 @@ VALIDATION_TEST(Abstracts, c_observations) {
 // Copying an Abstract must preserve its published context and operations.
 // Provider state may still change through those operations.
 VALIDATION_TEST(Abstracts, copied_view) {
+  static_assert(!__is_convertible(ttx_abstract, Policies::None));
+  static_assert(!__is_convertible(ttx_abstract, Policies::Unknown));
+  static_assert(!__is_convertible(ttx_abstract, Policies::Constant));
+  static_assert(!__is_convertible(ttx_abstract, Policies::Ordered));
   observation_subject provider{};
-  const Abstract subject(observation_abstract(&provider));
+  const ttx_abstract original = observation_abstract(&provider);
+  const Abstract subject = original;
   const auto copy = subject;
+  const ttx_abstract returned = copy;
   EXPECT(copy == subject);
-  EXPECT(copy.get_abi().context == subject.get_abi().context);
-  EXPECT(copy.get_abi().operations == subject.get_abi().operations);
+  EXPECT(returned.context == original.context);
+  EXPECT(returned.operations == original.operations);
   EXPECT_EQ(
       subject.bind<Validation::Value>().visit(
           [](Validation::Value value) { return value.read(); },
@@ -223,20 +229,21 @@ VALIDATION_TEST(Abstracts, copied_view) {
 VALIDATION_TEST(Abstracts, semantic_reentry_uses_fresh_api_record) {
   EquivalentLocation provider;
   const Abstract first = provider.first();
+  const ttx_abstract origin = first;
 
   first.bind<Reentry>().visit(
       [&](Reentry value) {
         const Abstract returned = value.get_abstract();
-        EXPECT_EQ(first.get_abi().context, returned.get_abi().context);
-        EXPECT(first.get_abi().operations != returned.get_abi().operations);
+        const ttx_abstract reentered = returned;
+        EXPECT_EQ(origin.context, reentered.context);
+        EXPECT(origin.operations != reentered.operations);
         EXPECT(first != returned);
 
         first.bind<Policies::Constant>().visit(
             [&](Policies::Constant constant) {
-              const auto selected = constant.get_abstract();
-              EXPECT_EQ(selected.get_abi().context, first.get_abi().context);
-              EXPECT_EQ(
-                  selected.get_abi().operations, returned.get_abi().operations);
+              const ttx_abstract selected = constant.get_abstract();
+              EXPECT_EQ(selected.context, origin.context);
+              EXPECT_EQ(selected.operations, reentered.operations);
             },
 
             [&] { EXPECT(False); });
@@ -278,7 +285,7 @@ VALIDATION_TEST(Abstracts, fresh_abstract_binding) {
       Abstract::Reachability::Reachable);
   EXPECT_EQ(provider.generation, U8(2));
 
-  const auto api = subject.get_abi();
+  const ttx_abstract api = subject;
   const ttx_negotiation_status failures[] = {
     TTX_NEGOTIATION_UNKNOWN, TTX_NEGOTIATION_REJECTED};
 

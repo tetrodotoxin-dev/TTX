@@ -45,8 +45,8 @@ class Selection {
       -> Semantic::Negotiation::Status {
     const auto selected = get_abi();
     const ttx_graph_visitor callback(visitor_context(visitor), visit);
-    return Semantic::Negotiation::Status(selected.operations->select(
-        selected.context, request.get_abi(), callback));
+    return Semantic::Negotiation::Status(
+        selected.operations->select(selected.context, request, callback));
   }
 
  private:
