@@ -22,7 +22,12 @@ cc_binary(
 
 cc_binary(
     name = "alias_consumer",
-    srcs = ["alias.c"],
+    srcs = [
+        "alias.c",
+        "alias.h",
+        "alias_owner.cpp",
+        "alias_provider.c",
+    ],
     deps = ["//:graph"],
 )
 

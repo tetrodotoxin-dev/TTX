@@ -1,9 +1,9 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/graph/policies/alias.h"
+#include "validation/consumer/alias.h"
 
-#include "ttx/graph/capabilities/normalize.h"
+#include "ttx/graph/policies/alias.h"
 #include "ttx/graph/policies/none.h"
 #include "ttx/graph/policies/unknown.h"
 
@@ -25,29 +25,17 @@ static void visit(void* context, ttx_graph_visitor visitor) {
 
 static ttx_negotiation_status supports(void* context, perimortem_uuid id) {
   (void)context;
-  if (id.high == TTX_NORMALIZE_ID_HIGH && id.low == TTX_NORMALIZE_ID_LOW) {
-    return TTX_NEGOTIATION_UNKNOWN;
-  }
-
+  (void)id;
   return TTX_NEGOTIATION_REJECTED;
 }
 
-// Each export stores its final subject as the context of resolve. Returning
-// that record lets the test distinguish two exports that share an operation
-// table but denote different subjects.
-static ttx_negotiation_status resolve(void* context, ttx_abstract* output) {
-  *output = *(const ttx_abstract*)context;
-  return TTX_NEGOTIATION_SATISFIED;
+static ttx_abstract resolve(ttx_abstract self) {
+  return *(const ttx_abstract*)self.context;
 }
 
 static ttx_negotiation_status
     bind(void* context, perimortem_uuid id, void* output) {
-  static const ttx_normalize_ops normalizer = {resolve};
-  if (id.high == TTX_NORMALIZE_ID_HIGH && id.low == TTX_NORMALIZE_ID_LOW) {
-    *(ttx_normalize*)output = (ttx_normalize){context, &normalizer};
-    return TTX_NEGOTIATION_SATISFIED;
-  }
-
+  (void)output;
   return supports(context, id);
 }
 
@@ -56,9 +44,9 @@ static ttx_abstract_reachability reachable(void* context) {
   return TTX_ABSTRACT_REACHABLE;
 }
 
-S32 main(void) {
-  static const ttx_abstract_ops operations = {
-    supports, bind, child, visit, reachable, ttx_resolve_self};
+S32 validate_alias(ttx_abstract location) {
+  static const ttx_abstract_ops operations = {supports, bind,      child,
+                                              visit,    reachable, resolve};
 
   ttx_abstract child_a = ttx_unknown();
   ttx_abstract child_b = ttx_none();
@@ -66,34 +54,23 @@ S32 main(void) {
   const ttx_abstract b = {&child_b, &operations};
 
   const perimortem_uuid alias_id = {TTX_ALIAS_ID_HIGH, TTX_ALIAS_ID_LOW};
-  ttx_alias_slot storage;
-  const ttx_abstract location = ttx_alias_initialize(&storage);
   ttx_alias writer;
   if (location.operations->bind(location.context, alias_id, &writer) !=
       TTX_NEGOTIATION_SATISFIED) {
     return 1;
   }
 
-  if (writer.operations->set_referent(writer.context, a) !=
-      TTX_NEGOTIATION_SATISFIED) {
+  if (writer.operations->set_referent(writer.context, ttx_none()) !=
+          TTX_NEGOTIATION_SATISFIED ||
+      location.operations->resolve(location).operations !=
+          ttx_none().operations ||
+      writer.operations->set_referent(writer.context, a) !=
+          TTX_NEGOTIATION_SATISFIED) {
     return 2;
   }
 
   const ttx_abstract captured = writer.operations->get_referent(writer.context);
-  const perimortem_uuid normalize_id = {
-    TTX_NORMALIZE_ID_HIGH, TTX_NORMALIZE_ID_LOW};
-
-  ttx_normalize normalizer;
-  if (location.operations->bind(location.context, normalize_id, &normalizer) !=
-      TTX_NEGOTIATION_SATISFIED) {
-    return 6;
-  }
-
-  ttx_abstract original;
-  if (normalizer.operations->resolve(normalizer.context, &original) !=
-      TTX_NEGOTIATION_SATISFIED) {
-    return 7;
-  }
+  const ttx_abstract original = location.operations->resolve(location);
 
   if (writer.operations->set_referent(writer.context, b) !=
       TTX_NEGOTIATION_SATISFIED) {
@@ -120,15 +97,18 @@ S32 main(void) {
     return 5;
   }
 
-  ttx_abstract redirected;
-  if (normalizer.operations->resolve(normalizer.context, &redirected) !=
-          TTX_NEGOTIATION_SATISFIED ||
-      redirected.operations->get_reachability(redirected.context) !=
+  const ttx_abstract redirected = location.operations->resolve(location);
+  if (redirected.operations->get_reachability(redirected.context) !=
           TTX_ABSTRACT_UNREACHABLE ||
       original.operations->get_reachability(original.context) !=
           TTX_ABSTRACT_INDETERMINATE) {
     return 8;
   }
 
-  return 0;
+  if (writer.operations->set_referent(writer.context, ttx_unknown()) !=
+      TTX_NEGOTIATION_SATISFIED) {
+    return 9;
+  }
+
+  return validate_c_provider(a, b);
 }

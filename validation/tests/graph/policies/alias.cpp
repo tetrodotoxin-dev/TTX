@@ -6,14 +6,17 @@
 #include "toolchain/validation/test.hpp"
 
 #include "perimortem/core/view/null_terminated.hpp"
+#include "perimortem/memory/thread/vector.hpp"
 
 #include "ttx/data/transfer.hpp"
 #include "ttx/graph/policies/none.hpp"
 #include "ttx/graph/policies/unknown.hpp"
+#include "ttx/graph/providers/alias.hpp"
 #include "validation/tests/graph/fixtures/observation.h"
 #include "validation/tests/graph/fixtures/value.hpp"
 
 using namespace Perimortem::Core;
+using namespace Perimortem::Memory;
 using namespace Toolchain::Validation;
 using namespace Ttx::Data;
 using namespace Ttx::Graph;
@@ -22,10 +25,10 @@ using namespace Ttx::Semantic;
 static Harness Aliases = {.name = "TTX::Alias"};
 
 VALIDATION_TEST(Aliases, location_and_referent) {
-  ttx_alias_slot storage;
-  const Abstract location = Policies::Alias::initialize(storage);
+  Providers::Alias owner;
+  const Abstract location = owner;
   ttx_alias bound{};
-  const auto slot = location.get_abi();
+  const ttx_abstract slot = location;
   ASSERT_EQ(
       slot.operations->bind(slot.context, Policies::Alias::contract_id, &bound),
       TTX_NEGOTIATION_SATISFIED);
@@ -67,8 +70,8 @@ VALIDATION_TEST(Aliases, location_and_referent) {
 
   // A reference can denote another reference, including itself. Each read
   // returns the stored location and lets the caller choose the next bind.
-  ttx_alias_slot second_storage;
-  const Abstract second = Policies::Alias::initialize(second_storage);
+  Providers::Alias second_owner;
+  const Abstract second = second_owner;
   ASSERT(alias.set_referent(second) == Negotiation::Status::Satisfied);
   ASSERT(alias.get_referent() == second);
   second.bind<Policies::Alias>().visit(
@@ -99,16 +102,17 @@ VALIDATION_TEST(Aliases, redirect_during_observation) {
 
   const Abstract a(observation_abstract(&first));
   const Abstract b(observation_abstract(&second));
-  ttx_alias_slot storage;
-  const Abstract location = Policies::Alias::initialize(storage);
+  Providers::Alias owner(a);
+  Thread::Vector<Abstract> variables;
+  const Abstract location = variables.insert(owner);
   ttx_alias bound{};
-  const auto slot = location.get_abi();
+  const ttx_abstract slot = location;
   ASSERT_EQ(
       slot.operations->bind(slot.context, Policies::Alias::contract_id, &bound),
       TTX_NEGOTIATION_SATISFIED);
 
   const Policies::Alias alias(bound);
-  ASSERT(alias.set_referent(a) == Negotiation::Status::Satisfied);
+  ASSERT(alias.get_referent() == a);
 
   ttx_alias copy{};
   auto source = alias.get_abi();
@@ -170,23 +174,43 @@ VALIDATION_TEST(Aliases, redirect_during_observation) {
 }
 
 VALIDATION_TEST(Aliases, refused_replacement) {
-  ttx_alias_slot storage;
-  const auto slot = Policies::Alias::initialize(storage).get_abi();
+  Providers::Alias storage{Abstract(ttx_none())};
+  const ttx_abstract slot = storage.get_abstract();
   ttx_alias api{};
   ASSERT_EQ(
       slot.operations->bind(slot.context, Policies::Alias::contract_id, &api),
       TTX_NEGOTIATION_SATISFIED);
 
   const Policies::Alias alias(api);
-  const Abstract retained(ttx_none());
+  ASSERT(
+      alias.get_referent().supports<Policies::None>() ==
+      Negotiation::Status::Satisfied);
+
+  observation_subject subject{};
+  const Abstract retained(observation_abstract(&subject));
   ASSERT(alias.set_referent(retained) == Negotiation::Status::Satisfied);
   EXPECT_EQ(
       api.operations->set_referent(api.context, {}), TTX_NEGOTIATION_REJECTED);
   EXPECT(alias.get_referent() == retained);
 
+  auto ordinary = *ttx_abstract(retained).operations;
+  ordinary.get_reachability = [](void*) { return TTX_ABSTRACT_UNREACHABLE; };
+  EXPECT(
+      alias.set_referent(Abstract(&subject, ordinary)) ==
+      Negotiation::Status::Satisfied);
+  EXPECT(alias.get_referent() == Abstract(&subject, ordinary));
+  ASSERT(alias.set_referent(retained) == Negotiation::Status::Satisfied);
+
   const Abstract unknown(ttx_unknown());
-  ttx_abstract_ops incomplete = *unknown.get_abi().operations;
+  ttx_abstract_ops incomplete = *ttx_abstract(unknown).operations;
   incomplete.get_reachability = nullptr;
+  EXPECT_EQ(
+      api.operations->set_referent(api.context, {&storage, &incomplete}),
+      TTX_NEGOTIATION_REJECTED);
+  EXPECT(alias.get_referent() == retained);
+
+  incomplete = *ttx_abstract(unknown).operations;
+  incomplete.resolve = nullptr;
   EXPECT_EQ(
       api.operations->set_referent(api.context, {&storage, &incomplete}),
       TTX_NEGOTIATION_REJECTED);
@@ -196,17 +220,18 @@ VALIDATION_TEST(Aliases, refused_replacement) {
   // separately. A read through this API always supplies its original target.
   ttx_negotiation_status decision = TTX_NEGOTIATION_UNKNOWN;
   static const ttx_alias_ops operations = {
-    [](void*) { return ttx_none(); },
+    [](void*) { return ttx_unknown(); },
     [](void* context, ttx_abstract) {
       return *Data::cast<ttx_negotiation_status>(context);
     }};
 
   const Policies::Alias restricted({&decision, &operations});
   const Abstract previous = restricted.get_referent();
-  ASSERT(previous.supports<Policies::None>() == Negotiation::Status::Satisfied);
-  EXPECT(restricted.set_referent(unknown) == Negotiation::Status::Unknown);
+  ASSERT(
+      previous.supports<Policies::Unknown>() == Negotiation::Status::Satisfied);
+  EXPECT(restricted.set_referent(retained) == Negotiation::Status::Unknown);
   EXPECT(restricted.get_referent() == previous);
   decision = TTX_NEGOTIATION_REJECTED;
-  EXPECT(restricted.set_referent(unknown) == Negotiation::Status::Rejected);
+  EXPECT(restricted.set_referent(retained) == Negotiation::Status::Rejected);
   EXPECT(restricted.get_referent() == previous);
 }
