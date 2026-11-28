@@ -22,9 +22,8 @@ namespace Ttx::Graph {
 // Graph navigation is independent of the consumer's native type system.
 // Binding supplies a typed API whose terminal operations follow that contract.
 // Returning an Abstract makes graph observations available again at the
-// location chosen by the provider. A contract offering `get_abstract` preserves
-// the location from which it was bound. The full graph contract is in
-// abstract.h.
+// location chosen by the provider. A typed API's `get_abstract` returns the
+// location that granted that API. The full graph contract is in abstract.h.
 //
 // The supplying contract defines the context and table access duration.
 // Copies of an Abstract share that duration. A plain Abstract result requires
@@ -77,21 +76,13 @@ class Abstract {
   }
 
   // A successful UUID request supplies the complete Contract::Api record.
-  // Binding Abstract, or using a bound contract's `get_abstract` member,
-  // preserves the semantic location of this Abstract. The empty Option
-  // represents either an undetermined or refused request.
+  // Binding Abstract returns this node's own semantic location on success.
+  // The empty Option represents either an undetermined or refused request.
   template <typename Contract>
   auto bind() const -> Perimortem::Core::Storage::Option<Contract> {
-    return bind<Contract>(Contract::contract_id);
-  }
-
-  // The caller selects the C record specified by this UUID. This overload
-  // supports contracts whose UUID is discovered while navigating the graph.
-  template <typename Contract>
-  auto bind(Perimortem::Core::Identity::Uuid contract) const
-      -> Perimortem::Core::Storage::Option<Contract> {
     typename Contract::Api output{};
-    const auto status = api.operations->bind(api.context, contract, &output);
+    const auto status =
+        api.operations->bind(api.context, Contract::contract_id, &output);
     if (status == TTX_NEGOTIATION_SATISFIED) {
       return Contract(output);
     }

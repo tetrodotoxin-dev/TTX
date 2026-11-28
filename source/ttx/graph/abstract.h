@@ -111,17 +111,11 @@ typedef U8 ttx_abstract_reachability;
 // requests, including the bound contract's own UUID or Abstract, while the
 // operations already supplied remain usable.
 //
-// A typed operation can return an Abstract anywhere in the graph. The optional
-// `get_abstract` contract provides a way back after a successful bind. It
-// returns an Abstract at the same graph location that supplied the binding,
-// even when the returned API uses another context and operation table.
-//
-//   A --bind(Type)--> Type --get_abstract()--> A'
-//
-// A and A' represent the same graph location. This is semantic equivalence
-// rather than API-record equality. Returning through `get_abstract` preserves
-// the location and its Policies. Each API keeps its own published context and
-// operations, and each later binding remains an independent request.
+// A successful bind of Abstract returns the exact semantic location this
+// node represents. Different API records can represent that same location.
+// A typed operation can return an Abstract anywhere in the graph. If the
+// typed API supplies `get_abstract`, it returns the location that granted
+// that API throughout the caller's access.
 //
 // The supplying contract establishes the complete API representation before
 // the consumer calls its operations. That representation includes the table's
@@ -182,12 +176,8 @@ typedef struct ttx_abstract_ops {
   // function follows its supplying access contract. Copying the record
   // preserves those access durations.
   //
-  // A successful bind supplies an interpretation of the location on which
-  // the caller made the request. Binding Abstract returns that location
-  // directly. If a typed contract supplies `get_abstract`, that operation
-  // returns the binding's origin throughout the granted access. Repeating
-  // these conversions preserves the semantic location even when a provider
-  // supplies different native records. Each subsequent bind is a new request.
+  // Binding Abstract to this node returns this node's own semantic location
+  // on Satisfied. Each subsequent bind is a new observation.
   //
   // The caller uses the context supplied with this operation. Substituting
   // another context through this interface is undefined behavior.
