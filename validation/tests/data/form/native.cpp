@@ -13,7 +13,6 @@ using namespace Ttx::Data;
 
 static Harness NativeForms = {.name = "TTX::Data::Form::Native"};
 
-
 // Identity distinguishes C++ types while leaving their declared fields equal.
 // Result and Argument independently change one operation's signature. The
 // recursive return must preserve each record's complete description.
@@ -103,10 +102,12 @@ VALIDATION_TEST(NativeForms, array_parameter_bounds) {
       0x11, 0x80, 0x80, 0x00, 0x82, 0x21, 0x00, 0x01, 0x03, 0x00, 0x01, 0x01,
       0x84, 0x02, 0x00, 0x01, 0x11, 0x40, 0x00, 0x01, 0x03, 0x10, 0x00, 0x04,
     };
+
     static constexpr U8 element_bytes[] = {
       0x11, 0x80, 0x80, 0x00, 0x82, 0x21, 0x00, 0x01,
       0x03, 0x00, 0x01, 0x01, 0x83, 0x00, 0x00, 0x01,
     };
+
     static constexpr auto& adjusted =
         Form::Compiled<Form::Native<Adjusted>::reference>::get_representation();
     EXPECT(fixed.compatible(
@@ -121,6 +122,7 @@ VALIDATION_TEST(NativeForms, array_parameter_bounds) {
   ASSERT(
       Transfer::copy(source, Form::Storage::from(received)) == Status::Success);
   ASSERT(received);
+
   const U32 values[4] = {10, 20, 30, 40};
   EXPECT_EQ(received(&values), U32(40));
 

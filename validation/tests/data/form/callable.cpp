@@ -256,6 +256,7 @@ VALIDATION_TEST(Callables, admission_failure_order) {
     {Form::Schema::pointer(&unknown), 1},
     {integer, Count(-1)},
   };
+
   const auto schema = Form::Schema::callable(
       Form::Callable::Convention::SystemVAMD64, {arguments[0], 2}, {}, 8);
   Validation::DataTests::Preparation prepare(8);
@@ -274,6 +275,7 @@ VALIDATION_TEST(Callables, admission_failure_order) {
   const ttx_representation* published = &sentinel;
   const ttx_representation_allocator allocator{
     nullptr, [](void*, Count, Count) -> void* { return nullptr; }};
+
   EXPECT_EQ(
       ttx_representation_compile({}, 16, allocator, &published),
       TTX_DATA_INVALID);

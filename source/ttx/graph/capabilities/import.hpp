@@ -63,3 +63,9 @@ class Import {
 };
 
 }  // namespace Ttx::Graph::Capabilities
+
+TTX_DATA_RECORD(ttx_import_ops, TTX_DATA_MEMBER(ttx_import_ops, visit));
+TTX_DATA_RECORD(
+    ttx_import,
+    TTX_DATA_MEMBER(ttx_import, context),
+    TTX_DATA_MEMBER(ttx_import, operations));

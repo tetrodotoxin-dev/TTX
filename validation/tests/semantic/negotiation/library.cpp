@@ -11,6 +11,7 @@
 
 #include "ttx/data/transfer.hpp"
 #include "ttx/graph/abstract.hpp"
+#include "ttx/graph/capabilities/import.hpp"
 #include "ttx/semantic/negotiation/library.h"
 #include "validation/providers/abstract/provider.h"
 #include "validation/support/library.hpp"
@@ -34,6 +35,66 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(bootstrap_indexed, get));
 
 static Harness NativeEntry = {.name = "TTX::Bootstrap"};
+
+// The consumer requests Import directly on the entry Query. A record with
+// the wrong operation table must be refused before a callback can run.
+VALIDATION_TEST(NativeEntry, described_import) {
+  auto library =
+      Validation::Support::open_library("libabstract_subject.so"_view);
+  const auto* published = Data::cast<const ttx_storage>(
+      Validation::Support::find_symbol(library, "ttx_entry"_view));
+  ttx_semantic_query entry{};
+  const auto target = Form::Storage::from(entry).get_abi();
+  ASSERT_EQ(ttx_transfer(published, &target), TTX_DATA_SUCCESS);
+
+  Negotiation::Query query(entry);
+  // The old Import had the same physical shape. Its callback supplied the
+  // earlier Abstract contract, so agreement on the record alone cannot grant
+  // it.
+  constexpr Identity::Uuid old_import(
+      0x2793e7c714e64355ULL, 0xb6104e50092bf2e2ULL);
+  ttx_import former{};
+  EXPECT(
+      query.bind(old_import, Form::Storage::from(former)) !=
+      Negotiation::Status::Satisfied);
+
+  constexpr Identity::Uuid old_abstract(
+      0xb427e8d104cf46b1ULL, 0x83a7da1ee62a518bULL);
+  ttx_abstract wrong{};
+  EXPECT(
+      query.bind(old_abstract, Form::Storage::from(wrong)) !=
+      Negotiation::Status::Satisfied);
+  EXPECT(
+      query.bind(
+          Capabilities::Import::contract_id, Form::Storage::from(wrong)) ==
+      Negotiation::Status::Rejected);
+
+  Count callbacks = 0;
+  auto observe = [&](Abstract subject) {
+    EXPECT(subject.get_reachability() == Abstract::Reachability::Reachable);
+    ++callbacks;
+  };
+
+  query.bind<Capabilities::Import>().visit(
+      [&](Capabilities::Import importer) {
+        U32 unsupported = 1;
+        EXPECT(
+            importer.visit(
+                &unsupported,
+                Form::Storage::from(unsupported).get_representation(),
+                observe) == Negotiation::Status::Rejected);
+        EXPECT_EQ(callbacks, Count(0));
+
+        U8 accepted = 1;
+        EXPECT(
+            importer.visit(
+                &accepted, Form::Storage::from(accepted).get_representation(),
+                observe) == Negotiation::Status::Satisfied);
+        EXPECT_EQ(callbacks, Count(1));
+      },
+
+      [&](Negotiation::Status) { EXPECT(False); });
+}
 
 // This is the public bootstrap sequence. The export is described data. The
 // first provider operation is called only after Transfer establishes the
@@ -75,16 +136,16 @@ VALIDATION_TEST(NativeEntry, storage_to_query_to_abstract) {
                           TTX_NEGOTIATION_SATISFIED);
                       EXPECT(api.context != entry.context);
                       EXPECT_EQ(
-                          api.operations->get_state(api.context),
-                          TTX_ABSTRACT_PRESENT);
+                          api.operations->get_reachability(api.context),
+                          TTX_ABSTRACT_REACHABLE);
 
                       ttx_abstract bound{};
                       ASSERT_EQ(
                           api.operations->bind(api.context, id, &bound),
                           TTX_NEGOTIATION_SATISFIED);
                       EXPECT_EQ(
-                          bound.operations->get_state(bound.context),
-                          TTX_ABSTRACT_PRESENT);
+                          bound.operations->get_reachability(bound.context),
+                          TTX_ABSTRACT_REACHABLE);
                     },
 
                     fail);
@@ -123,7 +184,8 @@ VALIDATION_TEST(NativeEntry, independent_paths_and_formats) {
   callback_api.visit(
       callback_api.context, &visits, [](void* context, ttx_abstract api) {
         auto& count = *Data::cast<Count>(context);
-        if (Abstract(api).get_state() == Abstract::State::Present) {
+        if (Abstract(api).get_reachability() ==
+            Abstract::Reachability::Reachable) {
           ++count;
         }
       });
@@ -136,8 +198,8 @@ VALIDATION_TEST(NativeEntry, independent_paths_and_formats) {
       Negotiation::Status::Satisfied);
   ASSERT_EQ(indexed.count(indexed.context), U64(1));
   EXPECT(
-      Abstract(indexed.get(indexed.context, 0)).get_state() ==
-      Abstract::State::Present);
+      Abstract(indexed.get(indexed.context, 0)).get_reachability() ==
+      Abstract::Reachability::Reachable);
 
   ttx_semantic_query next{};
   ASSERT(
@@ -147,7 +209,7 @@ VALIDATION_TEST(NativeEntry, independent_paths_and_formats) {
   EXPECT(next.context != entry.context);
   Negotiation::Query(next).bind<Abstract>().visit(
       [&](Abstract api) {
-        EXPECT(api.get_state() == Abstract::State::Present);
+        EXPECT(api.get_reachability() == Abstract::Reachability::Reachable);
       },
 
       [&](Negotiation::Status) { EXPECT(False); });
@@ -180,15 +242,16 @@ VALIDATION_TEST(NativeEntry, incompatible_bootstrap) {
   EXPECT(!entry.bind && !entry.supports && !entry.context);
 }
 
-// Keep the outer record and every table slot the same size. Only get_state's
-// return description differs. Binding rejects that form because the canonical
-// description includes the operation table's function signatures.
+// Keep the outer record and every table slot the same size. Only
+// get_reachability's return description differs. Binding rejects that form
+// because the canonical description includes the operation table's function
+// signatures.
 struct WrongAbstractOperations {
   decltype(ttx_abstract_ops::supports) supports;
   decltype(ttx_abstract_ops::bind) bind;
   decltype(ttx_abstract_ops::resolve_route) resolve_route;
   decltype(ttx_abstract_ops::visit_routes) visit_routes;
-  U64 (*get_state)(void*);
+  U64 (*get_reachability)(void*);
 };
 
 struct WrongAbstract {
@@ -202,7 +265,7 @@ TTX_DATA_RECORD(
     TTX_DATA_MEMBER(WrongAbstractOperations, bind),
     TTX_DATA_MEMBER(WrongAbstractOperations, resolve_route),
     TTX_DATA_MEMBER(WrongAbstractOperations, visit_routes),
-    TTX_DATA_MEMBER(WrongAbstractOperations, get_state));
+    TTX_DATA_MEMBER(WrongAbstractOperations, get_reachability));
 TTX_DATA_RECORD(
     WrongAbstract,
     TTX_DATA_MEMBER(WrongAbstract, context),
@@ -231,7 +294,8 @@ VALIDATION_TEST(NativeEntry, nested_table_abi) {
   EXPECT(output.context == nullptr && output.operations == nullptr);
   query.bind<Abstract>().visit(
       [&](Abstract accepted) {
-        EXPECT(accepted.get_state() == Abstract::State::Present);
+        EXPECT(
+            accepted.get_reachability() == Abstract::Reachability::Reachable);
       },
 
       [&](Negotiation::Status) { EXPECT(False); });
