@@ -270,7 +270,7 @@ VALIDATION_TEST(Callables, admission_failure_order) {
       Status::Overflow);
 
   // With a usable allocator and output slot, the C entry checks the root
-  // before delegating pointer-width selection to the compiler.
+  // before the compiler selects the pointer width.
   const ttx_representation sentinel{};
   const ttx_representation* published = &sentinel;
   const ttx_representation_allocator allocator{
