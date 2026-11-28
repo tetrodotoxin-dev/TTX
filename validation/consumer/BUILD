@@ -21,6 +21,12 @@ cc_binary(
 )
 
 cc_binary(
+    name = "alias_consumer",
+    srcs = ["alias.c"],
+    deps = ["//:graph"],
+)
+
+cc_binary(
     name = "cpp_consumer",
     srcs = ["consumer.cpp"],
     deps = ["//:graph"],

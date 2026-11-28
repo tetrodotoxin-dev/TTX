@@ -20,7 +20,7 @@ import tempfile
 def check():
     repository = Path(__file__).resolve().parents[2]
     templates = repository / "validation/consumer"
-    subprocess.run(["bazel", "build", ":sdk", "--config=release"],
+    subprocess.run(["bazel", "build", ":_sdk_archives", "--config=release"],
                    cwd=repository, check=True)
     directory = Path(subprocess.check_output(
         ["bazel", "info", "bazel-bin", "--config=release"],
@@ -40,8 +40,7 @@ def check():
     with tempfile.TemporaryDirectory(prefix="ttx-sdk-consumer-") as temporary:
         workspace = Path(temporary) / "consumer"
         workspace.mkdir()
-        for name in [".bazelversion", ".bazelrc"]:
-            shutil.copyfile(repository / name, workspace / name)
+        shutil.copyfile(repository / ".bazelrc", workspace / ".bazelrc")
         shutil.copytree(templates, workspace / "validation/consumer")
         shutil.copyfile(templates / "BUILD.tpl", workspace / "BUILD")
 
@@ -74,6 +73,7 @@ def check():
             (workspace / "MODULE.bazel").write_text(module)
             targets = [
                 "//validation/consumer:c_consumer",
+                "//validation/consumer:alias_consumer",
                 "//validation/consumer:data_consumer",
                 "//validation/consumer:semantic_consumer",
                 "//validation/consumer:cpp_consumer",
