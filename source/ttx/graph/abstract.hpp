@@ -56,8 +56,6 @@ class Abstract {
   constexpr Abstract(Api api) : api(api) {}
   constexpr operator Api() const { return api; }
 
-  constexpr auto get_abi() const -> Api { return api; }
-
   // Resolves this position without selecting a named route. The consumer may
   // retain the subject under its grant and make route observations there.
   auto resolve() const -> Abstract { return api.operations->resolve(api); }

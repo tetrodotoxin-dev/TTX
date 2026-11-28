@@ -40,9 +40,7 @@ class Unknown {
   // performs a record copy, with the policy guaranteed by its provider.
   explicit constexpr Unknown(Api api) : api(api) {}
 
-  constexpr auto get_abi() const -> Api { return api; }
-
-  constexpr auto get_abstract() const -> Abstract { return Abstract(api); }
+  constexpr auto get_abstract() const -> Abstract { return api; }
 
   static EXPORTED(TTX) auto get_unknown() -> Unknown;
 

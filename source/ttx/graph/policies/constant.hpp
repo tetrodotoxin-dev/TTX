@@ -27,9 +27,7 @@ class Constant {
   // performs a record copy, with the policy guaranteed by its provider.
   explicit constexpr Constant(Api api) : api(api) {}
 
-  constexpr auto get_abi() const -> Api { return api; }
-
-  constexpr auto get_abstract() const -> Abstract { return Abstract(api); }
+  constexpr auto get_abstract() const -> Abstract { return api; }
 
  private:
   Api api;
