@@ -13,8 +13,8 @@
 #include "ttx/data/encoding/callable.hpp"
 #include "ttx/data/encoding/struct.hpp"
 #include "ttx/data/form/representation.h"
-#include "ttx/data/form/schema.hpp"
-#include "ttx/data/status.hpp"
+#include "ttx/data/form/schema.h"
+#include "ttx/data/status.h"
 
 namespace Ttx::Data::Form {
 

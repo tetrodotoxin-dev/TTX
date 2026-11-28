@@ -1,11 +1,11 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/data/transfer.hpp"
+#include "ttx/data/transfer.h"
 
-#if __has_include(                           \
-    "ttx/semantic/negotiation/query.hpp") || \
-    __has_include("ttx/graph/abstract.hpp")
+#if __has_include(                         \
+    "ttx/semantic/negotiation/query.h") || \
+    __has_include("ttx/graph/abstract.h")
 #error The Data component exposed a higher layer.
 #endif
 

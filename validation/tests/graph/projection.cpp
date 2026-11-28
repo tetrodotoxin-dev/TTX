@@ -9,7 +9,7 @@
 #include "perimortem/core/identity/uuid.hpp"
 #include "perimortem/core/view/vector.hpp"
 
-#include "ttx/graph/policies/unknown.hpp"
+#include "ttx/graph/policies/unknown.h"
 
 using namespace Perimortem::Core;
 using namespace Toolchain::Validation;

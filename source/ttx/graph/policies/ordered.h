@@ -20,4 +20,33 @@
 #define TTX_ORDERED_ID_HIGH 0x2726a909643e439dULL
 #define TTX_ORDERED_ID_LOW 0x91059fe227c4c4edULL
 
+#ifdef __cplusplus
+
+namespace Ttx::Graph::Policies {
+
+// Ordered carries the Abstract whose visitation order has semantic meaning.
+// The consumer preserves repeated occurrences and their positions. Unknown
+// leaves the ordering promise undetermined, while Rejected establishes that
+// visitation order is incidental under every policy of that Abstract.
+class Ordered {
+ public:
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_ORDERED_ID_HIGH, TTX_ORDERED_ID_LOW);
+  using Api = ttx_abstract;
+
+  // Copies an Abstract already supplied under the Ordered contract. Explicit
+  // construction makes the caller's interpretation visible. Construction
+  // performs a record copy, with the policy guaranteed by its provider.
+  explicit constexpr Ordered(Api api) : api(api) {}
+
+  constexpr auto get_abstract() const -> Abstract { return api; }
+
+ private:
+  Api api;
+};
+
+}  // namespace Ttx::Graph::Policies
+
+#endif
+
 #endif

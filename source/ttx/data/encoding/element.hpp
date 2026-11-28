@@ -4,7 +4,7 @@
 #pragma once
 
 #include "ttx/data/encoding/block.hpp"
-#include "ttx/data/form/schema.hpp"
+#include "ttx/data/form/schema.h"
 
 namespace Ttx::Data::Encoding {
 

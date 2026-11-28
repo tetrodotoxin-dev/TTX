@@ -3,7 +3,7 @@
 
 #include "ttx/graph/providers/none.hpp"
 
-#include "ttx/graph/policies/none.hpp"
+#include "ttx/graph/policies/none.h"
 
 using namespace Perimortem::Core;
 using namespace Ttx::Graph;

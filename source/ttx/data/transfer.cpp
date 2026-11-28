@@ -1,11 +1,11 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/data/transfer.hpp"
+#include "ttx/data/transfer.h"
 
 #include <string.h>
 
-#include "ttx/data/form/representation.hpp"
+#include "ttx/data/form/representation.h"
 
 using namespace Ttx::Data;
 

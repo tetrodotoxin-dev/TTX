@@ -8,7 +8,7 @@
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/graph/policies/constant.hpp"
+#include "ttx/graph/policies/constant.h"
 #include "validation/providers/composition/provider.h"
 #include "validation/support/library.hpp"
 

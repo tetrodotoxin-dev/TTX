@@ -7,7 +7,7 @@
 
 #include "perimortem/core/storage/vector.hpp"
 
-#include "ttx/data/form/schema.hpp"
+#include "ttx/data/form/schema.h"
 #include "validation/tests/data/form/preparation.hpp"
 
 using namespace Perimortem::Core;

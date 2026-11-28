@@ -19,4 +19,24 @@
 #define TTX_PROMISE_ID_HIGH 0x15b34b7dd7a3484aULL
 #define TTX_PROMISE_ID_LOW 0xa690dc618b7af5caULL
 
+#ifdef __cplusplus
+
+#include "perimortem/core/identity/uuid.hpp"
+
+namespace Ttx::Graph::Policies {
+
+// Promise identifies a pending obligation through `supports<Promise>()`.
+// While the owner is still choosing a subject, the consumer can keep the
+// supplied Abstract and retry its original operation under the same access
+// grant. After fulfillment that operation runs with the subject's context.
+class Promise {
+ public:
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_PROMISE_ID_HIGH, TTX_PROMISE_ID_LOW);
+};
+
+}  // namespace Ttx::Graph::Policies
+
+#endif
+
 #endif

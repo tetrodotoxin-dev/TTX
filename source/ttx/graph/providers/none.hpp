@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "ttx/graph/abstract.hpp"
+#include "ttx/graph/abstract.h"
 
 namespace Ttx::Graph::Providers {
 

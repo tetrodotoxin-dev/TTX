@@ -5,8 +5,8 @@
 
 #include "perimortem/core/view/bytes.hpp"
 
-#include "ttx/graph/policies/promise.hpp"
-#include "ttx/graph/policies/unknown.hpp"
+#include "ttx/graph/policies/promise.h"
+#include "ttx/graph/policies/unknown.h"
 #include "ttx/graph/providers/resolution.hpp"
 
 using namespace Perimortem::Core;

@@ -28,4 +28,26 @@ ttx_data_status ttx_transfer(
     const ttx_storage* input,
     const ttx_storage* output);
 
+#ifdef __cplusplus
+
+namespace Ttx::Data {
+
+// Transfer copies a represented value through the C Data operation. The two
+// Storage records supply source and destination geometry. Their referenced
+// memory stays accessible until the synchronous copy returns. The operation
+// copies only the represented extent after checking both regions. A failed
+// check leaves destination bytes unchanged.
+class Transfer {
+ public:
+  static auto copy(Form::Storage input, Form::Storage output) -> Status {
+    const auto source = input.get_abi();
+    const auto target = output.get_abi();
+    return Status(ttx_transfer(&source, &target));
+  }
+};
+
+}  // namespace Ttx::Data
+
+#endif
+
 #endif

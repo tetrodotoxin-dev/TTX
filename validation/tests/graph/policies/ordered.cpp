@@ -1,15 +1,15 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/graph/policies/ordered.hpp"
+#include "ttx/graph/policies/ordered.h"
 
 #include "toolchain/validation/test.hpp"
 
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/graph/policies/none.hpp"
-#include "ttx/graph/policies/unknown.hpp"
+#include "ttx/graph/policies/none.h"
+#include "ttx/graph/policies/unknown.h"
 
 using namespace Perimortem::Core;
 using namespace Toolchain::Validation;

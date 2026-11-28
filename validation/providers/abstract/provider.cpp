@@ -8,9 +8,9 @@
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/data/transfer.hpp"
-#include "ttx/graph/abstract.hpp"
-#include "ttx/graph/capabilities/import.hpp"
+#include "ttx/data/transfer.h"
+#include "ttx/graph/abstract.h"
+#include "ttx/graph/capabilities/import.h"
 #include "ttx/graph/policies/unknown.h"
 #include "ttx/semantic/negotiation/library.h"
 

@@ -8,7 +8,7 @@
 #include "perimortem/core/view/null_terminated.hpp"
 
 #include "ttx/data/form/compiler.hpp"
-#include "ttx/data/form/representation.hpp"
+#include "ttx/data/form/representation.h"
 
 using namespace Perimortem::Core;
 using namespace Toolchain::Validation;

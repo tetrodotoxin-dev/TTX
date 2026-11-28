@@ -8,10 +8,10 @@
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/graph/capabilities/export.hpp"
-#include "ttx/graph/capabilities/import.hpp"
-#include "ttx/graph/policies/constant.hpp"
-#include "ttx/graph/policies/none.hpp"
+#include "ttx/graph/capabilities/export.h"
+#include "ttx/graph/capabilities/import.h"
+#include "ttx/graph/policies/constant.h"
+#include "ttx/graph/policies/none.h"
 #include "ttx/graph/policies/unknown.h"
 #include "validation/tests/graph/fixtures/value.hpp"
 

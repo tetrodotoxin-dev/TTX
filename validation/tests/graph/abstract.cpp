@@ -6,11 +6,11 @@
 #include "perimortem/core/data.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/data/transfer.hpp"
-#include "ttx/graph/policies/constant.hpp"
-#include "ttx/graph/policies/none.hpp"
-#include "ttx/graph/policies/ordered.hpp"
-#include "ttx/graph/policies/unknown.hpp"
+#include "ttx/data/transfer.h"
+#include "ttx/graph/policies/constant.h"
+#include "ttx/graph/policies/none.h"
+#include "ttx/graph/policies/ordered.h"
+#include "ttx/graph/policies/unknown.h"
 #include "validation/tests/graph/fixtures/observation.h"
 #include "validation/tests/graph/fixtures/value.hpp"
 

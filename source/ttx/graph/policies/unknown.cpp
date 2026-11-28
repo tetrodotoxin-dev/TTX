@@ -1,7 +1,7 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/graph/policies/unknown.hpp"
+#include "ttx/graph/policies/unknown.h"
 
 #include "ttx/graph/providers/unknown.hpp"
 

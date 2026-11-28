@@ -5,9 +5,9 @@
 
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/graph/policies/alias.hpp"
-#include "ttx/graph/policies/none.hpp"
-#include "ttx/graph/policies/unknown.hpp"
+#include "ttx/graph/policies/alias.h"
+#include "ttx/graph/policies/none.h"
+#include "ttx/graph/policies/unknown.h"
 #include "ttx/graph/projection.hpp"
 #include "ttx/graph/providers/alias.hpp"
 

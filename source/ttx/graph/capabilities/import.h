@@ -40,4 +40,54 @@ typedef struct ttx_import_ops {
       void (*callback)(void* callback_context, ttx_abstract abstract));
 } ttx_import_ops;
 
+#ifdef __cplusplus
+
+#include "perimortem/core/data.hpp"
+
+namespace Ttx::Graph::Capabilities {
+
+class Import {
+ public:
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_IMPORT_ID_HIGH, TTX_IMPORT_ID_LOW);
+  using Api = ttx_import;
+  using Operations = ttx_import_ops;
+
+  // Copies the complete C record supplied under the Import contract.
+  // Explicit construction preserves the provider's context and operations
+  // as one API, with their supplying access duration.
+  explicit constexpr Import(Api api) : api(api) {}
+
+  constexpr auto get_abi() const -> Api { return api; }
+
+  template <typename Function>
+  auto visit(
+      const void* input,
+      const Data::Form::Representation& representation,
+      Function& callback) const -> Semantic::Negotiation::Status {
+    const auto api = get_abi();
+    return Semantic::Negotiation::Status(api.operations->visit(
+        api.context, input, &representation.get_abi(), &callback,
+        Import::callback<Function>));
+  }
+
+ private:
+  template <typename Function>
+  static auto callback(void* context, ttx_abstract abstract) -> void {
+    (*Perimortem::Core::Data::cast<Function>(context))(Abstract(abstract));
+  }
+
+  Api api;
+};
+
+}  // namespace Ttx::Graph::Capabilities
+
+TTX_DATA_RECORD(ttx_import_ops, TTX_DATA_MEMBER(ttx_import_ops, visit));
+TTX_DATA_RECORD(
+    ttx_import,
+    TTX_DATA_MEMBER(ttx_import, context),
+    TTX_DATA_MEMBER(ttx_import, operations));
+
+#endif
+
 #endif

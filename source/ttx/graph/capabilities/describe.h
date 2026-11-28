@@ -32,4 +32,50 @@ typedef struct ttx_describe_ops {
   U8 (*get_description)(void* context, perimortem_view_bytes* output);
 } ttx_describe_ops;
 
+#ifdef __cplusplus
+
+namespace Ttx::Graph::Capabilities {
+
+// Describe exposes optional UTF 8 metadata through its supplied operations.
+// An empty Option means unavailable metadata. A present empty View is an
+// intentionally empty value. Returned Views share the supplying access window.
+// Construction copies the API record under its supplying access.
+class Describe {
+ public:
+  using Api = ttx_describe;
+  static constexpr auto contract_id = Perimortem::Core::Identity::Uuid(
+      TTX_DESCRIBE_ID_HIGH,
+      TTX_DESCRIBE_ID_LOW);
+
+  explicit constexpr Describe(Api api) : api(api) {}
+  constexpr auto get_abi() const -> Api { return api; }
+
+  auto get_name() const
+      -> Perimortem::Core::Storage::Option<Perimortem::Core::View::Bytes> {
+    perimortem_view_bytes output{};
+    if (api.operations->get_name(api.context, &output) == 1) {
+      return Perimortem::Core::View::Bytes(output);
+    }
+
+    return {};
+  }
+
+  auto get_description() const
+      -> Perimortem::Core::Storage::Option<Perimortem::Core::View::Bytes> {
+    perimortem_view_bytes output{};
+    if (api.operations->get_description(api.context, &output) == 1) {
+      return Perimortem::Core::View::Bytes(output);
+    }
+
+    return {};
+  }
+
+ private:
+  Api api;
+};
+
+}  // namespace Ttx::Graph::Capabilities
+
+#endif
+
 #endif

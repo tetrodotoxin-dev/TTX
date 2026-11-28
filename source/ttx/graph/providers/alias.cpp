@@ -3,7 +3,7 @@
 
 #include "ttx/graph/providers/alias.hpp"
 
-#include "ttx/graph/policies/alias.hpp"
+#include "ttx/graph/policies/alias.h"
 #include "ttx/graph/providers/none.hpp"
 #include "ttx/graph/providers/resolution.hpp"
 #include "ttx/graph/providers/unknown.hpp"

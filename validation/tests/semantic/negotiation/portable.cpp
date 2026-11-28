@@ -3,7 +3,7 @@
 
 #include "toolchain/validation/test.hpp"
 
-#include "ttx/semantic/negotiation/query.hpp"
+#include "ttx/semantic/negotiation/query.h"
 #include "validation/tests/semantic/fixtures/portable_provider.h"
 
 using namespace Perimortem::Core;

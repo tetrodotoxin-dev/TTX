@@ -1,16 +1,16 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/graph/policies/alias.hpp"
+#include "ttx/graph/policies/alias.h"
 
 #include "toolchain/validation/test.hpp"
 
 #include "perimortem/core/view/null_terminated.hpp"
 #include "perimortem/memory/thread/vector.hpp"
 
-#include "ttx/data/transfer.hpp"
-#include "ttx/graph/policies/none.hpp"
-#include "ttx/graph/policies/unknown.hpp"
+#include "ttx/data/transfer.h"
+#include "ttx/graph/policies/none.h"
+#include "ttx/graph/policies/unknown.h"
 #include "ttx/graph/providers/alias.hpp"
 #include "validation/tests/graph/fixtures/observation.h"
 #include "validation/tests/graph/fixtures/value.hpp"

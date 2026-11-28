@@ -8,7 +8,7 @@
 #include "perimortem/core/storage/option.hpp"
 #include "perimortem/core/view/bytes.hpp"
 
-#include "ttx/graph/abstract.hpp"
+#include "ttx/graph/abstract.h"
 #include "ttx/graph/policies/none.h"
 #include "ttx/semantic/negotiation/status.h"
 

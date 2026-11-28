@@ -1,7 +1,7 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/data/form/representation.hpp"
+#include "ttx/data/form/representation.h"
 
 #include "toolchain/validation/test.hpp"
 
@@ -10,7 +10,7 @@
 #include "perimortem/memory/allocator/arena.hpp"
 
 #include "ttx/data/form/compiled.hpp"
-#include "ttx/data/form/schema.hpp"
+#include "ttx/data/form/schema.h"
 
 using namespace Perimortem::Core;
 using namespace Perimortem::Memory;

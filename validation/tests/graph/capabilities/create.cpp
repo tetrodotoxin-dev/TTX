@@ -1,13 +1,13 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/graph/capabilities/create.hpp"
+#include "ttx/graph/capabilities/create.h"
 
 #include "toolchain/validation/test.hpp"
 
 #include "perimortem/core/data.hpp"
 
-#include "ttx/graph/policies/none.hpp"
+#include "ttx/graph/policies/none.h"
 #include "ttx/graph/policies/unknown.h"
 #include "validation/tests/graph/fixtures/value.hpp"
 

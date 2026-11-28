@@ -30,4 +30,31 @@
 C_LINKAGE EXPORTED(TTX)
 ttx_abstract ttx_unknown(void);
 
+#ifdef __cplusplus
+
+namespace Ttx::Graph::Policies {
+
+class Unknown {
+ public:
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_UNKNOWN_ID_HIGH, TTX_UNKNOWN_ID_LOW);
+  using Api = ttx_abstract;
+
+  // Copies an Abstract already supplied under the Unknown contract. Explicit
+  // construction makes the caller's interpretation visible. Construction
+  // performs a record copy, with the policy guaranteed by its provider.
+  explicit constexpr Unknown(Api api) : api(api) {}
+
+  constexpr auto get_abstract() const -> Abstract { return api; }
+
+  static EXPORTED(TTX) auto get_unknown() -> Unknown;
+
+ private:
+  Api api;
+};
+
+}  // namespace Ttx::Graph::Policies
+
+#endif
+
 #endif

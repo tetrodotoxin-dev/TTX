@@ -31,4 +31,36 @@ typedef struct ttx_export_ops {
   ttx_negotiation_status (*expose)(void* context, ttx_abstract abstract);
 } ttx_export_ops;
 
+#ifdef __cplusplus
+
+namespace Ttx::Graph::Capabilities {
+
+class Export {
+ public:
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_EXPORT_ID_HIGH, TTX_EXPORT_ID_LOW);
+  using Api = ttx_export;
+  using Operations = ttx_export_ops;
+
+  // Copies the complete C record supplied under the Export contract.
+  // Explicit construction preserves the provider's context and operations
+  // as one API, with their supplying access duration.
+  explicit constexpr Export(Api api) : api(api) {}
+
+  constexpr auto get_abi() const -> Api { return api; }
+
+  auto expose(Abstract abstract) const -> Semantic::Negotiation::Status {
+    const auto api = get_abi();
+    return Semantic::Negotiation::Status(
+        api.operations->expose(api.context, abstract));
+  }
+
+ private:
+  Api api;
+};
+
+}  // namespace Ttx::Graph::Capabilities
+
+#endif
+
 #endif

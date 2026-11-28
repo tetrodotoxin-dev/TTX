@@ -1,7 +1,7 @@
 // # Tetrodotoxin
 // Copyright (c) 2023-present Matt Kaes and contributors
 
-#include "ttx/semantic/negotiation/query.hpp"
+#include "ttx/semantic/negotiation/query.h"
 
 using namespace Perimortem::Core;
 using namespace Ttx::Data;

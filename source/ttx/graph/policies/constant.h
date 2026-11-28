@@ -16,4 +16,30 @@
 #define TTX_CONSTANT_ID_HIGH 0xa9f347a1f048455bULL
 #define TTX_CONSTANT_ID_LOW 0xa5d873dbc5e5761fULL
 
+#ifdef __cplusplus
+
+namespace Ttx::Graph::Policies {
+
+class Constant {
+ public:
+  static constexpr auto contract_id = Perimortem::Core::Identity::Uuid(
+      TTX_CONSTANT_ID_HIGH,
+      TTX_CONSTANT_ID_LOW);
+  using Api = ttx_abstract;
+
+  // Copies an Abstract already supplied under the Constant contract. Explicit
+  // construction makes the caller's interpretation visible. Construction
+  // performs a record copy, with the policy guaranteed by its provider.
+  explicit constexpr Constant(Api api) : api(api) {}
+
+  constexpr auto get_abstract() const -> Abstract { return api; }
+
+ private:
+  Api api;
+};
+
+}  // namespace Ttx::Graph::Policies
+
+#endif
+
 #endif

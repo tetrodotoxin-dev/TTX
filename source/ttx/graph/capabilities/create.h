@@ -39,4 +39,45 @@ typedef struct ttx_create_ops {
       void (*callback)(void* callback_context, ttx_abstract abstract));
 } ttx_create_ops;
 
+#ifdef __cplusplus
+
+#include "perimortem/core/data.hpp"
+
+namespace Ttx::Graph::Capabilities {
+
+class Create {
+ public:
+  static constexpr auto contract_id =
+      Perimortem::Core::Identity::Uuid(TTX_CREATE_ID_HIGH, TTX_CREATE_ID_LOW);
+  using Api = ttx_create;
+  using Operations = ttx_create_ops;
+
+  // Copies the complete C record supplied under the Create contract.
+  // Explicit construction preserves the provider's context and operations
+  // as one API, with their supplying access duration.
+  explicit constexpr Create(Api api) : api(api) {}
+
+  constexpr auto get_abi() const -> Api { return api; }
+
+  template <typename Function>
+  auto create(Abstract arguments, Function& callback) const
+      -> Semantic::Negotiation::Status {
+    const auto api = get_abi();
+    return Semantic::Negotiation::Status(api.operations->create(
+        api.context, arguments, &callback, Create::callback<Function>));
+  }
+
+ private:
+  template <typename Function>
+  static auto callback(void* context, ttx_abstract abstract) -> void {
+    (*Perimortem::Core::Data::cast<Function>(context))(Abstract(abstract));
+  }
+
+  Api api;
+};
+
+}  // namespace Ttx::Graph::Capabilities
+
+#endif
+
 #endif

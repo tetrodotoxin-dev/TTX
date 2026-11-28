@@ -10,8 +10,8 @@
 
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/data/form/representation.hpp"
-#include "ttx/data/form/schema.hpp"
+#include "ttx/data/form/representation.h"
+#include "ttx/data/form/schema.h"
 
 namespace Validation::DataTests {
 

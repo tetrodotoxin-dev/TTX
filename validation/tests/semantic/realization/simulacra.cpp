@@ -12,7 +12,7 @@
 #include "perimortem/core/view/null_terminated.hpp"
 #include "perimortem/memory/allocator/bibliotheca.hpp"
 
-#include "ttx/semantic/negotiation/query.hpp"
+#include "ttx/semantic/negotiation/query.h"
 #include "validation/providers/interface/provider.h"
 #include "validation/support/library.hpp"
 

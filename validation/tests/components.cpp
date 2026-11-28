@@ -5,8 +5,8 @@
 
 #include "perimortem/core/algorithm/search.hpp"
 
-#include "ttx/graph/abstract.hpp"
-#include "ttx/graph/policies/unknown.hpp"
+#include "ttx/graph/abstract.h"
+#include "ttx/graph/policies/unknown.h"
 
 using namespace Perimortem::Core;
 using namespace Toolchain::Validation;

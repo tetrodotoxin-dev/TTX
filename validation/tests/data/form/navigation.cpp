@@ -5,7 +5,7 @@
 
 #include "perimortem/core/storage/vector.hpp"
 
-#include "ttx/data/form/representation.hpp"
+#include "ttx/data/form/representation.h"
 #include "validation/tests/data/form/preparation.hpp"
 #include "validation/tests/data/form/visitation.h"
 

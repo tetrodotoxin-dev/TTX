@@ -9,9 +9,9 @@
 #include "perimortem/core/diagnostics/log.hpp"
 #include "perimortem/core/view/null_terminated.hpp"
 
-#include "ttx/data/transfer.hpp"
-#include "ttx/graph/abstract.hpp"
-#include "ttx/graph/capabilities/import.hpp"
+#include "ttx/data/transfer.h"
+#include "ttx/graph/abstract.h"
+#include "ttx/graph/capabilities/import.h"
 #include "ttx/semantic/negotiation/library.h"
 #include "validation/providers/abstract/provider.h"
 #include "validation/support/library.hpp"
