@@ -8,7 +8,7 @@
 
 #include "ttx/data/form/storage.hpp"
 #include "ttx/semantic/negotiation/query.h"
-#include "ttx/semantic/negotiation/status.hpp"
+#include "ttx/semantic/negotiation/status.h"
 
 namespace Ttx::Semantic::Negotiation {
 

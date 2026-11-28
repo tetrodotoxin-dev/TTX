@@ -14,9 +14,9 @@ auto Negotiation::Query::supports(Identity::Uuid contract) const
   }
 
   const auto status = api.supports(api.context, contract);
-  return status == TTX_NEGOTIATION_SATISFIED ||
-                 status == TTX_NEGOTIATION_UNKNOWN
-             ? Negotiation::Status(status)
+  return status == Negotiation::Status::Satisfied ||
+                 status == Negotiation::Status::Unknown
+             ? status
              : Negotiation::Status::Rejected;
 }
 
@@ -27,9 +27,9 @@ auto Negotiation::Query::bind(Identity::Uuid contract, Form::Storage requested)
   }
 
   const auto status = api.bind(api.context, contract, requested.get_abi());
-  return status == TTX_NEGOTIATION_SATISFIED ||
-                 status == TTX_NEGOTIATION_UNKNOWN
-             ? Negotiation::Status(status)
+  return status == Negotiation::Status::Satisfied ||
+                 status == Negotiation::Status::Unknown
+             ? status
              : Negotiation::Status::Rejected;
 }
 

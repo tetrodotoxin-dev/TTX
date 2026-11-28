@@ -10,7 +10,7 @@
 
 #include "ttx/graph/abstract.hpp"
 #include "ttx/graph/policies/none.h"
-#include "ttx/semantic/negotiation/status.hpp"
+#include "ttx/semantic/negotiation/status.h"
 
 namespace Ttx::Graph {
 

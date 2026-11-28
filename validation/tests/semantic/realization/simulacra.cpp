@@ -148,14 +148,14 @@ VALIDATION_TEST(TtxSimulacra, support_outcomes) {
   for (Count status_index = 0; status_index < statuses.get_size();
        ++status_index) {
     const auto status = statuses[status_index];
-    foreign.api.reset(ttx_negotiation_status(status), 0, 0);
+    foreign.api.reset(status, 0, 0);
     EXPECT(query.supports<Counter>() == status);
     EXPECT_EQ(foreign.api.statistics().queries, U64(0));
   }
 
   const U8 invalid_statuses[] = {2, 99};
   for (const auto invalid : invalid_statuses) {
-    foreign.api.reset(invalid, 0, 0);
+    foreign.api.reset(Negotiation::Status(invalid), 0, 0);
     EXPECT(query.supports<Counter>() == Negotiation::Status::Rejected);
   }
 
@@ -195,12 +195,12 @@ VALIDATION_TEST(TtxSimulacra, refusal_boundaries) {
   Foreign foreign;
   ASSERT(foreign.api.query.bind);
 
-  const Storage::Vector<ttx_negotiation_status, 4> statuses = {
+  const Storage::Vector<Negotiation::Status, 4> statuses = {
     {
-      TTX_NEGOTIATION_UNKNOWN,
-      TTX_NEGOTIATION_REJECTED,
-      2,
-      99,
+      Negotiation::Status::Unknown,
+      Negotiation::Status::Rejected,
+      Negotiation::Status(2),
+      Negotiation::Status(99),
     },
   };
 
@@ -213,10 +213,10 @@ VALIDATION_TEST(TtxSimulacra, refusal_boundaries) {
         .visit(
             [&](const Counter&) { EXPECT(False); },
             [&](Negotiation::Status error) {
-              EXPECT_EQ(
-                  U8(error), status == 2 || status == 99
-                                 ? TTX_NEGOTIATION_REJECTED
-                                 : status);
+              EXPECT(
+                  error == (status == Negotiation::Status::Unknown
+                                ? Negotiation::Status::Unknown
+                                : Negotiation::Status::Rejected));
             });
 
     EXPECT_EQ(foreign.api.statistics().queries, U64(1));

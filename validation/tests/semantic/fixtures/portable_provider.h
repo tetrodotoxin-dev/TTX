@@ -16,5 +16,6 @@ typedef struct portable_counter {
 
 C_LINKAGE ttx_semantic_query portable_counter_open(void);
 C_LINKAGE U32 portable_counter_calls(void);
+C_LINKAGE U8 portable_support_code(ttx_semantic_query query);
 
 #endif

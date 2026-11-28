@@ -8,6 +8,15 @@
 static U32 value = 40;
 static U32 calls;
 
+_Static_assert(
+    sizeof(ttx_negotiation_status) == 1,
+    "C negotiation status is one byte");
+
+U8 portable_support_code(ttx_semantic_query query) {
+  const perimortem_uuid id = {17, 23};
+  return query.supports(query.context, id);
+}
+
 static U32 add(void* context, U32 amount) {
   U32* source = context;
   ++calls;

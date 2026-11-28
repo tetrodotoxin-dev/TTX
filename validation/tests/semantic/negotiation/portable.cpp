@@ -49,6 +49,37 @@ static Harness PortableBinding = {
   .name = "TTX::PortableBinding",
 };
 
+// A C consumer calls a C++ support operation through the published Query
+// record. Its return byte and Data's callable descriptor must agree with
+// the original unsigned-byte ABI for all three negotiation outcomes.
+VALIDATION_TEST(PortableBinding, scoped_status_from_cpp) {
+  using Status = Negotiation::Status;
+  using namespace Ttx::Data;
+  using ByteSupport = U8 (*)(void*, perimortem_uuid);
+  using TypedSupport = decltype(ttx_semantic_query::supports);
+  static_assert(__is_same(ttx_negotiation_status, Status));
+  static_assert(__is_same(__underlying_type(Status), U8));
+  static_assert(__is_same(TypedSupport, Status (*)(void*, perimortem_uuid)));
+  static_assert(
+      Form::Compiled<
+          Form::Native<TypedSupport>::reference>::get_representation()
+          .compatible(
+              Form::Compiled<
+                  Form::Native<ByteSupport>::reference>::get_representation()));
+
+  Status decision = Status::Satisfied;
+  const ttx_semantic_query query{
+    &decision, nullptr, [](void* context, perimortem_uuid) -> Status {
+      return *Data::cast<Status>(context);
+    }};
+
+  EXPECT_EQ(portable_support_code(query), U8(0));
+  decision = Status::Unknown;
+  EXPECT_EQ(portable_support_code(query), U8(1));
+  decision = Status::Rejected;
+  EXPECT_EQ(portable_support_code(query), U8(3));
+}
+
 // One UUID can describe the intended operation even when its C declaration
 // drifted. Refuse the U64 declaration before calling anything, then negotiate
 // the actual U32 API and call the supplied function with its opaque context.

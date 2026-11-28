@@ -34,23 +34,22 @@ static auto read(void* context) -> U32 {
   return *Data::cast<U32>(context);
 }
 
-static auto supports(void* context, perimortem_uuid id)
-    -> ttx_negotiation_status {
-  return Identity::Uuid(id) == contract ? TTX_NEGOTIATION_SATISFIED
-                                        : TTX_NEGOTIATION_UNKNOWN;
+static auto supports(void* context, perimortem_uuid id) -> Negotiation::Status {
+  return Identity::Uuid(id) == contract ? Negotiation::Status::Satisfied
+                                        : Negotiation::Status::Unknown;
 }
 
 static auto bind(void* context, perimortem_uuid id, ttx_storage requested)
-    -> ttx_negotiation_status {
-  if (supports(context, id) != TTX_NEGOTIATION_SATISFIED) {
-    return TTX_NEGOTIATION_UNKNOWN;
+    -> Negotiation::Status {
+  if (supports(context, id) != Negotiation::Status::Satisfied) {
+    return Negotiation::Status::Unknown;
   }
 
   Reading api{context, read};
   return Transfer::copy(Form::Storage::from(api), Form::Storage(requested)) ==
                  Status::Success
-             ? TTX_NEGOTIATION_SATISFIED
-             : TTX_NEGOTIATION_REJECTED;
+             ? Negotiation::Status::Satisfied
+             : Negotiation::Status::Rejected;
 }
 
 S32 main() {
