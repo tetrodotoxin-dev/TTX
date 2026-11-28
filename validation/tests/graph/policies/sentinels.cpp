@@ -10,6 +10,8 @@
 #include "ttx/graph/policies/none.hpp"
 #include "ttx/graph/policies/unknown.hpp"
 #include "ttx/graph/projection.hpp"
+#include "ttx/graph/providers/none.hpp"
+#include "ttx/graph/providers/unknown.hpp"
 #include "validation/tests/graph/fixtures/value.hpp"
 
 using namespace Perimortem::Core;
@@ -292,11 +294,15 @@ VALIDATION_TEST(Sentinels, retry_original_route) {
 // Support queries report policy status without binding an API. Unknown
 // establishes its own contract while leaving Constant undetermined.
 VALIDATION_TEST(Sentinels, support_properties) {
-  const auto unknown = Policies::Unknown::get_unknown().get_abstract();
-  const auto none = Policies::None::get_none().get_abstract();
+  const auto unknown = Providers::Unknown::get_abstract();
+  const auto none = Providers::None::get_abstract();
   constexpr auto unrelated =
       Identity::Uuid(0x44f044cf9d8e4b8fULL, 0x81b4ce5aa42be54eULL);
 
+  EXPECT(unknown == Abstract(ttx_unknown()));
+  EXPECT(none == Abstract(ttx_none()));
+  EXPECT(unknown == Policies::Unknown::get_unknown().get_abstract());
+  EXPECT(none == Policies::None::get_none().get_abstract());
   EXPECT(unknown.supports<Abstract>() == Negotiation::Status::Satisfied);
   EXPECT(
       unknown.supports<Policies::Unknown>() == Negotiation::Status::Satisfied);

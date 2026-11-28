@@ -25,8 +25,8 @@
 // path for identification without needing to observe all behaviors. Any
 // Abstract can emit support for the Unknown contract must collapse to a perfect
 // simulacra so TTX supports a built in Abstract that can be used to statically
-// emit for ture indeterminate paths. Consumers however should not assume that the
-// static TTX address represents the one and only `Unknown` representation.
+// emit for ture indeterminate paths. Consumers however should not assume that
+// the static TTX address represents the one and only `Unknown` representation.
 C_LINKAGE EXPORTED(TTX)
 ttx_abstract ttx_unknown(void);
 
