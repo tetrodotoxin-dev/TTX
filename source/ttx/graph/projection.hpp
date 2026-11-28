@@ -38,9 +38,11 @@ namespace Ttx::Graph {
 // mechanism requires the provider to supply an API record. Projection always
 // binds its native Abstract and Graph::Abstract. `bind_contract` handles every
 // remaining bind request when Concrete provides it. Route resolution and
-// visitation follow the same extension pattern. A projection normally exposes
-// its concrete value as a reachable target. When the target is selected by
-// the provider, its `get_reachability` member reports the current observation.
+// visitation follow the same extension pattern. A route can supply a graph
+// handle in either language or a typed view with a `get_abstract` operation.
+// A projection normally exposes its concrete value as a reachable target.
+// When the provider selects the target, its `get_reachability` member reports
+// the current observation.
 template <typename Concrete, U64 ProjectionHigh, U64 ProjectionLow>
 class Projection {
  public:
@@ -181,8 +183,10 @@ class Projection {
 
   static auto resolve(Concrete& value, Perimortem::Core::View::Bytes route)
       -> ttx_abstract {
-    if constexpr (requires { value.resolve_route(route).get_abi(); }) {
-      return value.resolve_route(route).get_abi();
+    if constexpr (requires { value.resolve_route(route).get_abstract(); }) {
+      return value.resolve_route(route).get_abstract();
+    } else if constexpr (requires { value.resolve_route(route); }) {
+      return value.resolve_route(route);
     }
 
     return ttx_none();

@@ -9,6 +9,8 @@
 #include "perimortem/core/identity/uuid.hpp"
 #include "perimortem/core/view/vector.hpp"
 
+#include "ttx/graph/policies/unknown.hpp"
+
 using namespace Perimortem::Core;
 using namespace Toolchain::Validation;
 using namespace Ttx::Graph;
@@ -118,7 +120,7 @@ class Simulacrum {
     }
 
     if (contract == Abstract::contract_id) {
-      *Data::cast<ttx_abstract>(output) = provider.get_abstract().get_abi();
+      *Data::cast<ttx_abstract>(output) = provider.get_abstract();
       return TTX_NEGOTIATION_SATISFIED;
     }
 
@@ -151,7 +153,7 @@ class Simulacrum {
   }
 
   static auto reenter(void* context) -> ttx_abstract {
-    return Data::cast<TypedContext>(context)->owner->get_abstract().get_abi();
+    return Data::cast<TypedContext>(context)->owner->get_abstract();
   }
 
   inline static constexpr Value::Abstract::Operations typed_operations =
@@ -217,10 +219,39 @@ VALIDATION_TEST(ProjectionTests, provider_owned_materialization) {
   auto projected = Value::Abstract::convert(graph);
   projected.visit(
       [&](const Value::Abstract& projection) {
-        EXPECT(projection.get_abi().context != graph.get_abi().context);
+        EXPECT(projection.get_abi().context != ttx_abstract(graph).context);
         EXPECT_EQ(projection.get_typed().get_value(), U64(7));
         EXPECT_EQ(projection.get_abstract(), graph);
       },
 
       [&] { EXPECT(False); });
+}
+
+template <typename Target, U64 NativeId>
+struct RouteResult : Projection<
+                         RouteResult<Target, NativeId>,
+                         0xab3db78143404aa1ULL,
+                         NativeId> {
+  Target target;
+  Count selections = 0;
+
+  auto resolve_route(View::Bytes) -> Target {
+    ++selections;
+    return target;
+  }
+};
+
+VALIDATION_TEST(ProjectionTests, route_result_conversion) {
+  const auto policy = Policies::Unknown::get_unknown();
+  const Abstract target = policy.get_abstract();
+  RouteResult<Abstract, 1> cpp{{}, target};
+  RouteResult<ttx_abstract, 2> c{{}, target};
+  RouteResult<Policies::Unknown, 3> typed{{}, policy};
+
+  EXPECT(cpp.get_abstract().resolve_route({}) == target);
+  EXPECT(c.get_abstract().resolve_route({}) == target);
+  EXPECT(typed.get_abstract().resolve_route({}) == target);
+  EXPECT_EQ(cpp.selections, Count(1));
+  EXPECT_EQ(c.selections, Count(1));
+  EXPECT_EQ(typed.selections, Count(1));
 }
